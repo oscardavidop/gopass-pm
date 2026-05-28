@@ -1,0 +1,87 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { tasksService } from '@/services/tasks.service';
+import type { CreateTaskPayload, TaskFilters, TaskStatus } from '@/types/task.types';
+
+export const taskKeys = {
+  byProject: (projectId: string, filters?: TaskFilters) =>
+    ['tasks', 'project', projectId, filters] as const,
+  detail: (taskId: string) => ['tasks', 'detail', taskId] as const,
+  activity: (taskId: string) => ['tasks', 'activity', taskId] as const,
+};
+
+export function useProjectTasks(projectId: string, filters?: TaskFilters) {
+  return useQuery({
+    queryKey: taskKeys.byProject(projectId, filters),
+    queryFn: () => tasksService.listByProject(projectId, filters),
+    enabled: !!projectId,
+  });
+}
+
+export function useTask(taskId: string) {
+  return useQuery({
+    queryKey: taskKeys.detail(taskId),
+    queryFn: () => tasksService.get(taskId),
+    enabled: !!taskId,
+  });
+}
+
+export function useCreateTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateTaskPayload) => tasksService.create(projectId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks', 'project', projectId] });
+      toast.success('Task created');
+    },
+    onError: () => toast.error('Failed to create task'),
+  });
+}
+
+export function useUpdateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateTaskPayload> }) =>
+      tasksService.update(id, data),
+    onSuccess: (_r, vars) => {
+      qc.invalidateQueries({ queryKey: taskKeys.detail(vars.id) });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => toast.error('Failed to update task'),
+  });
+}
+
+export function useUpdateTaskStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
+      tasksService.updateStatus(id, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => {
+      toast.error('Failed to update status');
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) => tasksService.remove(taskId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Task deleted');
+    },
+  });
+}
+
+export function useAddComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ content }: { content: string }) => tasksService.addComment(taskId, content),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) }),
+    onError: () => toast.error('Failed to add comment'),
+  });
+}
