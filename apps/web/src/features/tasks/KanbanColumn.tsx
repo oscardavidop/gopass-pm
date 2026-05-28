@@ -99,7 +99,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
             isOver ? 'bg-primary/5 ring-2 ring-inset ring-primary/20' : '',
           )}
         >
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence initial={false}>
             {tasks.map((task) => (
               <TaskCard key={task.id} task={task} onClick={onTaskClick} />
             ))}

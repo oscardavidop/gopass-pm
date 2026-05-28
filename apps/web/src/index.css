@@ -248,3 +248,32 @@
   opacity: 0.02;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
 }
+
+/* ─── FullCalendar dark theme overrides ─────────────── */
+.calendar-container .fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-button-bg-color: hsl(var(--accent));
+  --fc-button-border-color: hsl(var(--border));
+  --fc-button-hover-bg-color: hsl(var(--accent) / 0.8);
+  --fc-button-hover-border-color: hsl(var(--border));
+  --fc-button-active-bg-color: hsl(var(--primary));
+  --fc-button-text-color: hsl(var(--foreground));
+  --fc-today-bg-color: hsl(var(--primary) / 0.07);
+  --fc-neutral-bg-color: hsl(var(--card));
+  --fc-page-bg-color: transparent;
+}
+.calendar-container .fc-theme-standard td,
+.calendar-container .fc-theme-standard th { border-color: hsl(var(--border) / 0.5); }
+.calendar-container .fc-col-header-cell-cushion,
+.calendar-container .fc-daygrid-day-number { color: hsl(var(--foreground)); font-size: 0.75rem; }
+.calendar-container .fc-toolbar-title { font-size: 1rem; font-weight: 600; color: hsl(var(--foreground)); }
+.calendar-container .fc-button { text-transform: capitalize; border-radius: 6px !important; font-size: 0.75rem; padding: 0.35rem 0.75rem; }
+.calendar-container .fc-event { border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
+.calendar-container .fc-more-link { font-size: 0.7rem; color: hsl(var(--primary)); }
+.calendar-container .fc-daygrid-day:hover { background: hsl(var(--accent) / 0.3); }
+
+/* ─── cmdk Command Palette reset ───────────────────── */
+[cmdk-root] { background: transparent; }
+[cmdk-input] { background: transparent; border: none; outline: none; }
+[cmdk-list] { max-height: 400px; overflow-y: auto; }
+[cmdk-empty] { display: flex; flex-direction: column; align-items: center; justify-content: center; }

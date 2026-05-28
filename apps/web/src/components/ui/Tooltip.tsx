@@ -40,12 +40,14 @@ interface TooltipProps {
 export function Tooltip({ content, children, side = 'top', align = 'center', delayDuration = 300, className }: TooltipProps) {
   if (!content) return <>{children}</>;
   return (
-    <TooltipRoot delayDuration={delayDuration}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side} align={align} className={className}>
-        {content}
-      </TooltipContent>
-    </TooltipRoot>
+    <TooltipProvider delayDuration={delayDuration}>
+      <TooltipRoot>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent side={side} align={align} className={className}>
+          {content}
+        </TooltipContent>
+      </TooltipRoot>
+    </TooltipProvider>
   );
 }
 

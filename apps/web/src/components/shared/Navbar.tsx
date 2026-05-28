@@ -1,10 +1,12 @@
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Moon, Sun, LogOut, User, Settings, Bell, ChevronRight } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Settings, ChevronRight, Command } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from '@/hooks/useTheme';
 import { useLogout } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/auth.store';
+import { useUIStore } from '@/store/ui.store';
 import { Avatar } from '@/components/ui/Avatar';
+import { NotificationBell } from '@/components/shared/NotificationBell';
 import { cn } from '@/utils/cn';
 
 // Simple breadcrumb from pathname
@@ -24,6 +26,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const breadcrumbs = useBreadcrumbs();
+  const openCommandPalette = useUIStore((s) => s.openCommandPalette);
 
   return (
     <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 gap-4">
@@ -47,14 +50,19 @@ export function Navbar() {
       </nav>
 
       <div className="flex items-center gap-1 shrink-0">
-        {/* Notification bell (mock) */}
+        {/* CMD+K trigger */}
         <button
-          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent transition-colors text-muted-foreground hover:text-foreground relative"
-          title="Notifications"
+          onClick={openCommandPalette}
+          className="hidden md:flex items-center gap-2 h-8 px-3 rounded-md text-xs text-muted-foreground border border-border/50 bg-accent/30 hover:bg-accent hover:text-foreground transition-colors"
+          title="Open command palette (⌘K)"
         >
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+          <Command className="h-3 w-3" />
+          <span>Search…</span>
+          <kbd className="ml-1 border border-border/50 rounded px-1 text-[10px]">⌘K</kbd>
         </button>
+
+        {/* Notification bell */}
+        <NotificationBell />
 
         {/* Theme toggle */}
         <button

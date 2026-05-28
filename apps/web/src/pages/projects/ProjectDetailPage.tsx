@@ -11,6 +11,7 @@ import { KanbanBoard } from '@/features/tasks/KanbanBoard';
 import { TaskForm } from '@/features/tasks/TaskForm';
 import { TaskDrawer } from '@/features/tasks/TaskDrawer';
 import { TaskFilters } from '@/features/tasks/TaskFilters';
+import { PresenceAvatars } from '@/components/shared/PresenceAvatars';
 import { useProject } from '@/hooks/useProjects';
 import { useProjectTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -163,6 +164,9 @@ export function ProjectDetailPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Presence (online users) */}
+          <PresenceAvatars projectId={id} />
+
           {/* Members */}
           {members.length > 0 && (
             <div className="flex items-center gap-2">

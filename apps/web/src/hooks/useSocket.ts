@@ -9,7 +9,7 @@ const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000';
 let socketInstance: Socket | null = null;
 
 function getSocket(token: string): Socket {
-  if (socketInstance?.connected) return socketInstance;
+  if (socketInstance) return socketInstance;
   socketInstance?.disconnect();
   socketInstance = io(`${WS_URL}/events`, {
     auth: { token },
@@ -19,12 +19,14 @@ function getSocket(token: string): Socket {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });
+  socketRef_global.current = socketInstance;
   return socketInstance;
 }
 
 export function disconnectSocket() {
   socketInstance?.disconnect();
   socketInstance = null;
+  socketRef_global.current = null;
 }
 
 /** Hook: connect to /events namespace, subscribe to global + project room events */
@@ -35,7 +37,7 @@ export function useSocket(projectId?: string) {
   const socketRef   = useRef<Socket | null>(null);
 
   const invalidate = useCallback((projectId: string) => {
-    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['tasks', 'project', projectId] });
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }, [queryClient]);
 
@@ -90,8 +92,8 @@ export function useSocket(projectId?: string) {
 
 /** Get current socket instance (for emitting from components) */
 export function useSocketInstance() {
-  return socketRef_global;
+  return socketRef_global.current;
 }
 
 // Module-level ref for imperative access
-const socketRef_global = { current: socketInstance };
+const socketRef_global: { current: Socket | null } = { current: socketInstance };

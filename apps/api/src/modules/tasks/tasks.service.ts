@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Role, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
+import { EventsGateway } from '../events/events.gateway';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
@@ -12,12 +13,15 @@ import { FilterTasksDto } from './dto/filter-tasks.dto';
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsGateway,
+  ) {}
 
   async create(projectId: string, dto: CreateTaskDto, userId: string) {
     await this.assertProjectAccess(projectId, userId);
 
-    return this.prisma.task.create({
+    const task = await this.prisma.task.create({
       data: {
         ...dto,
         projectId,
@@ -26,6 +30,9 @@ export class TasksService {
       },
       include: this.taskIncludes(),
     });
+
+    this.events.emitTaskCreated(projectId, task);
+    return task;
   }
 
   async findAllByProject(projectId: string, userId: string, filters: FilterTasksDto) {
@@ -120,6 +127,8 @@ export class TasksService {
       include: this.taskIncludes(),
     });
 
+    this.events.emitTaskUpdated(updated.projectId, updated);
+
     // Audit log
     if (changes.length > 0) {
       await this.prisma.activityLog.create({
@@ -153,10 +162,13 @@ export class TasksService {
       throw new ForbiddenException('Cannot delete this task');
     }
 
-    return this.prisma.task.update({
+    const deleted = await this.prisma.task.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    this.events.emitTaskDeleted(task.projectId, id);
+    return deleted;
   }
 
   async getActivity(taskId: string, userId: string) {

@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FolderKanban,
+  Calendar,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -20,8 +21,9 @@ import { TooltipProvider } from '@/components/ui/Tooltip';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Projects', href: '/projects', icon: FolderKanban },
-  { label: 'Settings', href: '/settings', icon: Settings },
+  { label: 'Projects',  href: '/projects',  icon: FolderKanban },
+  { label: 'Calendar',  href: '/calendar',  icon: Calendar },
+  { label: 'Settings',  href: '/settings',  icon: Settings },
 ];
 
 export function Sidebar() {
