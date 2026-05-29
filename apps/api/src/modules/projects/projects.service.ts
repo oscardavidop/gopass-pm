@@ -127,22 +127,37 @@ export class ProjectsService {
       throw new ForbiddenException('Insufficient permissions');
     }
 
+    // Fetch the new member's user data so we can broadcast their info
+    const newMemberUser = await this.prisma.user.findUnique({
+      where: { id: memberId },
+      select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
+    });
+
     const result = await this.prisma.projectMember.upsert({
       where: { projectId_userId: { projectId, userId: memberId } },
       create: { projectId, userId: memberId },
       update: {},
     });
 
-    // Notify the newly added member via WebSocket
     const adder = project.members.find((m) => m.userId === currentUserId);
+    const actorName = adder?.user
+      ? `${(adder.user as any).firstName} ${(adder.user as any).lastName}`.trim()
+      : 'A team member';
+
+    // 1. Notify all existing project members so they refresh the member list
+    this.events.emitMemberAdded(projectId, {
+      projectId,
+      userId: memberId,
+      user: newMemberUser,
+    });
+
+    // 2. Notify the newly added member privately
     this.events.emitToUser(memberId, 'notification', {
       type: 'project_updated',
       title: 'You were added to a project',
       body: `You have been added to "${project.name}"`,
       projectId,
-      actorName: adder?.user
-        ? `${(adder.user as any).firstName} ${(adder.user as any).lastName}`.trim()
-        : 'A team member',
+      actorName,
     });
 
     return result;
@@ -160,9 +175,14 @@ export class ProjectsService {
     if (!targetMember) throw new NotFoundException('Member not found in this project');
     if (targetMember.role === 'OWNER') throw new ForbiddenException('Cannot remove project owner');
 
-    return this.prisma.projectMember.delete({
+    const result = await this.prisma.projectMember.delete({
       where: { projectId_userId: { projectId, userId: memberId } },
     });
+
+    // Broadcast removal to all members + force-remove the kicked user from the WS room
+    this.events.emitMemberRemoved(projectId, memberId, { projectId, userId: memberId });
+
+    return result;
   }
 
   private projectIncludes() {

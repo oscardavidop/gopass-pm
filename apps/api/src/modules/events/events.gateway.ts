@@ -125,6 +125,40 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`project:${projectId}`).emit('task:deleted', { id: taskId, projectId });
   }
 
+  /** Broadcast that a new member was added — refreshes member list for everyone in the project */
+  emitMemberAdded(projectId: string, data: { projectId: string; userId: string; user: any }) {
+    this.server.to(`project:${projectId}`).emit('project:member_added', data);
+  }
+
+  /**
+   * Broadcast that a member was removed:
+   * 1. Notifies everyone in the project room so they refresh the member list.
+   * 2. Forces the removed user's socket(s) to leave the project room (no more task events).
+   * 3. Removes them from presence and re-broadcasts the updated presence list.
+   * 4. Sends a private notification to the removed user so the frontend can redirect them.
+   */
+  emitMemberRemoved(projectId: string, removedUserId: string, data: { projectId: string; userId: string }) {
+    // 1. Notify everyone currently in the room (before forcing the user out)
+    this.server.to(`project:${projectId}`).emit('project:member_removed', data);
+    // 2. Force-leave the project room for all sockets belonging to removed user
+    this.server.in(`user:${removedUserId}`).socketsLeave(`project:${projectId}`);
+    // 3. Remove from presence map + broadcast updated list
+    const presenceMap = this.presenceRooms.get(projectId);
+    if (presenceMap) {
+      presenceMap.forEach((user, socketId) => {
+        if (user.id === removedUserId) presenceMap.delete(socketId);
+      });
+      this._broadcastPresence(projectId);
+    }
+    // 4. Private signal to the removed user so the frontend can navigate away
+    this.server.to(`user:${removedUserId}`).emit('notification', {
+      type: 'project_access_revoked',
+      projectId,
+      title: 'Removed from project',
+      body: 'You have been removed from this project.',
+    });
+  }
+
   /** Emit a notification directly to a specific user's private room */
   emitToUser(userId: string, event: string, data: unknown) {
     this.server.to(`user:${userId}`).emit(event, data);

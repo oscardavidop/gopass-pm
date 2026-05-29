@@ -13,6 +13,8 @@ import { FilterTasksDto } from './dto/filter-tasks.dto';
 
 @Injectable()
 export class TasksService {
+  private static readonly DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
@@ -21,12 +23,14 @@ export class TasksService {
   async create(projectId: string, dto: CreateTaskDto, userId: string) {
     await this.assertProjectAccess(projectId, userId);
 
+    const dueDate = this.normalizeDueDate(dto.dueDate);
+
     const task = await this.prisma.task.create({
       data: {
         ...dto,
         projectId,
         creatorId: userId,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        dueDate,
       },
       include: this.taskIncludes(),
     });
@@ -104,6 +108,7 @@ export class TasksService {
     const task = await this.findOne(id, userId);
     const oldValues: Record<string, any> = {};
     const changes: string[] = [];
+    const dueDate = this.normalizeDueDate(dto.dueDate);
 
     if (dto.status && dto.status !== task.status) {
       oldValues.status = task.status;
@@ -117,12 +122,20 @@ export class TasksService {
       oldValues.priority = task.priority;
       changes.push('priority');
     }
+    if (dto.dueDate !== undefined) {
+      const oldDueDate = task.dueDate ? task.dueDate.toISOString() : null;
+      const newDueDate = dueDate ? dueDate.toISOString() : null;
+      if (oldDueDate !== newDueDate) {
+        oldValues.dueDate = task.dueDate;
+        changes.push('dueDate');
+      }
+    }
 
     const updated = await this.prisma.task.update({
       where: { id },
       data: {
         ...dto,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        dueDate,
       },
       include: this.taskIncludes(),
     });
@@ -234,5 +247,19 @@ export class TasksService {
         select: { comments: { where: { deletedAt: null } } },
       },
     };
+  }
+
+  private normalizeDueDate(raw: string | undefined): Date | undefined {
+    if (raw === undefined) return undefined;
+
+    // Date input from UI often comes as YYYY-MM-DD (without time).
+    // Store it at end-of-day UTC to avoid becoming "instantly overdue" at midnight.
+    if (TasksService.DATE_ONLY_RE.test(raw)) {
+      return new Date(`${raw}T23:59:59.999Z`);
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    return parsed;
   }
 }

@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -47,6 +47,34 @@ export function ProjectDetailPage() {
 
   const currentUser = useAuthStore((s) => s.user);
 
+  // Redirect if the current user gets removed from this project in real-time
+  useEffect(() => {
+    const handleRevoked = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId: string }>).detail;
+      if (detail?.projectId === id) navigate('/projects', { replace: true });
+    };
+    window.addEventListener('project:access_revoked', handleRevoked);
+    return () => window.removeEventListener('project:access_revoked', handleRevoked);
+  }, [id, navigate]);
+
+  useEffect(() => {
+    const handleOpenTaskForm = () => {
+      setDefaultStatus('TODO');
+      setEditingTask(null);
+      setTaskFormOpen(true);
+    };
+    const handleOpenTaskDetail = (e: Event) => {
+      const detail = (e as CustomEvent<{ taskId?: string }>).detail;
+      if (detail?.taskId) setSelectedTaskId(detail.taskId);
+    };
+    window.addEventListener('gopass:open-task-form', handleOpenTaskForm);
+    window.addEventListener('gopass:open-task-detail', handleOpenTaskDetail);
+    return () => {
+      window.removeEventListener('gopass:open-task-form', handleOpenTaskForm);
+      window.removeEventListener('gopass:open-task-detail', handleOpenTaskDetail);
+    };
+  }, []);
+
   const debouncedSearch = useDebounce(search, 300);
 
   const { data: project, isLoading: projectLoading } = useProject(id!);
@@ -74,6 +102,9 @@ export function ProjectDetailPage() {
 
   const doneCount = useMemo(() => tasks.filter((t) => t.status === 'DONE').length, [tasks]);
   const progress  = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const inProgressCount = useMemo(() => tasks.filter((t) => t.status === 'IN_PROGRESS').length, [tasks]);
+  const reviewCount = useMemo(() => tasks.filter((t) => t.status === 'REVIEW').length, [tasks]);
+  const todoCount = useMemo(() => tasks.filter((t) => t.status === 'TODO').length, [tasks]);
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTaskId(task.id);
@@ -144,8 +175,9 @@ export function ProjectDetailPage() {
   return (
     <div className="space-y-4 page-enter">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="premium-panel p-4 md:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-start gap-3">
           <Link
             to="/projects"
             className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -153,58 +185,89 @@ export function ProjectDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
 
-          <div
-            className="w-9 h-9 rounded-xl shadow-sm shrink-0"
-            style={{ background: project.color ?? '#6366f1' }}
-          />
+            <div
+              className="w-10 h-10 rounded-xl shadow-sm shrink-0 border border-border/60"
+              style={{ background: project.color ?? '#6366f1' }}
+            />
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold">{project.name}</h1>
-              <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="text-xs">
-                {STATUS_LABEL[project.status] ?? project.status}
-              </Badge>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-bold">{project.name}</h1>
+                <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="text-xs">
+                  {STATUS_LABEL[project.status] ?? project.status}
+                </Badge>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+                  <Sparkles className="h-3 w-3" />
+                  Live workspace
+                </span>
+              </div>
+              {project.description && (
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{project.description}</p>
+              )}
             </div>
-            {project.description && (
-              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{project.description}</p>
-            )}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+              <p className="text-muted-foreground">Total tasks</p>
+              <p className="mt-0.5 text-base font-semibold">{tasks.length}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+              <p className="text-muted-foreground">In progress</p>
+              <p className="mt-0.5 text-base font-semibold text-blue-400">{inProgressCount}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+              <p className="text-muted-foreground">In review</p>
+              <p className="mt-0.5 text-base font-semibold text-amber-400">{reviewCount}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+              <p className="text-muted-foreground">Completed</p>
+              <p className="mt-0.5 text-base font-semibold text-emerald-400">{doneCount}</p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Presence (online users) */}
-          <PresenceAvatars projectId={id ?? ''} />
+        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-t border-border/60 pt-3.5">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Presence (online users) */}
+            <PresenceAvatars projectId={id ?? ''} />
 
-          {/* Members — modal trigger */}
-          {project && (
-            <MemberManager
-              projectId={id!}
-              members={project.members}
-              currentUserId={currentUser?.id ?? ''}
-              currentRole={currentProjectRole}
-            />
-          )}
+            {/* Members — modal trigger */}
+            {project && (
+              <MemberManager
+                projectId={id!}
+                members={project.members}
+                currentUserId={currentUser?.id ?? ''}
+                currentRole={currentProjectRole}
+              />
+            )}
+          </div>
 
-          {/* Progress */}
-          {tasks.length > 0 && (
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
+          <div className="flex items-center gap-3">
+            {tasks.length > 0 && (
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
+                  <Gauge className="h-3 w-3" />
+                  Sprint completion
+                </div>
+                <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground tabular-nums">{progress}%</span>
               </div>
-              <span className="text-xs text-muted-foreground">{progress}%</span>
-            </div>
-          )}
+            )}
 
-          <Button
-            size="sm"
-            onClick={() => handleAddTask('TODO')}
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add task
-          </Button>
+            <Button
+              size="sm"
+              onClick={() => handleAddTask('TODO')}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add task
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -221,21 +284,21 @@ export function ProjectDetailPage() {
 
       {/* ── Stats bar ── */}
       {tasks.length > 0 && (
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
-            {tasks.filter((t) => t.status === 'TODO').length} todo
+            <CircleDashed className="h-3.5 w-3.5 text-slate-400" />
+            {todoCount} todo
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-            {tasks.filter((t) => t.status === 'IN_PROGRESS').length} in progress
+            <Clock3 className="h-3.5 w-3.5 text-blue-400" />
+            {inProgressCount} in progress
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-            {tasks.filter((t) => t.status === 'REVIEW').length} review
+            <LayoutGrid className="h-3.5 w-3.5 text-amber-400" />
+            {reviewCount} review
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
             {doneCount} done
           </span>
         </div>

@@ -1,5 +1,6 @@
-import { Search, X } from 'lucide-react';
+import { Search, X, SlidersHorizontal, UserRound, Flag } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 
 interface TaskFiltersProps {
   search: string;
@@ -29,51 +30,79 @@ export function TaskFilters({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row gap-2">
-      <div className="flex-1">
-        <Input
-          placeholder="Search tasks…"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          leftIcon={<Search className="h-4 w-4" />}
-        />
+    <div className="premium-panel p-2.5 md:p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Smart filters
+        </div>
+        {hasFilters && (
+          <Button
+            onClick={clear}
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2.5 text-xs"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear all
+          </Button>
+        )}
       </div>
 
-      <select
-        value={priority}
-        onChange={(e) => onPriorityChange(e.target.value)}
-        className="px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring w-full sm:w-36"
-      >
-        <option value="">All priorities</option>
-        <option value="LOW">Low</option>
-        <option value="MEDIUM">Medium</option>
-        <option value="HIGH">High</option>
-        <option value="CRITICAL">Critical</option>
-      </select>
+      <div className="flex flex-col gap-2 lg:flex-row">
+        <div className="flex-1">
+          <Input
+            placeholder="Search by title, label or context..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            leftIcon={<Search className="h-4 w-4" />}
+            className="h-10 rounded-xl border-border/70 bg-background/70"
+          />
+        </div>
 
-      {members.length > 0 && (
         <select
-          value={assigneeId}
-          onChange={(e) => onAssigneeChange(e.target.value)}
-          className="px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring w-full sm:w-44"
+          value={priority}
+          onChange={(e) => onPriorityChange(e.target.value)}
+          className="h-10 w-full rounded-xl border border-input/80 bg-background/70 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring lg:w-44"
         >
-          <option value="">All assignees</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.firstName} {m.lastName}
-            </option>
-          ))}
+          <option value="">All priorities</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="CRITICAL">Critical</option>
         </select>
-      )}
+
+        {members.length > 0 && (
+          <select
+            value={assigneeId}
+            onChange={(e) => onAssigneeChange(e.target.value)}
+            className="h-10 w-full rounded-xl border border-input/80 bg-background/70 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring lg:w-52"
+          >
+            <option value="">All assignees</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.firstName} {m.lastName}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {hasFilters && (
-        <button
-          onClick={clear}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-input rounded-md hover:bg-accent transition-colors whitespace-nowrap"
-        >
-          <X className="h-3.5 w-3.5" />
-          Clear
-        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          {priority && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/60 px-2 py-1 text-muted-foreground">
+              <Flag className="h-3 w-3" />
+              {priority}
+            </span>
+          )}
+          {assigneeId && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/60 px-2 py-1 text-muted-foreground">
+              <UserRound className="h-3 w-3" />
+              Assignee selected
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

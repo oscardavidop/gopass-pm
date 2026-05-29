@@ -37,7 +37,6 @@ interface MemberManagerProps {
   currentRole: string;
 }
 
-/** Trigger button — shows in project header */
 export function MemberManagerTrigger({
   members,
   onClick,
@@ -46,33 +45,81 @@ export function MemberManagerTrigger({
   onClick: () => void;
 }) {
   const users = members.map((m) => m.user).filter(Boolean);
+
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 hover:bg-accent/50 px-2 py-1 rounded-lg transition-colors group"
+      className="
+        group flex items-center gap-3
+        rounded-2xl
+        bg-[#0b1220]/80
+        px-3 py-2
+        hover:bg-[#111827]
+        transition-all duration-200
+      "
       title="Manage team members"
     >
-      <div className="flex -space-x-2">
-        {users.slice(0, 4).map((u) => (
-          <Avatar
+      {/* Avatars */}
+      <div className="flex items-center -space-x-2">
+        {users.slice(0, 5).map((u, index) => (
+          <div
             key={u!.id}
-            src={(u as any).avatar}
-            firstName={u!.firstName}
-            lastName={u!.lastName}
-            size="xs"
-            className="ring-2 ring-background"
-          />
+            style={{ zIndex: users.length - index }}
+            className="transition-transform duration-200 group-hover:-translate-y-0.5"
+          >
+            <Avatar
+              src={(u as any).avatar}
+              firstName={u!.firstName}
+              lastName={u!.lastName}
+              size="xs"
+              className="
+                border-2 border-[#0b1220]
+                shadow-sm
+              "
+            />
+          </div>
         ))}
-        {users.length > 4 && (
-          <div className="w-6 h-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-medium text-muted-foreground">
-            +{users.length - 4}
+
+        {users.length > 5 && (
+          <div
+            className="
+              w-7 h-7 rounded-full
+              border-2 border-[#0b1220]
+              bg-[#1f2937]
+              flex items-center justify-center
+              text-[11px] font-semibold
+              text-gray-300
+            "
+          >
+            +{users.length - 5}
           </div>
         )}
       </div>
-      <span className="text-xs text-muted-foreground hidden sm:inline group-hover:text-foreground transition-colors">
-        {members.length} member{members.length !== 1 ? 's' : ''}
-      </span>
-      <Users className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+
+      {/* Text */}
+      <div className="hidden sm:flex flex-col items-start leading-tight">
+        <span className="text-sm font-medium text-white">
+          Team
+        </span>
+
+        <span className="text-[11px] text-gray-400">
+          {members.length} member{members.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Icon */}
+      <div
+        className="
+          hidden md:flex
+          items-center justify-center
+          w-8 h-8 rounded-xl
+          bg-white/5
+          group-hover:bg-white/10
+          transition-colors
+        "
+      >
+        <Users className="h-4 w-4 text-gray-400 group-hover:text-white transition-colors" />
+      </div>
     </button>
   );
 }
@@ -130,7 +177,16 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
             {members.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No members yet.</p>
             )}
-            {members.map((m) => {
+            {members.sort((a, b) => {
+              // Owners first
+              if (a.role === 'OWNER' && b.role !== 'OWNER') return -1;
+              if (b.role === 'OWNER' && a.role !== 'OWNER') return 1;
+              // Then by name
+              const nameA = `${a.user?.firstName ?? ''} ${a.user?.lastName ?? ''}`.trim();
+              const nameB = `${b.user?.firstName ?? ''} ${b.user?.lastName ?? ''}`.trim();
+              return nameA.localeCompare(nameB);
+            }).
+            map((m) => {
               const RoleIcon = ROLE_ICON[m.role] ?? User;
               const isRemoving = removingId === m.userId;
               const isSelf = m.userId === currentUserId;

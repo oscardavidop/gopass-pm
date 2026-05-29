@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   FolderKanban, CheckCircle2, Clock, AlertTriangle,
-  TrendingUp, TrendingDown, ArrowRight, Zap, Plus,
+  TrendingUp, TrendingDown, ArrowRight, Zap, Plus, Sparkles, Gauge,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -58,7 +58,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6 page-enter">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="premium-panel p-4 md:p-5 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <motion.h1
             initial={{ opacity: 0, y: -8 }}
@@ -68,12 +68,26 @@ export function DashboardPage() {
             {greeting()}, {user?.firstName} 👋
           </motion.h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Here's an overview of your workspace.
+            Executive snapshot of your workspace performance.
           </p>
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+            <Sparkles className="h-3 w-3" />
+            Realtime insights active
+          </div>
         </div>
 
         {/* Quick actions */}
         <div className="flex items-center gap-2">
+          <Link to="/projects">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New project
+            </motion.button>
+          </Link>
           <Link to="/projects">
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -125,11 +139,12 @@ export function DashboardPage() {
       {/* ── Completion bar ── */}
       {stats && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-          <Card>
+          <Card className="overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-primary/80 via-cyan-400/70 to-emerald-400/70" />
             <CardContent className="pt-5 pb-5">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-sm font-medium flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-amber-400" />
+                  <Gauge className="h-4 w-4 text-cyan-400" />
                   Overall completion rate
                 </span>
                 <span className="text-sm font-bold gradient-primary bg-clip-text text-transparent">

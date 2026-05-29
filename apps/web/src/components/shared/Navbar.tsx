@@ -1,5 +1,6 @@
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Moon, Sun, LogOut, User, Settings, ChevronRight, Command } from 'lucide-react';
+import { useIsFetching } from '@tanstack/react-query';
+import { Moon, Sun, LogOut, User, Settings, ChevronRight, Command, Home, Menu, Search, Wifi } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from '@/hooks/useTheme';
 import { useLogout } from '@/hooks/useAuth';
@@ -13,6 +14,9 @@ import { cn } from '@/utils/cn';
 function useBreadcrumbs() {
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return [{ label: 'Dashboard', href: '/dashboard', isLast: true }];
+  }
   return segments.map((seg, i) => ({
     label: seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' '),
     href: '/' + segments.slice(0, i + 1).join('/'),
@@ -27,59 +31,78 @@ export function Navbar() {
   const user = useAuthStore((s) => s.user);
   const breadcrumbs = useBreadcrumbs();
   const openCommandPalette = useUIStore((s) => s.openCommandPalette);
+  const openSidebarMobile = useUIStore((s) => s.setSidebarMobileOpen);
+  const isFetching = useIsFetching();
 
   return (
-    <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 gap-4">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1 text-sm min-w-0">
-        {breadcrumbs.map((crumb, i) => (
-          <span key={crumb.href} className="flex items-center gap-1 min-w-0">
-            {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />}
-            {crumb.isLast ? (
-              <span className="font-medium text-foreground truncate">{crumb.label}</span>
-            ) : (
-              <Link
-                to={crumb.href}
-                className="text-muted-foreground hover:text-foreground transition-colors truncate"
-              >
-                {crumb.label}
-              </Link>
-            )}
-          </span>
-        ))}
-      </nav>
+    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+      <div className="flex h-16 items-center justify-between gap-3 px-3 md:px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <button
+            onClick={() => openSidebarMobile(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-card text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
 
-      <div className="flex items-center gap-1 shrink-0">
-        {/* CMD+K trigger */}
-        <button
-          onClick={openCommandPalette}
-          className="hidden md:flex items-center gap-2 h-8 px-3 rounded-md text-xs text-muted-foreground border border-border/50 bg-accent/30 hover:bg-accent hover:text-foreground transition-colors"
-          title="Open command palette (⌘K)"
-        >
-          <Command className="h-3 w-3" />
-          <span>Search…</span>
-          <kbd className="ml-1 border border-border/50 rounded px-1 text-[10px]">⌘K</kbd>
-        </button>
+          {/* Breadcrumbs */}
+          <nav className="hidden min-w-0 items-center gap-1 text-sm md:flex">
+            <Link to="/dashboard" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground">
+              <Home className="h-3.5 w-3.5" />
+            </Link>
+            {breadcrumbs.map((crumb, i) => (
+              <span key={crumb.href} className="flex min-w-0 items-center gap-1">
+                {(i > 0 || breadcrumbs.length > 0) && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />}
+                {crumb.isLast ? (
+                  <span className="truncate font-medium text-foreground">{crumb.label}</span>
+                ) : (
+                  <Link
+                    to={crumb.href}
+                    className="truncate text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {crumb.label}
+                  </Link>
+                )}
+              </span>
+            ))}
+          </nav>
 
-        {/* Notification bell */}
-        <NotificationBell />
+          {/* Global search */}
+          <button
+            onClick={openCommandPalette}
+            className="group flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border/70 bg-card px-3 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/40 md:max-w-lg m-auto"
+            title="Open command palette (Cmd/Ctrl + K)"
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            <span className="truncate">Search projects, tasks, commands...</span>
+            <span className="ml-auto hidden shrink-0 items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5 text-[10px] md:inline-flex">
+              <Command className="h-3 w-3" /> K
+            </span>
+          </button>
+        </div>
 
-        {/* Theme toggle */}
-        <button
-          onClick={toggleTheme}
-          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {isDark
-            ? <Sun className="h-4 w-4" />
-            : <Moon className="h-4 w-4" />
-          }
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="hidden items-center gap-1 rounded-full border border-border/70 bg-card px-2 py-1 text-[11px] text-muted-foreground sm:flex">
+            <Wifi className="h-3 w-3 text-emerald-400" />
+            <span>Realtime</span>
+            {isFetching > 0 && <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-primary">Syncing...</span>}
+          </div>
+
+          <NotificationBell />
+
+          <button
+            onClick={toggleTheme}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
 
         {/* User menu */}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent transition-colors ml-1">
+            <button className="ml-1 flex items-center gap-2 rounded-lg border border-border/70 bg-card px-2 py-1.5 transition-colors hover:bg-accent">
               <Avatar
                 src={user?.avatar}
                 firstName={user?.firstName}
@@ -155,6 +178,7 @@ export function Navbar() {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
+        </div>
       </div>
     </header>
   );

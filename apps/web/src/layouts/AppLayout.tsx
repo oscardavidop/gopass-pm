@@ -31,17 +31,23 @@ export function AppLayout() {
   useSocket();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden bg-background app-shell-bg">
+      <div className="pointer-events-none absolute inset-0 opacity-70">
+        <div className="absolute -top-40 right-[8%] h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 left-[10%] h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+      </div>
+
       <Sidebar />
       <div
         className={cn(
-          'flex flex-col flex-1 overflow-hidden transition-[margin] duration-200',
-          sidebarCollapsed ? 'ml-16' : 'ml-60',
+          'relative z-10 flex flex-col flex-1 overflow-hidden transition-[margin] duration-200',
+          'ml-0 lg:ml-[272px]',
+          sidebarCollapsed && 'lg:ml-[72px]',
         )}
       >
         <Navbar />
         <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto px-6 py-6 max-w-screen-xl">
+          <div className="mx-auto w-full max-w-[1460px] px-3 py-4 md:px-5 md:py-5 xl:px-7">
             <PageTransition>
               <Outlet />
             </PageTransition>

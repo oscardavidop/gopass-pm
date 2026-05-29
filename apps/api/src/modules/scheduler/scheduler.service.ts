@@ -15,7 +15,7 @@ export class SchedulerService {
 
   /**
    * Every hour: find tasks that just became overdue (within last hour)
-   * and notify assigned users via WebSocket.
+    * and notify the assignee (or fallback to the creator) via WebSocket.
    */
   @Cron(CronExpression.EVERY_HOUR)
   async checkOverdueTasks() {
@@ -27,17 +27,15 @@ export class SchedulerService {
         deletedAt: null,
         status: { notIn: [TaskStatus.DONE] },
         dueDate: { gte: oneHourAgo, lte: now },
-        assigneeId: { not: null },
       },
       include: {
-        assignee: { select: { id: true } },
         project: { select: { id: true, name: true } },
       },
     });
 
     for (const task of overdueTasks) {
-      if (!task.assigneeId) continue;
-      this.events.emitToUser(task.assigneeId, 'notification', {
+      const targetUserId = task.assigneeId ?? task.creatorId;
+      this.events.emitToUser(targetUserId, 'notification', {
         type: 'task_overdue',
         title: 'Task overdue',
         message: `"${task.title}" is now overdue in ${task.project.name}`,
@@ -45,12 +43,12 @@ export class SchedulerService {
         projectId: task.projectId,
         createdAt: new Date().toISOString(),
       });
-      this.logger.log(`Overdue notification sent: task ${task.id} → user ${task.assigneeId}`);
+      this.logger.log(`Overdue notification sent: task ${task.id} → user ${targetUserId}`);
     }
   }
 
   /**
-   * Every hour: remind assigned users about tasks due within the next 24 hours.
+    * Every hour: remind users about tasks due within the next 24 hours.
    */
   @Cron(CronExpression.EVERY_HOUR)
   async sendDueReminders() {
@@ -62,18 +60,17 @@ export class SchedulerService {
       where: {
         deletedAt: null,
         status: { notIn: [TaskStatus.DONE] },
+        // 1h window around the 24h mark (23h-24h before due date)
         dueDate: { gte: in23h, lte: in24h },
-        assigneeId: { not: null },
       },
       include: {
-        assignee: { select: { id: true } },
         project: { select: { id: true, name: true } },
       },
     });
 
     for (const task of upcomingTasks) {
-      if (!task.assigneeId) continue;
-      this.events.emitToUser(task.assigneeId, 'notification', {
+      const targetUserId = task.assigneeId ?? task.creatorId;
+      this.events.emitToUser(targetUserId, 'notification', {
         type: 'task_due_reminder',
         title: 'Task due soon',
         message: `"${task.title}" is due in 24 hours in ${task.project.name}`,
@@ -81,6 +78,7 @@ export class SchedulerService {
         projectId: task.projectId,
         createdAt: new Date().toISOString(),
       });
+      this.logger.log(`Due reminder sent: task ${task.id} → user ${targetUserId}`);
     }
   }
 

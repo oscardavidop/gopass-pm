@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   X, Pencil, Trash2, Calendar, Flag, Tag, MessageSquare,
-  CheckSquare, Square, Plus, Clock, ChevronRight, Loader2,
+  CheckSquare, Square, Plus, Clock, ChevronRight, Loader2, Save, Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -52,6 +52,11 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const [commentText, setCommentText]   = useState('');
   const [deleteOpen, setDeleteOpen]     = useState(false);
   const [activeTab, setActiveTab]       = useState<'details' | 'activity' | 'comments'>('details');
+  const [autosave, setAutosave]         = useState(true);
+  const [titleDraft, setTitleDraft]     = useState('');
+  const [descDraft, setDescDraft]       = useState('');
+  const [draftDirty, setDraftDirty]     = useState(false);
+  const [dueDateDraft, setDueDateDraft] = useState('');
 
   const { data: task, isLoading } = useTask(taskId ?? '');
   const deleteTask  = useDeleteTask();
@@ -74,6 +79,57 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const priorityCfg = task ? (PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.MEDIUM) : null;
   const statusCfg   = task ? (STATUS_CONFIG[task.status]     ?? STATUS_CONFIG.TODO)     : null;
   const borderColor = task ? (PRIORITY_BORDER[task.priority] ?? 'border-l-slate-500/60') : '';
+
+  useEffect(() => {
+    if (!task) return;
+    setTitleDraft(task.title ?? '');
+    setDescDraft(task.description ?? '');
+    setDueDateDraft(task.dueDate ? task.dueDate.slice(0, 10) : '');
+    setDraftDirty(false);
+  }, [task?.id]);
+
+  const persistDraft = useCallback(async () => {
+    if (!task || !draftDirty) return;
+
+    const nextTitle = titleDraft.trim();
+    const nextDesc = descDraft.trim();
+    const baseTitle = task.title ?? '';
+    const baseDesc = task.description ?? '';
+
+    if (nextTitle.length < 2) return;
+    if (nextTitle === baseTitle && nextDesc === baseDesc) {
+      setDraftDirty(false);
+      return;
+    }
+
+    await updateTask.mutateAsync({
+      id: task.id,
+      data: {
+        title: nextTitle,
+        description: nextDesc || undefined,
+      },
+    });
+    setDraftDirty(false);
+  }, [task, draftDirty, titleDraft, descDraft, updateTask]);
+
+  useEffect(() => {
+    if (!task || !autosave || !draftDirty) return;
+    const timer = window.setTimeout(() => {
+      persistDraft();
+    }, 850);
+    return () => window.clearTimeout(timer);
+  }, [task, autosave, draftDirty, persistDraft]);
+
+  const saveDueDate = useCallback(async (value: string) => {
+    if (!task) return;
+    const normalized = value || undefined;
+    const current = task.dueDate ? task.dueDate.slice(0, 10) : '';
+    if ((normalized ?? '') === current) return;
+    await updateTask.mutateAsync({
+      id: task.id,
+      data: { dueDate: normalized },
+    });
+  }, [task, updateTask]);
 
   return (
     <>
@@ -110,10 +166,14 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
             )}
           >
             {/* ── header ── */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0 bg-card/90 backdrop-blur-md">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span>Task detail</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
+                  <Sparkles className="h-3 w-3" />
+                  Live
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 {task && onEdit && (
@@ -148,13 +208,59 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
               ) : task ? (
                 <div className="px-5 py-5 space-y-5">
                   {/* Title + description */}
-                  <div>
-                    <h2 className="text-lg font-semibold leading-snug mb-1.5">{task.title}</h2>
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                        {task.description}
-                      </p>
-                    )}
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <input
+                        value={titleDraft}
+                        onChange={(e) => {
+                          setTitleDraft(e.target.value);
+                          setDraftDirty(true);
+                        }}
+                        onBlur={() => {
+                          if (!autosave) persistDraft();
+                        }}
+                        className="w-full bg-transparent text-lg font-semibold leading-snug outline-none border border-transparent rounded-lg px-1.5 py-1 hover:border-border/60 focus:border-primary/40"
+                        placeholder="Task title"
+                      />
+                      <button
+                        onClick={() => setAutosave((v) => !v)}
+                        className={cn(
+                          'shrink-0 rounded-full border px-2 py-1 text-[10px] transition-colors',
+                          autosave
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                            : 'border-border text-muted-foreground hover:bg-accent',
+                        )}
+                        title="Toggle autosave"
+                      >
+                        Autosave {autosave ? 'on' : 'off'}
+                      </button>
+                    </div>
+                    <textarea
+                      value={descDraft}
+                      onChange={(e) => {
+                        setDescDraft(e.target.value);
+                        setDraftDirty(true);
+                      }}
+                      onBlur={() => {
+                        if (!autosave) persistDraft();
+                      }}
+                      rows={3}
+                      className="w-full resize-none rounded-xl border border-border/70 bg-background/50 px-3 py-2 text-sm leading-relaxed text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Add context, acceptance criteria or implementation notes..."
+                    />
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{autosave ? 'Changes are saved automatically' : 'Manual save mode'}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2"
+                        onClick={() => persistDraft()}
+                        disabled={updateTask.isPending || !draftDirty || titleDraft.trim().length < 2}
+                      >
+                        {updateTask.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        Save
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Meta grid */}
@@ -229,14 +335,18 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                       </MetaRow>
                     )}
 
-                    {(task as any).dueDate && (
-                      <MetaRow label="Due date">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>{formatDate((task as any).dueDate)}</span>
-                        </div>
-                      </MetaRow>
-                    )}
+                    <MetaRow label="Due date">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <input
+                          type="date"
+                          value={dueDateDraft}
+                          onChange={(e) => setDueDateDraft(e.target.value)}
+                          onBlur={(e) => saveDueDate(e.target.value)}
+                          className="h-7 rounded-md border border-input bg-background/70 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
+                    </MetaRow>
 
                     <MetaRow label="Created">
                       <div className="flex items-center gap-1 text-muted-foreground">
@@ -312,7 +422,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
       </AnimatePresence>
 
       <ConfirmDialog
-        open={deleteOpen}
+        open={deleteOpen && !deleteTask.isPending}
         onOpenChange={setDeleteOpen}
         title="Delete task"
         description="This action cannot be undone. The task and all its data will be permanently deleted."

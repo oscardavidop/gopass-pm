@@ -1,196 +1,282 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Command,
   LayoutDashboard,
   FolderKanban,
   Calendar,
   Settings,
-  ChevronLeft,
-  ChevronRight,
+  ChevronsUpDown,
+  Menu,
   PanelLeft,
-  LogOut,
-  User,
+  Plus,
+  Sparkles,
+  Users,
+  X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/utils/cn';
 import { useUIStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
-import { useLogout } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { TooltipProvider } from '@/components/ui/Tooltip';
+import { Button } from '@/components/ui/Button';
 import logoLight from '../../../assets/img/logo-light.png';
 import logoDark from '../../../assets/img/logo-dark.png';
 
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Projects',  href: '/projects',  icon: FolderKanban },
-  { label: 'Calendar',  href: '/calendar',  icon: Calendar },
-  { label: 'Settings',  href: '/settings',  icon: Settings },
+const navSections = [
+  {
+    title: 'Workspace',
+    items: [
+      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Projects', href: '/projects', icon: FolderKanban },
+      { label: 'Calendar', href: '/calendar', icon: Calendar },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { label: 'Team', href: '/profile', icon: Users },
+      { label: 'Settings', href: '/settings', icon: Settings },
+    ],
+  },
 ];
 
-export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar, theme } = useUIStore();
+function SidebarContent({
+  collapsed,
+  mobile,
+  onClose,
+}: {
+  collapsed: boolean;
+  mobile?: boolean;
+  onClose?: () => void;
+}) {
+  const { theme, toggleSidebar, openCommandPalette } = useUIStore();
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const { mutate: logout } = useLogout();
+
+  const handleGo = (href: string) => {
+    navigate(href);
+    onClose?.();
+  };
+
+  const handleOpenCreateProject = () => {
+    navigate('/projects');
+    onClose?.();
+    setTimeout(() => window.dispatchEvent(new CustomEvent('gopass:open-project-form')), 100);
+  };
+
+  const shellWidth = collapsed ? 'w-[72px]' : 'w-[272px]';
+
+  return (
+    <aside
+      className={cn(
+        'flex h-full flex-col border-r border-border/70 bg-card/80 backdrop-blur-xl',
+        'relative overflow-hidden',
+        shellWidth,
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-70">
+        <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-40 w-40 rounded-full bg-sky-400/10 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 flex h-16 items-center border-b border-border/70 px-3">
+        {mobile && (
+          <button
+            onClick={onClose}
+            className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
+            aria-label="Close sidebar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+
+        <button
+          onClick={() => !collapsed && undefined}
+          className={cn(
+            'group flex w-full items-center rounded-xl border border-border/70 bg-background/70 px-2 py-1.5 transition-colors',
+            collapsed ? 'justify-center px-0' : 'gap-2',
+          )}
+        >
+          <img
+            src={theme === 'dark' ? logoDark : logoLight}
+            alt="Tasku"
+            className="h-7 w-7 shrink-0 object-contain"
+          />
+          {!collapsed && (
+            <>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-sm font-semibold text-foreground">Tasku Workspace</p>
+                <p className="text-[11px] text-muted-foreground">Enterprise plan</p>
+              </div>
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="relative z-10 flex-1 overflow-y-auto px-2 py-3">
+        {!collapsed && (
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              className="h-8 justify-start"
+              onClick={handleOpenCreateProject}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Project
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 justify-start"
+              onClick={() => {
+                openCommandPalette();
+                onClose?.();
+              }}
+            >
+              <Command className="h-3.5 w-3.5" />
+              Palette
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              {!collapsed && (
+                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                  {section.title}
+                </p>
+              )}
+
+              <div className="space-y-1">
+                {section.items.map(({ href, icon: Icon, label }) => {
+                  const active = location.pathname.startsWith(href);
+                  const link = (
+                    <Link
+                      key={href}
+                      to={href}
+                      onClick={onClose}
+                      className={cn(
+                        'group relative flex items-center rounded-xl px-2.5 py-2 text-sm transition-all duration-150',
+                        collapsed ? 'justify-center px-0' : 'gap-2.5',
+                        active
+                          ? 'bg-primary/12 text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-accent/80 hover:text-foreground',
+                      )}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId={mobile ? 'sidebar-active-mobile' : 'sidebar-active-desktop'}
+                          className="absolute left-1 top-1/2 h-5 -translate-y-1/2 rounded-full border-l-2 border-primary"
+                        />
+                      )}
+
+                      <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : '')} />
+                      {!collapsed && <span className="truncate">{label}</span>}
+                    </Link>
+                  );
+
+                  return collapsed ? (
+                    <Tooltip key={href} content={label} side="right" delayDuration={100}>
+                      {link}
+                    </Tooltip>
+                  ) : (
+                    link
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative z-10 border-t border-border/70 p-2.5">
+        <button
+          onClick={() => handleGo('/profile')}
+          className={cn(
+            'mb-2 flex w-full items-center rounded-xl border border-border/60 bg-background/70 p-2 text-left transition-colors hover:bg-accent/70',
+            collapsed ? 'justify-center' : 'gap-2.5',
+          )}
+        >
+          <Avatar
+            src={user?.avatar}
+            firstName={user?.firstName}
+            lastName={user?.lastName}
+            size="sm"
+            online
+          />
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="truncate text-[11px] text-muted-foreground">{user?.email}</p>
+            </div>
+          )}
+        </button>
+
+        <button
+          onClick={() => {
+            toggleSidebar();
+            if (mobile) onClose?.();
+          }}
+          className={cn(
+            'flex w-full items-center rounded-lg px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+            collapsed ? 'justify-center px-0' : 'gap-2',
+          )}
+        >
+          {mobile ? <Menu className="h-3.5 w-3.5" /> : <PanelLeft className="h-3.5 w-3.5" />}
+          {!collapsed && <span>{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>}
+        </button>
+
+        {!collapsed && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-400">
+            <Sparkles className="h-3 w-3" />
+            <span>Realtime collaboration active</span>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+export function Sidebar() {
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const sidebarMobileOpen = useUIStore((s) => s.sidebarMobileOpen);
+  const closeSidebarMobile = useUIStore((s) => s.closeSidebarMobile);
 
   return (
     <TooltipProvider delayDuration={0}>
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col',
-          'border-r border-border bg-card',
-          'transition-all duration-200 ease-spring',
-          sidebarCollapsed ? 'w-16' : 'w-60',
-        )}
-      >
-        {/* Logo */}
-        <div
-          className={cn(
-            'flex items-center h-14 border-b border-border px-4',
-            sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5',
-          )}
-        >
-          {/* Collapsed: small icon; Expanded: full logo */}
-          {sidebarCollapsed ? (
-            <img
-              src={theme === 'dark' ? logoDark : logoLight}
-              alt="GoPass PM"
-              className="h-7 w-7 object-contain shrink-0 select-none"
+      <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">
+        <SidebarContent collapsed={sidebarCollapsed} />
+      </div>
+
+      <AnimatePresence>
+        {sidebarMobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm lg:hidden"
+              onClick={closeSidebarMobile}
             />
-          ) : (
-            <motion.img
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -6 }}
-              transition={{ duration: 0.15 }}
-              src={theme === 'dark' ? logoDark : logoLight}
-              alt="GoPass PM"
-              className="h-8 object-contain max-w-[140px] select-none"
-            />
-          )}
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 py-4 px-2 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ label, href, icon: Icon }) => {
-            const active = location.pathname.startsWith(href);
-            const link = (
-              <Link
-                key={href}
-                to={href}
-                className={cn(
-                  'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
-                  'transition-all duration-150 group',
-                  active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                  sidebarCollapsed && 'justify-center px-0',
-                )}
-              >
-                {/* Active indicator */}
-                {active && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-primary"
-                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-                  />
-                )}
-
-                <Icon
-                  className={cn(
-                    'h-4 w-4 shrink-0 transition-colors',
-                    active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
-                  )}
-                />
-                <AnimatePresence>
-                  {!sidebarCollapsed && (
-                    <motion.span
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.1 }}
-                    >
-                      {label}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </Link>
-            );
-
-            return sidebarCollapsed ? (
-              <Tooltip key={href} content={label} side="right">
-                {link}
-              </Tooltip>
-            ) : link;
-          })}
-        </nav>
-
-        {/* User section */}
-        <div className={cn('border-t border-border p-2 space-y-0.5')}>
-          {/* Profile link */}
-          {sidebarCollapsed ? (
-            <Tooltip content={`${user?.firstName} ${user?.lastName}`} side="right">
-              <button
-                onClick={() => navigate('/profile')}
-                className="w-full flex items-center justify-center py-2 rounded-md hover:bg-accent transition-colors"
-              >
-                <Avatar
-                  src={user?.avatar}
-                  firstName={user?.firstName}
-                  lastName={user?.lastName}
-                  size="sm"
-                />
-              </button>
-            </Tooltip>
-          ) : (
-            <button
-              onClick={() => navigate('/profile')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-colors group"
+            <motion.div
+              initial={{ x: -320, opacity: 0.8 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -320, opacity: 0.8 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-y-0 left-0 z-50 lg:hidden"
             >
-              <Avatar
-                src={user?.avatar}
-                firstName={user?.firstName}
-                lastName={user?.lastName}
-                size="sm"
-                online
-              />
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium truncate leading-none">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email}</p>
-              </div>
-            </button>
-          )}
-
-          {/* Collapse toggle */}
-          <button
-            onClick={toggleSidebar}
-            className={cn(
-              'w-full flex items-center gap-3 px-3 py-2 rounded-md',
-              'text-muted-foreground hover:text-foreground hover:bg-accent',
-              'transition-colors text-sm',
-              sidebarCollapsed ? 'justify-center px-0' : '',
-            )}
-          >
-            <PanelLeft className="h-4 w-4 shrink-0" />
-            <AnimatePresence>
-              {!sidebarCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-xs"
-                >
-                  Collapse
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </button>
-        </div>
-      </aside>
+              <SidebarContent collapsed={false} mobile onClose={closeSidebarMobile} />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </TooltipProvider>
   );
 }

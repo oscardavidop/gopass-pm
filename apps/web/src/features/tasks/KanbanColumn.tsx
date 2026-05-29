@@ -51,15 +51,15 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
   };
 
   return (
-    <div className="flex flex-col min-w-[272px] w-[272px]">
+    <div className="flex flex-col min-w-[292px] w-[292px]">
       {/* Column header */}
       {/* Unified column container — single border, no seam */}
       <div className={cn(
-        'flex flex-col flex-1 rounded-xl bg-card border border-border overflow-hidden',
+        'flex flex-col flex-1 premium-panel overflow-hidden',
         'border-t-2', config.accent,
       )}>
         {/* Column header */}
-        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2.5 border-b border-border bg-card/90 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <span className={cn('w-2 h-2 rounded-full shrink-0', config.dot)} />
             <span className="text-xs font-semibold text-foreground">{config.label}</span>
@@ -96,8 +96,8 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
           <div
             ref={setNodeRef}
             className={cn(
-              'flex-1 px-2 pb-2 pt-2 min-h-[200px] transition-all duration-150 space-y-2',
-              isOver ? 'bg-primary/5 ring-2 ring-inset ring-primary/20' : '',
+              'flex-1 px-2.5 pb-2.5 pt-2.5 min-h-[240px] transition-all duration-150 space-y-2',
+              isOver ? 'bg-primary/5 ring-2 ring-inset ring-primary/25 shadow-inner' : '',
             )}
           >
             <AnimatePresence initial={false}>
@@ -115,7 +115,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="bg-card border border-primary/40 rounded-lg p-2.5 shadow-sm">
+                  <div className="bg-card border border-primary/40 rounded-xl p-2.5 shadow-sm">
                     <input
                       ref={inputRef}
                       value={quickTitle}
@@ -148,12 +148,12 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center h-24 gap-2"
+                className="flex flex-col items-center justify-center h-28 gap-2 rounded-xl border border-dashed border-border/70 bg-background/40"
               >
                 <p className="text-xs text-muted-foreground/60">No tasks</p>
                 <button
                   onClick={() => setQuickAddOpen(true)}
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors rounded-md px-2 py-1 hover:bg-accent"
                 >
                   <Plus className="h-3 w-3" /> Add task
                 </button>

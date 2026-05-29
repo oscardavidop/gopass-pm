@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Plus, Search, LayoutGrid, List, FolderOpen } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Plus, Search, LayoutGrid, List, FolderOpen, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { Button } from '@/components/ui/Button';
@@ -65,19 +65,28 @@ export function ProjectsPage() {
     setEditingProject(null);
   }, []);
 
+  useEffect(() => {
+    const handleOpenForm = () => {
+      setEditingProject(null);
+      setDrawerOpen(true);
+    };
+    window.addEventListener('gopass:open-project-form', handleOpenForm);
+    return () => window.removeEventListener('gopass:open-project-form', handleOpenForm);
+  }, []);
+
   return (
     <div className="space-y-6 page-enter">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <div className="text-muted-foreground text-sm mt-0.5">
             {isLoading ? (
               <Skeleton className="h-3.5 w-24 inline-block" />
             ) : (
               `${data?.meta.total ?? 0} project${(data?.meta.total ?? 0) !== 1 ? 's' : ''}`
             )}
-          </p>
+          </div>
         </div>
         <Button onClick={() => { setEditingProject(null); setDrawerOpen(true); }} size="sm">
           <Plus className="h-4 w-4" />
@@ -86,58 +95,119 @@ export function ProjectsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1">
+      <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
           <Input
-            placeholder="Search projects…"
+            placeholder="Search projects..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            leftIcon={<Search className="h-4 w-4" />}
+            className="
+        pl-10 h-11
+        rounded-2xl
+        border-border/60
+        bg-background/70
+        backdrop-blur-sm
+        shadow-sm
+        transition-all duration-200
+        hover:border-primary/30
+        focus-visible:ring-2
+        focus-visible:ring-primary/20
+        focus-visible:border-primary/40
+      "
           />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | '')}
-          className={cn(
-            'px-3 py-2 rounded-lg border border-input bg-background text-sm',
-            'focus:outline-none focus:ring-2 focus:ring-ring',
-            'w-full sm:w-38 transition-colors hover:border-ring/50',
-          )}
-        >
-          <option value="">All statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="ON_HOLD">On hold</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="ARCHIVED">Archived</option>
-        </select>
+        {/* Right controls */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
 
-        {/* View toggle */}
-        <div className="flex border border-input rounded-lg overflow-hidden bg-background shrink-0">
-          <button
-            onClick={() => setView('grid')}
-            className={cn(
-              'px-3 py-2 transition-colors',
-              view === 'grid'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent text-muted-foreground hover:text-foreground',
-            )}
-            title="Grid view"
+          {/* Status filter */}
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as ProjectStatus | '')
+              }
+              className={cn(
+                `
+          h-11 min-w-[170px]
+          rounded-2xl
+          border border-border/60
+          bg-background/70
+          backdrop-blur-sm
+          px-4 pr-10
+          text-sm font-medium
+          shadow-sm
+          transition-all duration-200
+          hover:border-primary/30
+          focus:outline-none
+          focus:ring-2
+          focus:ring-primary/20
+          focus:border-primary/40
+          appearance-none
+          `
+              )}
+            >
+              <option value="">All statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ON_HOLD">On hold</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+
+          {/* View toggle */}
+          <div
+            className="
+        flex items-center
+        rounded-2xl
+        border border-border/60
+        bg-background/70
+        backdrop-blur-sm
+        p-1
+        shadow-sm
+        gap-1
+      "
           >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={cn(
-              'px-3 py-2 border-l border-input transition-colors',
-              view === 'list'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent text-muted-foreground hover:text-foreground',
-            )}
-            title="List view"
-          >
-            <List className="h-4 w-4" />
-          </button>
+            <button
+              onClick={() => setView('grid')}
+              className={cn(
+                `
+          h-9 w-9 rounded-xl
+          flex items-center justify-center
+          transition-all duration-200
+          `,
+                view === 'grid'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+              title="Grid view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+
+            <button
+              onClick={() => setView('list')}
+              className={cn(
+                `
+          h-9 w-9 rounded-xl
+          flex items-center justify-center
+          transition-all duration-200
+          `,
+                view === 'list'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+              title="List view"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 

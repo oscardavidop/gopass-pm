@@ -35,7 +35,7 @@ export class FilterTasksDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(200)
+  @Max(500)
   @IsOptional()
   limit?: number = 50;
 

@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, MessageSquare, GripVertical, Flag, CheckSquare2 } from 'lucide-react';
+import { Calendar, MessageSquare, GripVertical, Flag } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -44,19 +44,21 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
         exit={{ opacity: 0, scale: 0.95, y: -4 }}
         transition={{ duration: 0.15 }}
         className={cn(
-          'bg-card border border-border rounded-lg cursor-pointer group',
+          'bg-card border border-border/80 rounded-xl cursor-pointer group',
           'border-l-[3px]', priorityConfig.border,
-          'hover:shadow-md hover:border-border/80 transition-all duration-150',
+          'hover:shadow-md hover:border-border transition-all duration-150',
           isDragging && 'card-drag-shadow ring-2 ring-primary/30',
         )}
+        style={{
+          userSelect: 'none',
+        }}
         onClick={() => onClick?.(task)}
       >
-        <div className="p-3">
+        <div className="p-3.5" {...listeners}>
           <div className="flex items-start gap-2">
             {/* Drag handle */}
             <button
-              className="mt-0.5 opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity cursor-grab active:cursor-grabbing shrink-0 -ml-1"
-              {...listeners}
+              className="mt-0.5 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity cursor-grab active:cursor-grabbing shrink-0 -ml-1"
               onClick={(e) => e.stopPropagation()}
             >
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
@@ -67,6 +69,11 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
               <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                 {task.title}
               </p>
+
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <Flag className="h-2.5 w-2.5" />
+                {priorityConfig.label}
+              </div>
 
               {/* Tags */}
               {task.tags && task.tags.length > 0 && (
@@ -86,7 +93,7 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
               )}
 
               {/* Footer */}
-              <div className="flex items-center justify-between mt-2.5 gap-2">
+              <div className="flex items-center justify-between mt-2.5 gap-2 border-t border-border/60 pt-2.5">
                 <div className="flex items-center gap-2.5 text-xs text-muted-foreground min-w-0">
                   {task.dueDate && (
                     <span
@@ -100,7 +107,7 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
                     </span>
                   )}
                   {(task._count?.comments ?? 0) > 0 && (
-                    <span className="flex items-center gap-0.5 shrink-0">
+                    <span className="inline-flex items-center gap-0.5 shrink-0 rounded-full bg-secondary/70 px-1.5 py-0.5">
                       <MessageSquare className="h-3 w-3" />
                       {task._count!.comments}
                     </span>

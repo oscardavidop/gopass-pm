@@ -96,15 +96,15 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
   if (view === 'list') {
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} layout>
-        <div className="group flex items-center gap-4 px-4 py-3 bg-card border border-border rounded-xl hover:border-border/80 hover:shadow-sm transition-all">
+        <div className="group premium-panel flex items-center gap-4 px-4 py-3.5 hover:-translate-y-[1px] transition-all duration-200">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
           <Link to={`/projects/${project.id}`} className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate hover:text-primary transition-colors">{project.name}</p>
+            <p className="text-sm font-semibold truncate hover:text-primary transition-colors">{project.name}</p>
             {project.description && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">{project.description}</p>
             )}
           </Link>
-          <div className="hidden sm:flex items-center gap-2 w-28 shrink-0">
+          <div className="hidden sm:flex items-center gap-2 w-36 shrink-0">
             <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: color }} />
             </div>
@@ -129,8 +129,14 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} layout>
-      <div className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-border/80 transition-all duration-200 flex flex-col">
+      <div className="group premium-panel overflow-hidden transition-all duration-200 flex flex-col hover:-translate-y-[2px] hover:shadow-lg">
         <div className="h-1.5 shrink-0" style={{ background: `linear-gradient(90deg, ${color}, ${color}66)` }} />
+        <div className="h-16 px-4 pt-3 bg-gradient-to-br from-primary/5 to-transparent">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">Workspace Project</span>
+            <span>{project._count?.members ?? 0} collaborators</span>
+          </div>
+        </div>
         <div className="p-4 flex-1 flex flex-col gap-3">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
@@ -138,17 +144,19 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
               <h3 className="font-semibold text-foreground truncate group-hover/link:text-primary transition-colors text-sm">
                 {project.name}
               </h3>
-              {project.description && (
+              {project.description ? (
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
                   {project.description}
                 </p>
+              ) : (
+                <p className="text-xs text-muted-foreground/70 mt-0.5">No description added yet.</p>
               )}
             </Link>
             <ProjectMenu project={project} onEdit={onEdit} onDelete={onDelete} />
           </div>
 
           {/* Stats */}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground border border-border/60 rounded-lg px-2.5 py-2 bg-background/50">
             <span className="flex items-center gap-1"><CheckSquare className="h-3.5 w-3.5" />{totalTasks} task{totalTasks !== 1 ? 's' : ''}</span>
             <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{project._count?.members ?? 0}</span>
             {project.endDate && (

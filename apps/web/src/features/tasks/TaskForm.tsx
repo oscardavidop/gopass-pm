@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Calendar, Flag, Sparkles, Tag, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -89,37 +90,53 @@ export function TaskForm({ open, onClose, onSubmit, task, isLoading, defaultStat
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          {isEditing ? 'Edit Task' : 'Create Task'}
+        </div>
+      }
+      className="max-w-2xl"
+    >
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-        <Input
-          label="Task title"
-          placeholder="What needs to be done?"
-          error={errors.title?.message}
-          {...register('title')}
-        />
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5">
-            Description <span className="text-muted-foreground font-normal">(optional)</span>
-          </label>
-          <textarea
-            className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-            rows={3}
-            placeholder="Add more details…"
-            {...register('description')}
+        <div className="rounded-xl border border-border/70 bg-card/70 p-4 space-y-3">
+          <Input
+            label="Task title"
+            placeholder="What needs to be done?"
+            error={errors.title?.message}
+            className="h-10 rounded-xl"
+            {...register('title')}
           />
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">
+              Description <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <textarea
+              className="w-full resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={4}
+              placeholder="Add context, acceptance criteria or notes..."
+              {...register('description')}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Controller
             name="priority"
             control={control}
             render={({ field }) => (
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Priority</label>
+              <div className="rounded-xl border border-border/70 bg-card/70 p-3">
+                <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Flag className="h-3.5 w-3.5" />
+                  Priority
+                </label>
                 <select
                   {...field}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
@@ -133,11 +150,14 @@ export function TaskForm({ open, onClose, onSubmit, task, isLoading, defaultStat
             name="status"
             control={control}
             render={({ field }) => (
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Status</label>
+              <div className="rounded-xl border border-border/70 bg-card/70 p-3">
+                <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Status
+                </label>
                 <select
                   {...field}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="TODO">To do</option>
                   <option value="IN_PROGRESS">In progress</option>
@@ -147,21 +167,24 @@ export function TaskForm({ open, onClose, onSubmit, task, isLoading, defaultStat
               </div>
             )}
           />
-        </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Due date" type="date" {...register('dueDate')} />
+          <div className="rounded-xl border border-border/70 bg-card/70 p-3">
+            <Input label="Due date" type="date" className="h-10 rounded-xl" leftIcon={<Calendar className="h-4 w-4" />} {...register('dueDate')} />
+          </div>
 
           {members.length > 0 && (
             <Controller
               name="assigneeId"
               control={control}
               render={({ field }) => (
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Assignee</label>
+                <div className="rounded-xl border border-border/70 bg-card/70 p-3">
+                  <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <UserRound className="h-3.5 w-3.5" />
+                    Assignee
+                  </label>
                   <select
                     {...field}
-                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Unassigned</option>
                     {members.map((m) => (
@@ -176,13 +199,17 @@ export function TaskForm({ open, onClose, onSubmit, task, isLoading, defaultStat
           )}
         </div>
 
-        <Input
-          label="Tags"
-          placeholder="bug, frontend, design (comma-separated)"
-          {...register('tags')}
-        />
+        <div className="rounded-xl border border-border/70 bg-card/70 p-3">
+          <Input
+            label="Tags"
+            placeholder="bug, frontend, design"
+            leftIcon={<Tag className="h-4 w-4" />}
+            className="h-10 rounded-xl"
+            {...register('tags')}
+          />
+        </div>
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-1">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
             Cancel
           </Button>

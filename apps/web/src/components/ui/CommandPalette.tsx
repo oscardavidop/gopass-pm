@@ -1,15 +1,16 @@
-import { useEffect, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useCallback, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, FolderKanban, Calendar, Settings, User,
-  Search, Plus, LogOut, Sun, Moon, Zap, Hash,
+  Search, Plus, LogOut, Sun, Moon, Zap, Hash, Clock3, ClipboardList,
   ChevronRight, Command as CommandIcon,
 } from 'lucide-react';
 import { useUIStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
 import { useProjects } from '@/hooks/useProjects';
+import { useProjectTasks } from '@/hooks/useTasks';
 import { cn } from '@/utils/cn';
 
 interface CommandItem {
@@ -17,23 +18,40 @@ interface CommandItem {
   label: string;
   sublabel?: string;
   icon: React.ElementType;
-  color?: string;
+  colorClass?: string;
+  iconColor?: string;
   shortcut?: string[];
   action: () => void;
   group: string;
 }
 
+const RECENT_KEY = 'tasku-command-recent';
+
 export function CommandPalette() {
-  const open              = useUIStore((s) => s.commandPaletteOpen);
-  const closeCP           = useUIStore((s) => s.closeCommandPalette);
-  const toggleTheme       = useUIStore((s) => s.toggleTheme);
-  const theme             = useUIStore((s) => s.theme);
-  const logout            = useAuthStore((s) => s.clearAuth);
-  const navigate          = useNavigate();
+  const open = useUIStore((s) => s.commandPaletteOpen);
+  const closeCP = useUIStore((s) => s.closeCommandPalette);
+  const toggleTheme = useUIStore((s) => s.toggleTheme);
+  const theme = useUIStore((s) => s.theme);
+  const logout = useAuthStore((s) => s.clearAuth);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
   const { data: projectsData } = useProjects();
   const projects = projectsData?.items ?? projectsData ?? [];
+  const currentProjectId = useMemo(() => {
+    const match = location.pathname.match(/^\/projects\/([^/]+)$/);
+    return match?.[1] ?? null;
+  }, [location.pathname]);
+  const currentProject = useMemo(
+    () => (projects as any[]).find((p: any) => p.id === currentProjectId),
+    [projects, currentProjectId],
+  );
+  const { data: currentProjectTasksData } = useProjectTasks(currentProjectId ?? '', {
+    limit: 12,
+  });
+  const currentProjectTasks = currentProjectTasksData?.items ?? [];
 
   /* ── Global shortcut: ⌘K / Ctrl+K ── */
   useEffect(() => {
@@ -45,6 +63,25 @@ export function CommandPalette() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) setRecentIds(parsed.slice(0, 6));
+    } catch {
+      // Ignore localStorage parse errors
+    }
+  }, []);
+
+  const pushRecent = useCallback((id: string) => {
+    setRecentIds((prev) => {
+      const next = [id, ...prev.filter((item) => item !== id)].slice(0, 6);
+      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const go = useCallback(
@@ -60,48 +97,61 @@ export function CommandPalette() {
   const staticCommands: CommandItem[] = [
     {
       id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard,
-      color: 'text-indigo-400', group: 'Navigation',
+      colorClass: 'text-indigo-400', group: 'Navigation',
       shortcut: ['G', 'D'],
       action: () => go('/'),
     },
     {
       id: 'projects', label: 'Go to Projects', icon: FolderKanban,
-      color: 'text-violet-400', group: 'Navigation',
+      colorClass: 'text-violet-400', group: 'Navigation',
       shortcut: ['G', 'P'],
       action: () => go('/projects'),
     },
     {
       id: 'calendar', label: 'Go to Calendar', icon: Calendar,
-      color: 'text-blue-400', group: 'Navigation',
+      colorClass: 'text-blue-400', group: 'Navigation',
       action: () => go('/calendar'),
     },
     {
       id: 'profile', label: 'Go to Profile', icon: User,
-      color: 'text-emerald-400', group: 'Navigation',
+      colorClass: 'text-emerald-400', group: 'Navigation',
       shortcut: ['G', 'U'],
       action: () => go('/profile'),
     },
     {
       id: 'settings', label: 'Go to Settings', icon: Settings,
-      color: 'text-amber-400', group: 'Navigation',
+      colorClass: 'text-amber-400', group: 'Navigation',
       shortcut: ['G', 'S'],
       action: () => go('/settings'),
     },
     {
       id: 'new-project', label: 'New Project…', icon: Plus,
-      color: 'text-green-400', group: 'Create',
+      colorClass: 'text-green-400', group: 'Create',
       shortcut: ['C', 'P'],
       action: () => { go('/projects'); setTimeout(() => window.dispatchEvent(new CustomEvent('gopass:open-project-form')), 100); },
     },
     {
+      id: 'new-task', label: 'New Task…', icon: Plus,
+      colorClass: 'text-sky-400', group: 'Create',
+      shortcut: ['C', 'T'],
+      action: () => {
+        if (currentProjectId) {
+          closeCP();
+          window.dispatchEvent(new CustomEvent('gopass:open-task-form'));
+          return;
+        }
+        go('/projects');
+      },
+    },
+    {
       id: 'toggle-theme', label: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       icon: theme === 'dark' ? Sun : Moon,
-      color: 'text-yellow-400', group: 'Appearance',
+      colorClass: 'text-yellow-400', group: 'Appearance',
       action: () => { toggleTheme(); closeCP(); },
     },
     {
       id: 'logout', label: 'Sign out', icon: LogOut,
-      color: 'text-red-400', group: 'Account',
+      colorClass: 'text-red-400', group: 'Account',
       action: () => { logout(); closeCP(); navigate('/login'); },
     },
   ];
@@ -109,17 +159,65 @@ export function CommandPalette() {
   /* ── Project commands (dynamic) ── */
   const projectCommands: CommandItem[] = Array.isArray(projects)
     ? projects.slice(0, 8).map((p: any) => ({
-        id: `project-${p.id}`,
-        label: p.name,
-        sublabel: `${p._count?.tasks ?? 0} tasks`,
-        icon: Hash,
-        color: p.color ? `text-[${p.color}]` : 'text-indigo-400',
-        group: 'Projects',
-        action: () => go(`/projects/${p.id}`),
-      }))
+      id: `project-${p.id}`,
+      label: p.name,
+      sublabel: `${p._count?.tasks ?? 0} tasks`,
+      icon: Hash,
+      colorClass: p.color ? undefined : 'text-indigo-400',
+      iconColor: p.color,
+      group: 'Projects',
+      action: () => go(`/projects/${p.id}`),
+    }))
     : [];
 
-  const allCommands = [...staticCommands, ...projectCommands];
+  const contextCommands: CommandItem[] = currentProjectId
+    ? [
+      {
+        id: `context-open-project-${currentProjectId}`,
+        label: `Open ${currentProject?.name ?? 'project'} board`,
+        sublabel: 'Current context',
+        icon: FolderKanban,
+        colorClass: 'text-primary',
+        group: 'Context',
+        action: () => go(`/projects/${currentProjectId}`),
+      },
+      {
+        id: `context-new-task-${currentProjectId}`,
+        label: 'Create task in this project',
+        sublabel: 'Quick action',
+        icon: Plus,
+        colorClass: 'text-emerald-400',
+        group: 'Context',
+        shortcut: ['N', 'T'],
+        action: () => {
+          closeCP();
+          window.dispatchEvent(new CustomEvent('gopass:open-task-form'));
+        },
+      },
+    ]
+    : [];
+
+  const taskCommands: CommandItem[] = currentProjectId
+    ? currentProjectTasks.map((task: any) => ({
+      id: `context-task-${task.id}`,
+      label: task.title,
+      sublabel: task.status?.replace('_', ' '),
+      icon: ClipboardList,
+      colorClass: 'text-cyan-400',
+      group: 'Tasks in Context',
+      action: () => {
+        navigate(`/projects/${currentProjectId}`);
+        closeCP();
+        window.dispatchEvent(new CustomEvent('gopass:open-task-detail', { detail: { taskId: task.id } }));
+      },
+    }))
+    : [];
+
+  const allCommands = [...staticCommands, ...contextCommands, ...taskCommands, ...projectCommands];
+  const recentCommands = useMemo(
+    () => recentIds.map((id) => allCommands.find((cmd) => cmd.id === id)).filter(Boolean) as CommandItem[],
+    [allCommands, recentIds],
+  );
 
   /* Group commands for rendering */
   const groups = allCommands.reduce<Record<string, CommandItem[]>>((acc, cmd) => {
@@ -144,12 +242,15 @@ export function CommandPalette() {
 
           {/* Palette */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -20 }}
+            initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "calc(-50% - 20px)" }}
+            animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+            exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "calc(-50% - 20px)" }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-[20vh] left-1/2 -translate-x-1/2 z-[61] w-full max-w-xl"
+            className="fixed top-1/2 left-1/2 z-[61] w-full max-w-xl"
+          // Nota: Quitamos '-translate-x-1/2' de Tailwind
           >
+
+
             <Command
               shouldFilter={true}
               className="rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
@@ -177,6 +278,22 @@ export function CommandPalette() {
                   <p className="text-sm">No results for "{search}"</p>
                 </Command.Empty>
 
+                {search.length === 0 && recentCommands.length > 0 && (
+                  <Command.Group
+                    heading="Recent"
+                    className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:mt-2 [&_[cmdk-group-heading]]:mb-0.5"
+                  >
+                    {recentCommands.map((cmd) => (
+                      <PaletteItem
+                        key={`recent-${cmd.id}`}
+                        cmd={{ ...cmd, group: 'Recent', icon: Clock3 }}
+                        onClose={() => { closeCP(); setSearch(''); }}
+                        onSelect={() => pushRecent(cmd.id)}
+                      />
+                    ))}
+                  </Command.Group>
+                )}
+
                 {Object.entries(groups).map(([group, items]) => (
                   <Command.Group
                     key={group}
@@ -184,7 +301,12 @@ export function CommandPalette() {
                     className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:mt-2 [&_[cmdk-group-heading]]:mb-0.5"
                   >
                     {items.map((cmd) => (
-                      <PaletteItem key={cmd.id} cmd={cmd} onClose={() => { closeCP(); setSearch(''); }} />
+                      <PaletteItem
+                        key={cmd.id}
+                        cmd={cmd}
+                        onClose={() => { closeCP(); setSearch(''); }}
+                        onSelect={() => pushRecent(cmd.id)}
+                      />
                     ))}
                   </Command.Group>
                 ))}
@@ -210,13 +332,25 @@ export function CommandPalette() {
   );
 }
 
-function PaletteItem({ cmd, onClose }: { cmd: CommandItem; onClose: () => void }) {
+function PaletteItem({
+  cmd,
+  onClose,
+  onSelect,
+}: {
+  cmd: CommandItem;
+  onClose: () => void;
+  onSelect?: () => void;
+}) {
   const Icon = cmd.icon;
   return (
     <Command.Item
       key={cmd.id}
       value={`${cmd.label} ${cmd.sublabel ?? ''} ${cmd.group}`}
-      onSelect={() => { cmd.action(); onClose(); }}
+      onSelect={() => {
+        onSelect?.();
+        cmd.action();
+        onClose();
+      }}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm',
         'text-muted-foreground hover:text-foreground',
@@ -224,7 +358,13 @@ function PaletteItem({ cmd, onClose }: { cmd: CommandItem; onClose: () => void }
         'transition-colors group',
       )}
     >
-      <div className={cn('w-7 h-7 rounded-md flex items-center justify-center bg-accent/50 group-data-[selected=true]:bg-accent shrink-0', cmd.color)}>
+      <div
+        className={cn(
+          'w-7 h-7 rounded-md flex items-center justify-center bg-accent/50 group-data-[selected=true]:bg-accent shrink-0',
+          cmd.colorClass,
+        )}
+        style={cmd.iconColor ? { color: cmd.iconColor } : undefined}
+      >
         <Icon className="h-3.5 w-3.5" />
       </div>
 

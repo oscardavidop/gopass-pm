@@ -76,7 +76,7 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
     });
 
     return grouped;
-  }, [tasks, localOrder]);
+  }, [tasks, localOrder, localStatus]);
 
   const handleDragStart = useCallback(({ active }: DragStartEvent) => {
     const task = tasks.find((t) => t.id === active.id);
@@ -101,9 +101,15 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
       const srcOrder = prev[sourceStatus] ?? columns[sourceStatus].map((t) => t.id);
       const dstOrder = prev[destStatus] ?? columns[destStatus].map((t) => t.id);
       const newSrc = srcOrder.filter((id) => id !== taskId);
-      const overIndex = dstOrder.findIndex((id) => id === overId);
-      const insertAt = overIndex >= 0 ? overIndex : dstOrder.length;
-      const newDst = [...dstOrder.slice(0, insertAt), taskId, ...dstOrder.slice(insertAt)];
+      // Keep destination order unique to avoid duplicate React keys while dragging
+      const dstWithoutTask = dstOrder.filter((id) => id !== taskId);
+      const overIndex = dstWithoutTask.findIndex((id) => id === overId);
+      const insertAt = overIndex >= 0 ? overIndex : dstWithoutTask.length;
+      const newDst = [
+        ...dstWithoutTask.slice(0, insertAt),
+        taskId,
+        ...dstWithoutTask.slice(insertAt),
+      ];
       return { ...prev, [sourceStatus]: newSrc, [destStatus]: newDst };
     });
   }, [tasks, columns, localStatus]);
@@ -121,14 +127,19 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
     const task = tasks.find((t) => t.id === active.id);
     if (!task) return;
 
+    // Resolve destination: prefer column header id, then localStatus override, then server status.
+    // Using localStatus here avoids the bug where a task that was visually moved (but not yet
+    // confirmed by server) would report its OLD status as the drop target's column.
     const destColumn =
       COLUMNS.find((c) => c.id === overId)?.id ??
-      tasks.find((t) => t.id === overId)?.status;
+      (localStatus[overId] ?? tasks.find((t) => t.id === overId)?.status);
 
     if (!destColumn) return;
 
-    const prevStatus = task.status;
-    if (prevStatus !== destColumn) {
+    // Compare against persisted task status (server source of truth), not local optimistic
+    // status from handleDragOver. Otherwise cross-column drops may skip the API call.
+    const persistedStatus = task.status;
+    if (persistedStatus !== destColumn) {
       updateStatus.mutate(
         { id: task.id, status: destColumn as Task['status'] },
         {
@@ -136,7 +147,7 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
             // Clear local override — server is now source of truth
             setLocalStatus((prev) => { const { [task.id]: _, ...rest } = prev; return rest; });
             setLocalOrder((prev) => {
-              const { [prevStatus]: _s, [destColumn]: _d, ...rest } = prev;
+              const { [persistedStatus]: _s, [destColumn]: _d, ...rest } = prev;
               return rest;
             });
           },
