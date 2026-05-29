@@ -10,13 +10,26 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/Select';
-import { useTask, useDeleteTask, useAddComment, useUpdateTask } from '@/hooks/useTasks';
-import { timeAgo, formatDate } from '@/utils/formatters';
+import {
+  useTask,
+  useDeleteTask,
+  useAddComment,
+  useUpdateTask,
+  useAddSubtask,
+  useUpdateSubtask,
+  useDeleteSubtask,
+  useReorderSubtasks,
+} from '@/hooks/useTasks';
+import { useGenerateSubtasksAi, useImproveDescriptionAi, useSuggestPriorityAi } from '@/hooks/useAi';
+import { timeAgo } from '@/utils/formatters';
+import { isRichTextEmpty, sanitizeRichText } from '@/utils/richText';
 import { type Task, type TaskStatus, type Priority } from '@/types/task.types';
 import { cn } from '@/utils/cn';
+import toast from 'react-hot-toast';
 
 /* ─── config maps ──────────────────────────────────────────── */
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -62,6 +75,13 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const deleteTask  = useDeleteTask();
   const addComment  = useAddComment(taskId ?? '');
   const updateTask  = useUpdateTask();
+  const improveDescriptionAi = useImproveDescriptionAi();
+  const generateSubtasksAi = useGenerateSubtasksAi();
+  const suggestPriorityAi = useSuggestPriorityAi();
+  const addSubtask = useAddSubtask(taskId ?? '');
+  const updateSubtask = useUpdateSubtask(taskId ?? '');
+  const deleteSubtask = useDeleteSubtask(taskId ?? '');
+  const reorderSubtasks = useReorderSubtasks(taskId ?? '');
 
   const handleDelete = useCallback(async () => {
     if (!taskId) return;
@@ -92,9 +112,9 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
     if (!task || !draftDirty) return;
 
     const nextTitle = titleDraft.trim();
-    const nextDesc = descDraft.trim();
+    const nextDesc = sanitizeRichText(descDraft);
     const baseTitle = task.title ?? '';
-    const baseDesc = task.description ?? '';
+    const baseDesc = sanitizeRichText(task.description ?? '');
 
     if (nextTitle.length < 2) return;
     if (nextTitle === baseTitle && nextDesc === baseDesc) {
@@ -106,7 +126,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
       id: task.id,
       data: {
         title: nextTitle,
-        description: nextDesc || undefined,
+        description: isRichTextEmpty(nextDesc) ? undefined : nextDesc,
       },
     });
     setDraftDirty(false);
@@ -130,6 +150,53 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
       data: { dueDate: normalized },
     });
   }, [task, updateTask]);
+
+  const handleImproveDescription = useCallback(async () => {
+    if (!task) return;
+    if (!descDraft.trim()) {
+      toast.error('Add a description first');
+      return;
+    }
+    const response = await improveDescriptionAi.mutateAsync({
+      projectId: task.projectId,
+      title: titleDraft,
+      description: descDraft,
+    });
+    setDescDraft(response.improvedDescription);
+    setDraftDirty(true);
+    toast.success('Description improved');
+  }, [task, titleDraft, descDraft, improveDescriptionAi]);
+
+  const handleGenerateSubtasks = useCallback(async () => {
+    if (!task) return;
+    const response = await generateSubtasksAi.mutateAsync({
+      projectId: task.projectId,
+      title: titleDraft || task.title,
+      description: descDraft || undefined,
+    });
+
+    if (!response.subtasks.length) return;
+
+    for (const subtask of response.subtasks) {
+      await addSubtask.mutateAsync({ title: subtask.title });
+    }
+    toast.success('AI subtasks created');
+  }, [task, titleDraft, descDraft, generateSubtasksAi, addSubtask]);
+
+  const handleSuggestPriority = useCallback(async () => {
+    if (!task) return;
+    const response = await suggestPriorityAi.mutateAsync({
+      projectId: task.projectId,
+      title: titleDraft || task.title,
+      description: descDraft || undefined,
+      dueDate: dueDateDraft || undefined,
+    });
+    await updateTask.mutateAsync({
+      id: task.id,
+      data: { priority: response.priority },
+    });
+    toast.success(`Priority updated to ${response.priority}`);
+  }, [task, titleDraft, descDraft, dueDateDraft, suggestPriorityAi, updateTask]);
 
   return (
     <>
@@ -235,19 +302,28 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         Autosave {autosave ? 'on' : 'off'}
                       </button>
                     </div>
-                    <textarea
+                    <RichTextEditor
+                      label="Description"
                       value={descDraft}
-                      onChange={(e) => {
-                        setDescDraft(e.target.value);
+                      onChange={(nextValue) => {
+                        setDescDraft(nextValue);
                         setDraftDirty(true);
                       }}
-                      onBlur={() => {
-                        if (!autosave) persistDraft();
-                      }}
-                      rows={3}
-                      className="w-full resize-none rounded-xl border border-border/70 bg-background/50 px-3 py-2 text-sm leading-relaxed text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      maxLength={5000}
+                      minHeightClassName="min-h-[140px]"
                       placeholder="Add context, acceptance criteria or implementation notes..."
                     />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleImproveDescription} isLoading={improveDescriptionAi.isPending}>
+                        Improve description
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleGenerateSubtasks} isLoading={generateSubtasksAi.isPending}>
+                        Generate subtasks
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleSuggestPriority} isLoading={suggestPriorityAi.isPending}>
+                        Suggest priority
+                      </Button>
+                    </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">{autosave ? 'Changes are saved automatically' : 'Manual save mode'}</span>
                       <Button
@@ -395,7 +471,15 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
 
                     {/* Tab: Subtasks placeholder */}
                     {activeTab === 'details' && (
-                      <SubtasksPanel task={task as Task} />
+                      <SubtasksPanel
+                        task={task as Task}
+                        onCreate={async (title) => addSubtask.mutateAsync({ title })}
+                        onToggle={async (subtaskId, completed) => updateSubtask.mutateAsync({ subtaskId, data: { completed } })}
+                        onRename={async (subtaskId, title) => updateSubtask.mutateAsync({ subtaskId, data: { title } })}
+                        onDelete={async (subtaskId) => deleteSubtask.mutateAsync({ subtaskId })}
+                        onReorder={async (orderedIds) => reorderSubtasks.mutateAsync({ orderedIds })}
+                        isBusy={addSubtask.isPending || updateSubtask.isPending || deleteSubtask.isPending || reorderSubtasks.isPending}
+                      />
                     )}
 
                     {/* Tab: Activity */}
@@ -436,34 +520,60 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
 }
 
 /* ─── sub-panels ────────────────────────────────────────────── */
-function SubtasksPanel({ task }: { task: Task }) {
-  const [items, setItems] = useState<{ id: string; title: string; done: boolean }[]>([]);
+function SubtasksPanel({
+  task,
+  onCreate,
+  onToggle,
+  onRename,
+  onDelete,
+  onReorder,
+  isBusy,
+}: {
+  task: Task;
+  onCreate: (title: string) => Promise<void>;
+  onToggle: (subtaskId: string, completed: boolean) => Promise<void>;
+  onRename: (subtaskId: string, title: string) => Promise<void>;
+  onDelete: (subtaskId: string) => Promise<void>;
+  onReorder: (orderedIds: string[]) => Promise<void>;
+  isBusy: boolean;
+}) {
   const [input, setInput] = useState('');
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
-  const toggle = (id: string) =>
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+  const items = task.subtasks ?? [];
+  const done = items.filter((item) => item.completed).length;
 
-  const addItem = () => {
-    if (!input.trim()) return;
-    setItems((prev) => [...prev, { id: crypto.randomUUID(), title: input.trim(), done: false }]);
+  const addItem = async () => {
+    const title = input.trim();
+    if (!title) return;
+    await onCreate(title);
     setInput('');
     setAdding(false);
   };
 
-  const done = items.filter((i) => i.done).length;
+  const moveItem = async (index: number, direction: 'up' | 'down') => {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= items.length) return;
+
+    const reordered = [...items];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(target, 0, moved);
+    await onReorder(reordered.map((item) => item.id));
+  };
 
   return (
     <div className="space-y-2">
       {items.length > 0 && (
         <>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>{done}/{items.length} completed</span>
             <span>{Math.round((done / items.length) * 100)}%</span>
           </div>
-          <div className="w-full h-1 bg-secondary rounded-full overflow-hidden mb-3">
+          <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-secondary">
             <motion.div
-              className="h-full bg-emerald-400 rounded-full"
+              className="h-full rounded-full bg-emerald-400"
               initial={{ width: 0 }}
               animate={{ width: `${(done / items.length) * 100}%` }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
@@ -473,22 +583,88 @@ function SubtasksPanel({ task }: { task: Task }) {
       )}
 
       <div className="space-y-1">
-        {items.map((item) => (
-          <motion.button
+        {items.map((item, index) => (
+          <div
             key={item.id}
-            layout
-            onClick={() => toggle(item.id)}
-            className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-accent/50 transition-colors text-left group"
+            className="group flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-accent/50"
           >
-            {item.done ? (
-              <CheckSquare className="h-4 w-4 text-emerald-400 shrink-0" />
+            <button
+              disabled={isBusy}
+              onClick={() => onToggle(item.id, !item.completed)}
+              className="shrink-0"
+            >
+              {item.completed ? (
+                <CheckSquare className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <Square className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+              )}
+            </button>
+
+            {editingId === item.id ? (
+              <input
+                autoFocus
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={async () => {
+                  const next = editingTitle.trim();
+                  if (next && next !== item.title) {
+                    await onRename(item.id, next);
+                  }
+                  setEditingId(null);
+                }}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const next = editingTitle.trim();
+                    if (next && next !== item.title) {
+                      await onRename(item.id, next);
+                    }
+                    setEditingId(null);
+                  }
+                  if (e.key === 'Escape') {
+                    setEditingId(null);
+                  }
+                }}
+                className="h-7 flex-1 rounded-md border border-input bg-background/70 px-2 text-sm"
+              />
             ) : (
-              <Square className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0 transition-colors" />
+              <button
+                onClick={() => {
+                  setEditingId(item.id);
+                  setEditingTitle(item.title);
+                }}
+                className={cn('flex-1 text-left text-sm', item.completed && 'line-through text-muted-foreground')}
+              >
+                {item.title}
+              </button>
             )}
-            <span className={cn('text-sm', item.done && 'line-through text-muted-foreground')}>
-              {item.title}
-            </span>
-          </motion.button>
+
+            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                disabled={isBusy || index === 0}
+                onClick={() => moveItem(index, 'up')}
+                className="rounded p-1 text-xs text-muted-foreground hover:bg-accent"
+                title="Move up"
+              >
+                ↑
+              </button>
+              <button
+                disabled={isBusy || index === items.length - 1}
+                onClick={() => moveItem(index, 'down')}
+                className="rounded p-1 text-xs text-muted-foreground hover:bg-accent"
+                title="Move down"
+              >
+                ↓
+              </button>
+              <button
+                disabled={isBusy}
+                onClick={() => onDelete(item.id)}
+                className="rounded p-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                title="Delete"
+              >
+                ×
+              </button>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -500,7 +676,7 @@ function SubtasksPanel({ task }: { task: Task }) {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex gap-2 mt-2">
+            <div className="mt-2 flex gap-2">
               <input
                 autoFocus
                 value={input}
@@ -510,16 +686,16 @@ function SubtasksPanel({ task }: { task: Task }) {
                   if (e.key === 'Escape') { setAdding(false); setInput(''); }
                 }}
                 placeholder="Subtask title…"
-                className="flex-1 text-sm bg-background/60 border border-input rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+                className="flex-1 rounded-md border border-input bg-background/60 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <Button size="sm" onClick={addItem} disabled={!input.trim()}>Add</Button>
+              <Button size="sm" onClick={addItem} disabled={!input.trim() || isBusy}>Add</Button>
               <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setInput(''); }}>Cancel</Button>
             </div>
           </motion.div>
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors py-1"
+            className="mt-1 flex items-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-primary"
           >
             <Plus className="h-3.5 w-3.5" />
             Add subtask
@@ -528,8 +704,8 @@ function SubtasksPanel({ task }: { task: Task }) {
       </AnimatePresence>
 
       {items.length === 0 && !adding && (
-        <div className="text-center py-6 text-muted-foreground text-sm">
-          <CheckSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+        <div className="py-6 text-center text-sm text-muted-foreground">
+          <CheckSquare className="mx-auto mb-2 h-8 w-8 opacity-30" />
           No subtasks yet
         </div>
       )}

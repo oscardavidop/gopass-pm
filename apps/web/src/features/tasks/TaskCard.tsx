@@ -44,9 +44,9 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
         exit={{ opacity: 0, scale: 0.95, y: -4 }}
         transition={{ duration: 0.15 }}
         className={cn(
-          'bg-card border border-border/80 rounded-xl cursor-pointer group',
+          'bg-card border border-border/85 rounded-xl cursor-pointer group',
           'border-l-[3px]', priorityConfig.border,
-          'hover:shadow-md hover:border-border transition-all duration-150',
+          'hover:shadow-md hover:border-border hover:bg-accent/20 transition-all duration-150',
           isDragging && 'card-drag-shadow ring-2 ring-primary/30',
         )}
         style={{
@@ -70,7 +70,7 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
                 {task.title}
               </p>
 
-              <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-border/80 bg-secondary/75 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 <Flag className="h-2.5 w-2.5" />
                 {priorityConfig.label}
               </div>
@@ -81,7 +81,7 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
                   {task.tags.slice(0, 3).map((tag) => (
                     <span
                       key={tag}
-                      className="text-[10px] bg-secondary px-1.5 py-0.5 rounded-full text-muted-foreground font-medium"
+                      className="text-[10px] border border-border/70 bg-secondary/85 px-1.5 py-0.5 rounded-full text-muted-foreground font-medium"
                     >
                       {tag}
                     </span>
@@ -107,7 +107,7 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
                     </span>
                   )}
                   {(task._count?.comments ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-0.5 shrink-0 rounded-full bg-secondary/70 px-1.5 py-0.5">
+                    <span className="inline-flex items-center gap-0.5 shrink-0 rounded-full border border-border/70 bg-secondary/85 px-1.5 py-0.5">
                       <MessageSquare className="h-3 w-3" />
                       {task._count!.comments}
                     </span>

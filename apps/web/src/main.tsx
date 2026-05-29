@@ -22,12 +22,38 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <App />
       <Toaster
-        position="bottom-right"
+        position="bottom-center"
+        reverseOrder={false}
+        gutter={10}
+        containerStyle={{
+          bottom: 'max(18px, env(safe-area-inset-bottom))',
+          left: '12px',
+          right: '12px',
+        }}
         toastOptions={{
+          duration: 2800,
+          className: 'tasku-notch-toast',
           style: {
-            background: 'hsl(var(--card))',
-            color: 'hsl(var(--foreground))',
-            border: '1px solid hsl(var(--border))',
+            maxWidth: 'min(92vw, 560px)',
+            width: 'max-content',
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none',
+            padding: '0',
+          },
+          success: {
+            className: 'tasku-notch-toast tasku-notch-toast--success',
+            iconTheme: {
+              primary: 'hsl(var(--success))',
+              secondary: 'hsl(var(--card))',
+            },
+          },
+          error: {
+            className: 'tasku-notch-toast tasku-notch-toast--error',
+            iconTheme: {
+              primary: 'hsl(var(--destructive))',
+              secondary: 'hsl(var(--card))',
+            },
           },
         }}
       />

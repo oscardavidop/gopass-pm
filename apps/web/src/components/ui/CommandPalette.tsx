@@ -144,6 +144,19 @@ export function CommandPalette() {
       },
     },
     {
+      id: 'new-task-ai', label: 'Generate Task with AI…', icon: Zap,
+      colorClass: 'text-violet-400', group: 'Create',
+      shortcut: ['N'],
+      action: () => {
+        if (currentProjectId) {
+          closeCP();
+          window.dispatchEvent(new CustomEvent('gopass:open-task-form'));
+          return;
+        }
+        go('/projects');
+      },
+    },
+    {
       id: 'toggle-theme', label: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       icon: theme === 'dark' ? Sun : Moon,
       colorClass: 'text-yellow-400', group: 'Appearance',

@@ -11,6 +11,7 @@ import { Sparkles, FolderKanban, Calendar, Tag, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import {
   DrawerRoot,
   DrawerContent,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/Drawer';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
+import { isRichTextEmpty } from '@/utils/richText';
 import { type Project } from '@/types/project.types';
 
 const COLOR_SWATCHES = [
@@ -48,7 +50,7 @@ const STATUS_OPTIONS = [
 
 const schema = z.object({
   name: z.string().min(2, 'At least 2 characters').max(100, 'Max 100 characters'),
-  description: z.string().max(500, 'Max 500 characters').optional(),
+  description: z.string().max(3000, 'Max 3000 characters').optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid hex color'),
   status: z.enum(['ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']),
   startDate: z.string().optional(),
@@ -116,7 +118,10 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
   }, [project, reset, open]);
 
   const handleFormSubmit = async (data: ProjectFormData) => {
-    await onSubmit(data);
+    await onSubmit({
+      ...data,
+      description: isRichTextEmpty(data.description) ? undefined : data.description,
+    });
   };
 
   return (
@@ -124,7 +129,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
       <DrawerContent size="md">
         {/* Color preview header */}
         <motion.div
-          className="h-24 shrink-0 relative overflow-hidden"
+          className="h-20 shrink-0 relative overflow-hidden"
           animate={{ background: `linear-gradient(135deg, ${selectedColor}cc, ${selectedColor}44)` }}
           transition={{ duration: 0.4 }}
         >
@@ -150,7 +155,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
           </div>
         </motion.div>
 
-        <DrawerHeader className="border-t-0 pt-4">
+        {/* <DrawerHeader className="border-t-0 pt-4">
           <DrawerTitle>
             {isEditing ? 'Edit project' : (
               <span className="flex items-center gap-2">
@@ -164,7 +169,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
               ? 'Update your project details below.'
               : 'Fill in the details to create a new project.'}
           </DrawerDescription>
-        </DrawerHeader>
+        </DrawerHeader> */}
 
         <DrawerBody>
           <form id="project-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
@@ -178,26 +183,21 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
             />
 
             {/* Description */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5 text-foreground">
-                Description
-                <span className="text-muted-foreground font-normal ml-1">(optional)</span>
-              </label>
-              <textarea
-                className={cn(
-                  'w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm',
-                  'placeholder:text-muted-foreground',
-                  'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent',
-                  'resize-none transition-colors',
-                )}
-                rows={3}
-                placeholder="What's this project about?"
-                {...register('description')}
-              />
-              {errors.description && (
-                <p className="text-xs text-destructive mt-1">{errors.description.message}</p>
+            <Controller
+              name="description"
+              control={control}
+              render={({ field, fieldState }) => (
+                <RichTextEditor
+                  label="Description"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  placeholder="Describe goals, scope, dependencies and delivery notes..."
+                  error={fieldState.error?.message}
+                  maxLength={3000}
+                  minHeightClassName="min-h-[150px]"
+                />
               )}
-            </div>
+            />
 
             {/* Color picker */}
             <div>

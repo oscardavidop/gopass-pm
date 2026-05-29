@@ -85,3 +85,52 @@ export function useAddComment(taskId: string) {
     onError: () => toast.error('Failed to add comment'),
   });
 }
+
+export function useAddSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ title }: { title: string }) => tasksService.addSubtask(taskId, title),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => toast.error('Failed to add subtask'),
+  });
+}
+
+export function useUpdateSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ subtaskId, data }: { subtaskId: string; data: { title?: string; completed?: boolean; position?: number } }) =>
+      tasksService.updateSubtask(taskId, subtaskId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => toast.error('Failed to update subtask'),
+  });
+}
+
+export function useDeleteSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ subtaskId }: { subtaskId: string }) => tasksService.deleteSubtask(taskId, subtaskId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => toast.error('Failed to delete subtask'),
+  });
+}
+
+export function useReorderSubtasks(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderedIds }: { orderedIds: string[] }) => tasksService.reorderSubtasks(taskId, orderedIds),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => toast.error('Failed to reorder subtasks'),
+  });
+}

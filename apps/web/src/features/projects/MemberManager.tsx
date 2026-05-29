@@ -72,10 +72,7 @@ export function MemberManagerTrigger({
               firstName={u!.firstName}
               lastName={u!.lastName}
               size="xs"
-              className="
-                border-2 border-[#0b1220]
-                shadow-sm
-              "
+              className=""
             />
           </div>
         ))}

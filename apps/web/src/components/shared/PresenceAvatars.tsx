@@ -31,7 +31,7 @@ export function PresenceAvatars({ projectId }: PresenceAvatarsProps) {
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             >
               <Tooltip content={`${u.firstName} ${u.lastName}`}>
-                <div className="ring-2 ring-background rounded-full">
+                <div className="rounded-full">
                   <Avatar
                     src={u.avatar}
                     firstName={u.firstName}

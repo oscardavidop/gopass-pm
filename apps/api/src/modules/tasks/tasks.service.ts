@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Role, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
@@ -24,15 +25,35 @@ export class TasksService {
     await this.assertProjectAccess(projectId, userId);
 
     const dueDate = this.normalizeDueDate(dto.dueDate);
+    const { subtasks = [], ...taskPayload } = dto;
 
-    const task = await this.prisma.task.create({
-      data: {
-        ...dto,
-        projectId,
-        creatorId: userId,
-        dueDate,
-      },
-      include: this.taskIncludes(),
+    const task = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          ...taskPayload,
+          projectId,
+          creatorId: userId,
+          dueDate,
+        },
+      });
+
+      if (subtasks.length > 0) {
+        await tx.subtask.createMany({
+          data: subtasks
+            .map((subtask, index) => ({
+              parentTaskId: created.id,
+              title: subtask.title.trim(),
+              completed: subtask.completed ?? false,
+              position: subtask.position ?? index,
+            }))
+            .filter((subtask) => subtask.title.length >= 2),
+        });
+      }
+
+      return tx.task.findUniqueOrThrow({
+        where: { id: created.id },
+        include: this.taskIncludes(),
+      });
     });
 
     this.events.emitTaskCreated(projectId, task);
@@ -131,10 +152,12 @@ export class TasksService {
       }
     }
 
+    const { subtasks: _ignoredSubtasks, ...dtoData } = dto;
+
     const updated = await this.prisma.task.update({
       where: { id },
       data: {
-        ...dto,
+        ...dtoData,
         dueDate,
       },
       include: this.taskIncludes(),
@@ -222,6 +245,169 @@ export class TasksService {
     });
   }
 
+  async addSubtask(taskId: string, title: string, userId: string) {
+    const task = await this.findOne(taskId, userId);
+    const existingCount = await this.prisma.subtask.count({ where: { parentTaskId: taskId } });
+
+    const subtask = await this.prisma.subtask.create({
+      data: {
+        parentTaskId: taskId,
+        title: title.trim(),
+        position: existingCount,
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        action: 'SUBTASK_CREATED',
+        entity: 'Subtask',
+        entityId: subtask.id,
+        newValue: { title: subtask.title, position: subtask.position },
+        userId,
+        taskId,
+      },
+    });
+
+    const updatedTask = await this.prisma.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: this.taskIncludes(),
+    });
+
+    this.events.emitTaskUpdated(task.projectId, updatedTask);
+    return subtask;
+  }
+
+  async updateSubtask(taskId: string, subtaskId: string, data: { title?: string; completed?: boolean; position?: number }, userId: string) {
+    const task = await this.findOne(taskId, userId);
+
+    const subtask = await this.prisma.subtask.findFirst({
+      where: { id: subtaskId, parentTaskId: taskId },
+    });
+
+    if (!subtask) throw new NotFoundException('Subtask not found');
+
+    const updated = await this.prisma.subtask.update({
+      where: { id: subtaskId },
+      data: {
+        ...(data.title !== undefined && { title: data.title.trim() }),
+        ...(data.completed !== undefined && { completed: data.completed }),
+        ...(data.position !== undefined && { position: data.position }),
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        action: 'SUBTASK_UPDATED',
+        entity: 'Subtask',
+        entityId: subtaskId,
+        oldValue: { title: subtask.title, completed: subtask.completed, position: subtask.position },
+        newValue: { title: updated.title, completed: updated.completed, position: updated.position },
+        userId,
+        taskId,
+      },
+    });
+
+    const updatedTask = await this.prisma.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: this.taskIncludes(),
+    });
+    this.events.emitTaskUpdated(task.projectId, updatedTask);
+
+    return updated;
+  }
+
+  async removeSubtask(taskId: string, subtaskId: string, userId: string) {
+    const task = await this.findOne(taskId, userId);
+
+    const subtask = await this.prisma.subtask.findFirst({
+      where: { id: subtaskId, parentTaskId: taskId },
+    });
+
+    if (!subtask) throw new NotFoundException('Subtask not found');
+
+    await this.prisma.subtask.delete({ where: { id: subtaskId } });
+
+    await this.prisma.activityLog.create({
+      data: {
+        action: 'SUBTASK_DELETED',
+        entity: 'Subtask',
+        entityId: subtaskId,
+        oldValue: { title: subtask.title, position: subtask.position },
+        userId,
+        taskId,
+      },
+    });
+
+    const rest = await this.prisma.subtask.findMany({
+      where: { parentTaskId: taskId },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    });
+
+    await this.prisma.$transaction(
+      rest.map((item, index) =>
+        this.prisma.subtask.update({
+          where: { id: item.id },
+          data: { position: index },
+        }),
+      ),
+    );
+
+    const updatedTask = await this.prisma.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: this.taskIncludes(),
+    });
+    this.events.emitTaskUpdated(task.projectId, updatedTask);
+
+    return { id: subtaskId };
+  }
+
+  async reorderSubtasks(taskId: string, orderedIds: string[], userId: string) {
+    const task = await this.findOne(taskId, userId);
+
+    const subtasks = await this.prisma.subtask.findMany({
+      where: { parentTaskId: taskId },
+      select: { id: true },
+    });
+
+    if (subtasks.length !== orderedIds.length) {
+      throw new BadRequestException('Invalid subtask order payload');
+    }
+
+    const validIds = new Set(subtasks.map((subtask) => subtask.id));
+    if (orderedIds.some((id) => !validIds.has(id))) {
+      throw new BadRequestException('Invalid subtask ids in reorder payload');
+    }
+
+    await this.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        this.prisma.subtask.update({
+          where: { id },
+          data: { position: index },
+        }),
+      ),
+    );
+
+    await this.prisma.activityLog.create({
+      data: {
+        action: 'SUBTASK_REORDERED',
+        entity: 'Subtask',
+        entityId: taskId,
+        newValue: { orderedIds },
+        userId,
+        taskId,
+      },
+    });
+
+    const updatedTask = await this.prisma.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: this.taskIncludes(),
+    });
+    this.events.emitTaskUpdated(task.projectId, updatedTask);
+
+    return updatedTask.subtasks;
+  }
+
   private async assertProjectAccess(projectId: string, userId: string) {
     const project = await this.prisma.project.findFirst({
       where: {
@@ -242,6 +428,9 @@ export class TasksService {
       },
       creator: {
         select: { id: true, firstName: true, lastName: true, avatar: true },
+      },
+      subtasks: {
+        orderBy: { position: 'asc' as const },
       },
       _count: {
         select: { comments: { where: { deletedAt: null } } },

@@ -11,6 +11,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { EventsModule } from './modules/events/events.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
     DashboardModule,
     EventsModule,
     SchedulerModule,
+    AiModule,
   ],
 })
 export class AppModule {}

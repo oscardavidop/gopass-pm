@@ -9,9 +9,29 @@ import {
   MinLength,
   IsInt,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority, TaskStatus } from '@prisma/client';
+
+export class CreateSubtaskDto {
+  @ApiProperty({ example: 'Implement webhook signature validation' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  title: string;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  completed?: boolean;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  position?: number;
+}
 
 export class CreateTaskDto {
   @ApiProperty({ example: 'Implement JWT authentication' })
@@ -23,7 +43,7 @@ export class CreateTaskDto {
   @ApiPropertyOptional({ example: 'Access + Refresh token strategy' })
   @IsString()
   @IsOptional()
-  @MaxLength(2000)
+  @MaxLength(5000)
   description?: string;
 
   @ApiPropertyOptional({ enum: Priority, default: 'MEDIUM' })
@@ -57,4 +77,11 @@ export class CreateTaskDto {
   @Min(0)
   @IsOptional()
   position?: number = 0;
+
+  @ApiPropertyOptional({ type: [CreateSubtaskDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSubtaskDto)
+  subtasks?: CreateSubtaskDto[] = [];
 }

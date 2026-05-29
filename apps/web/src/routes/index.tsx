@@ -11,6 +11,7 @@ import { ProjectDetailPage } from '@/pages/projects/ProjectDetailPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { LandingPage } from '@/pages/LandingPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -25,10 +26,16 @@ function GuestOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RootPage() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  return <LandingPage />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<RootPage />} />
 
       {/* Auth */}
       <Route element={<GuestOnly><AuthLayout /></GuestOnly>}>

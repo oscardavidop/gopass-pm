@@ -26,6 +26,16 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
   CRITICAL: 'text-red-500',
 };
 
+export interface Subtask {
+  id: string;
+  parentTaskId: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -35,6 +45,7 @@ export interface Task {
   dueDate: string | null;
   position: number;
   tags: string[];
+  subtasks: Subtask[];
   projectId: string;
   assigneeId: string | null;
   assignee: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'> | null;
@@ -78,6 +89,11 @@ export interface CreateTaskPayload {
   dueDate?: string;
   assigneeId?: string;
   tags?: string[];
+  subtasks?: Array<{
+    title: string;
+    completed?: boolean;
+    position?: number;
+  }>;
   position?: number;
 }
 

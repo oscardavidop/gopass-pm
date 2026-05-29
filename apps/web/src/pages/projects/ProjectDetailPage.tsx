@@ -1,21 +1,25 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge } from 'lucide-react';
+import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge, ChevronDown, Bot, FilePenLine } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { KanbanBoard } from '@/features/tasks/KanbanBoard';
+import { AiTaskCreateDrawer } from '@/features/tasks/AiTaskCreateDrawer';
+import { ManualTaskCreateDrawer } from '@/features/tasks/ManualTaskCreateDrawer';
 import { TaskForm } from '@/features/tasks/TaskForm';
 import { TaskDrawer } from '@/features/tasks/TaskDrawer';
 import { TaskFilters } from '@/features/tasks/TaskFilters';
 import { PresenceAvatars } from '@/components/shared/PresenceAvatars';
 import { MemberManager } from '@/features/projects/MemberManager';
 import { useProject } from '@/hooks/useProjects';
-import { useProjectTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
+import { useProjectTasks, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuthStore } from '@/store/auth.store';
+import { stripRichText } from '@/utils/richText';
 import { type Priority, type Task, type TaskStatus } from '@/types/task.types';
 
 const STATUS_VARIANT: Record<string, any> = {
@@ -39,7 +43,11 @@ export function ProjectDetailPage() {
   const [search, setSearch] = useState('');
   const [priority, setPriority] = useState<Priority | ''>('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
-  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [aiCreateOpen, setAiCreateOpen] = useState(false);
+  const [manualCreateOpen, setManualCreateOpen] = useState(false);
+  const [taskEditOpen, setTaskEditOpen] = useState(false);
+  const [taskIdeaSeed, setTaskIdeaSeed] = useState('');
+  const [manualTitleSeed, setManualTitleSeed] = useState('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus>('TODO');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -61,7 +69,8 @@ export function ProjectDetailPage() {
     const handleOpenTaskForm = () => {
       setDefaultStatus('TODO');
       setEditingTask(null);
-      setTaskFormOpen(true);
+      setTaskIdeaSeed('');
+      setAiCreateOpen(true);
     };
     const handleOpenTaskDetail = (e: Event) => {
       const detail = (e as CustomEvent<{ taskId?: string }>).detail;
@@ -75,6 +84,27 @@ export function ProjectDetailPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTextInput = !!target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.getAttribute('contenteditable') === 'true'
+      );
+      if (isTextInput) return;
+      if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setEditingTask(null);
+        setDefaultStatus('TODO');
+        setManualTitleSeed('');
+        setManualCreateOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const debouncedSearch = useDebounce(search, 300);
 
   const { data: project, isLoading: projectLoading } = useProject(id!);
@@ -85,7 +115,6 @@ export function ProjectDetailPage() {
     limit: 200,
   });
 
-  const createTask = useCreateTask(id!);
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
@@ -102,6 +131,10 @@ export function ProjectDetailPage() {
 
   const doneCount = useMemo(() => tasks.filter((t) => t.status === 'DONE').length, [tasks]);
   const progress  = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const projectDescriptionPreview = useMemo(
+    () => stripRichText(project?.description ?? ''),
+    [project?.description],
+  );
   const inProgressCount = useMemo(() => tasks.filter((t) => t.status === 'IN_PROGRESS').length, [tasks]);
   const reviewCount = useMemo(() => tasks.filter((t) => t.status === 'REVIEW').length, [tasks]);
   const todoCount = useMemo(() => tasks.filter((t) => t.status === 'TODO').length, [tasks]);
@@ -113,23 +146,21 @@ export function ProjectDetailPage() {
   const handleAddTask = useCallback((status: string) => {
     setDefaultStatus(status as TaskStatus);
     setEditingTask(null);
-    setTaskFormOpen(true);
+    setTaskIdeaSeed('');
+    setAiCreateOpen(true);
   }, []);
 
   const handleQuickAdd = useCallback(async (status: string, title: string) => {
-    await createTask.mutateAsync({ title, status: status as TaskStatus, priority: 'MEDIUM' });
-  }, [createTask]);
-
-  const handleCreateTask = useCallback(async (formData: any) => {
-    await createTask.mutateAsync(formData);
-    setTaskFormOpen(false);
-  }, [createTask]);
+    setDefaultStatus(status as TaskStatus);
+    setManualTitleSeed(title);
+    setManualCreateOpen(true);
+  }, []);
 
   const handleEditTask = useCallback(async (formData: any) => {
     if (!editingTask) return;
     await updateTask.mutateAsync({ id: editingTask.id, data: formData });
     setEditingTask(null);
-    setTaskFormOpen(false);
+    setTaskEditOpen(false);
   }, [editingTask, updateTask]);
 
   const handleDeleteTask = useCallback(async () => {
@@ -196,33 +227,33 @@ export function ProjectDetailPage() {
                 <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="text-xs">
                   {STATUS_LABEL[project.status] ?? project.status}
                 </Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/12 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">
                   <Sparkles className="h-3 w-3" />
                   Live workspace
                 </span>
               </div>
-              {project.description && (
-                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{project.description}</p>
+              {projectDescriptionPreview && (
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{projectDescriptionPreview}</p>
               )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+            <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
               <p className="text-muted-foreground">Total tasks</p>
               <p className="mt-0.5 text-base font-semibold">{tasks.length}</p>
             </div>
-            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+            <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
               <p className="text-muted-foreground">In progress</p>
-              <p className="mt-0.5 text-base font-semibold text-blue-400">{inProgressCount}</p>
+              <p className="mt-0.5 text-base font-semibold text-blue-700 dark:text-blue-400">{inProgressCount}</p>
             </div>
-            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+            <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
               <p className="text-muted-foreground">In review</p>
-              <p className="mt-0.5 text-base font-semibold text-amber-400">{reviewCount}</p>
+              <p className="mt-0.5 text-base font-semibold text-amber-700 dark:text-amber-400">{reviewCount}</p>
             </div>
-            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2">
+            <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
               <p className="text-muted-foreground">Completed</p>
-              <p className="mt-0.5 text-base font-semibold text-emerald-400">{doneCount}</p>
+              <p className="mt-0.5 text-base font-semibold text-emerald-700 dark:text-emerald-400">{doneCount}</p>
             </div>
           </div>
         </div>
@@ -246,13 +277,13 @@ export function ProjectDetailPage() {
           <div className="flex items-center gap-3">
             {tasks.length > 0 && (
               <div className="hidden sm:flex items-center gap-2">
-                <div className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
+                <div className="inline-flex items-center gap-1 rounded-full border border-border/75 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
                   <Gauge className="h-3 w-3" />
                   Sprint completion
                 </div>
                 <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                    className="h-full bg-emerald-600 dark:bg-emerald-400 rounded-full transition-all duration-500"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -260,13 +291,55 @@ export function ProjectDetailPage() {
               </div>
             )}
 
-            <Button
-              size="sm"
-              onClick={() => handleAddTask('TODO')}
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Add task
-            </Button>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <Button size="sm" className="inline-flex items-center gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  New Task
+                  <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  sideOffset={8}
+                  align="end"
+                  className="z-50 w-72 rounded-xl border border-border bg-card p-1.5 shadow-xl"
+                >
+                  <DropdownMenu.Item
+                    className="cursor-pointer rounded-lg px-3 py-2 outline-none transition-colors hover:bg-accent"
+                    onSelect={() => {
+                      setDefaultStatus('TODO');
+                      setTaskIdeaSeed('');
+                      setAiCreateOpen(true);
+                    }}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="mt-0.5 rounded-md bg-primary/15 p-1 text-primary"><Bot className="h-3.5 w-3.5" /></span>
+                      <div>
+                        <div className="flex items-center gap-1.5 text-sm font-medium">Create with AI <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">Suggested</span></div>
+                        <p className="text-xs text-muted-foreground">Generate complete task draft with AI context.</p>
+                      </div>
+                    </div>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="cursor-pointer rounded-lg px-3 py-2 outline-none transition-colors hover:bg-accent"
+                    onSelect={() => {
+                      setDefaultStatus('TODO');
+                      setManualTitleSeed('');
+                      setManualCreateOpen(true);
+                    }}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="mt-0.5 rounded-md bg-secondary p-1 text-muted-foreground"><FilePenLine className="h-3.5 w-3.5" /></span>
+                      <div>
+                        <div className="text-sm font-medium">Create manually</div>
+                        <p className="text-xs text-muted-foreground">Full control over fields, subtasks and details.</p>
+                      </div>
+                    </div>
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
         </div>
       </div>
@@ -286,19 +359,19 @@ export function ProjectDetailPage() {
       {tasks.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <CircleDashed className="h-3.5 w-3.5 text-slate-400" />
+            <CircleDashed className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
             {todoCount} todo
           </span>
           <span className="flex items-center gap-1.5">
-            <Clock3 className="h-3.5 w-3.5 text-blue-400" />
+            <Clock3 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
             {inProgressCount} in progress
           </span>
           <span className="flex items-center gap-1.5">
-            <LayoutGrid className="h-3.5 w-3.5 text-amber-400" />
+            <LayoutGrid className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
             {reviewCount} review
           </span>
           <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             {doneCount} done
           </span>
         </div>
@@ -328,12 +401,37 @@ export function ProjectDetailPage() {
       )}
 
       {/* ── Task Form Dialog ── */}
+      <AiTaskCreateDrawer
+        open={aiCreateOpen}
+        projectId={id ?? ''}
+        defaultStatus={defaultStatus}
+        members={members}
+        initialIdea={taskIdeaSeed}
+        onClose={() => {
+          setAiCreateOpen(false);
+          setTaskIdeaSeed('');
+        }}
+      />
+
+      <ManualTaskCreateDrawer
+        open={manualCreateOpen}
+        projectId={id ?? ''}
+        defaultStatus={defaultStatus}
+        members={members}
+        initialTitle={manualTitleSeed}
+        onClose={() => {
+          setManualCreateOpen(false);
+          setManualTitleSeed('');
+        }}
+      />
+
       <TaskForm
-        open={taskFormOpen}
-        onClose={() => { setTaskFormOpen(false); setEditingTask(null); }}
-        onSubmit={editingTask ? handleEditTask : handleCreateTask}
+        open={taskEditOpen}
+        onClose={() => { setTaskEditOpen(false); setEditingTask(null); }}
+        onSubmit={handleEditTask}
+        projectId={id ?? ''}
         task={editingTask}
-        isLoading={createTask.isPending || updateTask.isPending}
+        isLoading={updateTask.isPending}
         defaultStatus={defaultStatus}
         members={members}
       />
@@ -344,7 +442,7 @@ export function ProjectDetailPage() {
         onClose={() => setSelectedTaskId(null)}
         onEdit={(task) => {
           setEditingTask(task);
-          setTaskFormOpen(true);
+          setTaskEditOpen(true);
         }}
       />
 

@@ -9,10 +9,10 @@ import { cn } from '@/utils/cn';
 import { type Task } from '@/types/task.types';
 
 const COLUMN_CONFIG: Record<string, { label: string; color: string; accent: string; dot: string }> = {
-  TODO:        { label: 'To do',       color: 'text-slate-400',   accent: 'border-slate-400/30',   dot: 'bg-slate-400' },
-  IN_PROGRESS: { label: 'In progress', color: 'text-blue-400',    accent: 'border-blue-400/30',    dot: 'bg-blue-400' },
-  REVIEW:      { label: 'Review',      color: 'text-amber-400',   accent: 'border-amber-400/30',   dot: 'bg-amber-400' },
-  DONE:        { label: 'Done',        color: 'text-emerald-400', accent: 'border-emerald-400/30', dot: 'bg-emerald-400' },
+  TODO:        { label: 'To do',       color: 'text-slate-700 dark:text-slate-400',   accent: 'border-slate-500/35 dark:border-slate-400/30',   dot: 'bg-slate-500 dark:bg-slate-400' },
+  IN_PROGRESS: { label: 'In progress', color: 'text-blue-700 dark:text-blue-400',    accent: 'border-blue-600/35 dark:border-blue-400/30',    dot: 'bg-blue-600 dark:bg-blue-400' },
+  REVIEW:      { label: 'Review',      color: 'text-amber-700 dark:text-amber-400',   accent: 'border-amber-600/35 dark:border-amber-400/30',   dot: 'bg-amber-600 dark:bg-amber-400' },
+  DONE:        { label: 'Done',        color: 'text-emerald-700 dark:text-emerald-400', accent: 'border-emerald-600/35 dark:border-emerald-400/30', dot: 'bg-emerald-600 dark:bg-emerald-400' },
 };
 
 interface KanbanColumnProps {
@@ -51,7 +51,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
   };
 
   return (
-    <div className="flex flex-col min-w-[292px] w-[292px]">
+    <div className="flex flex-col flex-1 min-w-[240px] w-full">
       {/* Column header */}
       {/* Unified column container — single border, no seam */}
       <div className={cn(
@@ -59,10 +59,10 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
         'border-t-2', config.accent,
       )}>
         {/* Column header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2.5 border-b border-border bg-card/90 backdrop-blur-md">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2.5 border-b border-border/85 bg-card/95 backdrop-blur-md dark:border-border dark:bg-card/90">
           <div className="flex items-center gap-2">
             <span className={cn('w-2 h-2 rounded-full shrink-0', config.dot)} />
-            <span className="text-xs font-semibold text-foreground">{config.label}</span>
+            <span className={cn('text-xs font-semibold', config.color)}>{config.label}</span>
             <span className={cn(
               'text-[11px] font-medium px-1.5 py-0.5 rounded-full tabular-nums',
               'bg-secondary text-muted-foreground',
@@ -97,7 +97,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
             ref={setNodeRef}
             className={cn(
               'flex-1 px-2.5 pb-2.5 pt-2.5 min-h-[240px] transition-all duration-150 space-y-2',
-              isOver ? 'bg-primary/5 ring-2 ring-inset ring-primary/25 shadow-inner' : '',
+              isOver ? 'bg-primary/8 ring-2 ring-inset ring-primary/30 shadow-inner' : '',
             )}
           >
             <AnimatePresence initial={false}>
@@ -115,7 +115,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="bg-card border border-primary/40 rounded-xl p-2.5 shadow-sm">
+                  <div className="bg-card border border-primary/45 rounded-xl p-2.5 shadow-sm">
                     <input
                       ref={inputRef}
                       value={quickTitle}
@@ -148,9 +148,9 @@ export function KanbanColumn({ id, title, tasks, onTaskClick, onAddTask, onQuick
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center h-28 gap-2 rounded-xl border border-dashed border-border/70 bg-background/40"
+                className="flex flex-col items-center justify-center h-28 gap-2 rounded-xl border border-dashed border-border/80 bg-background/65"
               >
-                <p className="text-xs text-muted-foreground/60">No tasks</p>
+                <p className="text-xs text-muted-foreground">No tasks</p>
                 <button
                   onClick={() => setQuickAddOpen(true)}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors rounded-md px-2 py-1 hover:bg-accent"

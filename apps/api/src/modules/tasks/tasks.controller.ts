@@ -20,6 +20,9 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
+import { UpdateSubtaskDto } from './dto/update-subtask.dto';
+import { ReorderSubtasksDto } from './dto/reorder-subtasks.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -114,5 +117,48 @@ export class TasksController {
     @CurrentUser() user: any,
   ) {
     return this.tasksService.deleteComment(commentId, user.id, user.role);
+  }
+
+  // ── Subtasks ─────────────────────────────────────────────
+  @Post('tasks/:id/subtasks')
+  @ApiOperation({ summary: 'Create subtask' })
+  createSubtask(
+    @Param('id') taskId: string,
+    @Body() dto: CreateSubtaskDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.tasksService.addSubtask(taskId, dto.title, user.id);
+  }
+
+  @Patch('tasks/:taskId/subtasks/:subtaskId')
+  @ApiOperation({ summary: 'Update subtask' })
+  updateSubtask(
+    @Param('taskId') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @Body() dto: UpdateSubtaskDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.tasksService.updateSubtask(taskId, subtaskId, dto, user.id);
+  }
+
+  @Delete('tasks/:taskId/subtasks/:subtaskId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete subtask' })
+  deleteSubtask(
+    @Param('taskId') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.tasksService.removeSubtask(taskId, subtaskId, user.id);
+  }
+
+  @Patch('tasks/:taskId/subtasks/reorder')
+  @ApiOperation({ summary: 'Reorder subtasks' })
+  reorderSubtasks(
+    @Param('taskId') taskId: string,
+    @Body() dto: ReorderSubtasksDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.tasksService.reorderSubtasks(taskId, dto.orderedIds, user.id);
   }
 }

@@ -71,7 +71,7 @@ export function Navbar() {
           {/* Global search */}
           <button
             onClick={openCommandPalette}
-            className="group flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border/70 bg-card px-3 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/40 md:max-w-lg m-auto"
+            className="group flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border/80 bg-card px-3 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/40 md:max-w-lg"
             title="Open command palette (Cmd/Ctrl + K)"
           >
             <Search className="h-4 w-4 shrink-0" />

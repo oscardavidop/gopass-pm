@@ -131,12 +131,29 @@ model Task {
 
   comments     Comment[]
   activityLogs ActivityLog[]
+  subtasks     Subtask[]
 
   @@index([projectId])
   @@index([assigneeId])
   @@index([status])
   @@index([priority])
   @@map("tasks")
+}
+
+model Subtask {
+  id           String   @id @default(uuid())
+  title        String
+  completed    Boolean  @default(false)
+  position     Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  parentTaskId String @map("parent_task_id")
+  parentTask   Task   @relation(fields: [parentTaskId], references: [id], onDelete: Cascade)
+
+  @@index([parentTaskId])
+  @@index([parentTaskId, position])
+  @@map("subtasks")
 }
 
 model Comment {

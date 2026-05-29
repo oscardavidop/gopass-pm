@@ -5,6 +5,7 @@ import type {
   CreateTaskPayload,
   TaskFilters,
   ActivityLog,
+  Subtask,
 } from '@/types/task.types';
 import type { PaginatedResponse } from '@/types/project.types';
 
@@ -36,4 +37,19 @@ export const tasksService = {
 
   deleteComment: (taskId: string, commentId: string) =>
     api.delete(`/tasks/${taskId}/comments/${commentId}`),
+
+  addSubtask: (taskId: string, title: string) =>
+    api.post<{ data: Subtask }>(`/tasks/${taskId}/subtasks`, { title }).then((r) => r.data.data),
+
+  updateSubtask: (
+    taskId: string,
+    subtaskId: string,
+    payload: Partial<Pick<Subtask, 'title' | 'completed' | 'position'>>,
+  ) => api.patch<{ data: Subtask }>(`/tasks/${taskId}/subtasks/${subtaskId}`, payload).then((r) => r.data.data),
+
+  deleteSubtask: (taskId: string, subtaskId: string) =>
+    api.delete(`/tasks/${taskId}/subtasks/${subtaskId}`),
+
+  reorderSubtasks: (taskId: string, orderedIds: string[]) =>
+    api.patch<{ data: Subtask[] }>(`/tasks/${taskId}/subtasks/reorder`, { orderedIds }).then((r) => r.data.data),
 };

@@ -20,7 +20,7 @@ export class CreateProjectDto {
   @ApiPropertyOptional({ example: 'Core SaaS platform development' })
   @IsString()
   @IsOptional()
-  @MaxLength(500)
+  @MaxLength(3000)
   description?: string;
 
   @ApiPropertyOptional({ example: '#6366f1' })

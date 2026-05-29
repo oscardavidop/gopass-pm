@@ -14,6 +14,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { formatDate } from '@/utils/formatters';
+import { stripRichText } from '@/utils/richText';
 import { cn } from '@/utils/cn';
 import { type Project } from '@/types/project.types';
 
@@ -92,6 +93,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
   const totalTasks = project._count?.tasks ?? 0;
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const color = project.color ?? '#6366f1';
+  const descriptionPreview = stripRichText(project.description ?? '');
 
   if (view === 'list') {
     return (
@@ -100,8 +102,8 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
           <Link to={`/projects/${project.id}`} className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate hover:text-primary transition-colors">{project.name}</p>
-            {project.description && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{project.description}</p>
+            {descriptionPreview && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{descriptionPreview}</p>
             )}
           </Link>
           <div className="hidden sm:flex items-center gap-2 w-36 shrink-0">
@@ -144,9 +146,9 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
               <h3 className="font-semibold text-foreground truncate group-hover/link:text-primary transition-colors text-sm">
                 {project.name}
               </h3>
-              {project.description ? (
+              {descriptionPreview ? (
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                  {project.description}
+                  {descriptionPreview}
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground/70 mt-0.5">No description added yet.</p>

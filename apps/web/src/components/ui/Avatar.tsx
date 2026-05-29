@@ -79,7 +79,7 @@ export function Avatar({
         </AvatarPrimitive.Fallback>
       </AvatarPrimitive.Root>
       {online && (
-        <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-card" />
+        <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-400" />
       )}
     </span>
   );

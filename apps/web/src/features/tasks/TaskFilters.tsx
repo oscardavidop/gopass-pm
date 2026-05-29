@@ -56,14 +56,14 @@ export function TaskFilters({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             leftIcon={<Search className="h-4 w-4" />}
-            className="h-10 rounded-xl border-border/70 bg-background/70"
+            className="h-10 rounded-xl border-border/80 bg-background/85"
           />
         </div>
 
         <select
           value={priority}
           onChange={(e) => onPriorityChange(e.target.value)}
-          className="h-10 w-full rounded-xl border border-input/80 bg-background/70 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring lg:w-44"
+          className="h-10 w-full rounded-xl border border-input/90 bg-background/85 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring lg:w-44"
         >
           <option value="">All priorities</option>
           <option value="LOW">Low</option>
@@ -76,7 +76,7 @@ export function TaskFilters({
           <select
             value={assigneeId}
             onChange={(e) => onAssigneeChange(e.target.value)}
-            className="h-10 w-full rounded-xl border border-input/80 bg-background/70 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring lg:w-52"
+            className="h-10 w-full rounded-xl border border-input/90 bg-background/85 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring lg:w-52"
           >
             <option value="">All assignees</option>
             {members.map((m) => (
@@ -91,13 +91,13 @@ export function TaskFilters({
       {hasFilters && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           {priority && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/60 px-2 py-1 text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-secondary/75 px-2 py-1 text-muted-foreground">
               <Flag className="h-3 w-3" />
               {priority}
             </span>
           )}
           {assigneeId && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/60 px-2 py-1 text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-secondary/75 px-2 py-1 text-muted-foreground">
               <UserRound className="h-3 w-3" />
               Assignee selected
             </span>

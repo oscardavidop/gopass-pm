@@ -99,7 +99,7 @@ export function ProjectsPage() {
 
         {/* Search */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" />
 
           <Input
             placeholder="Search projects..."
@@ -110,10 +110,9 @@ export function ProjectsPage() {
         rounded-2xl
         border-border/60
         bg-background/70
-        backdrop-blur-sm
         shadow-sm
-        transition-all duration-200
         hover:border-primary/30
+        focus:outline-none
         focus-visible:ring-2
         focus-visible:ring-primary/20
         focus-visible:border-primary/40

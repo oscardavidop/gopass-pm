@@ -56,6 +56,7 @@ async function bootstrap() {
     .addTag('Users', 'User management')
     .addTag('Projects', 'Project management')
     .addTag('Tasks', 'Task management')
+    .addTag('AI', 'AI structured generation endpoints')
     .addTag('Dashboard', 'Analytics and metrics')
     .build();
 
