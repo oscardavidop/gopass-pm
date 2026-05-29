@@ -28,7 +28,7 @@ export function CommandPalette() {
   const closeCP           = useUIStore((s) => s.closeCommandPalette);
   const toggleTheme       = useUIStore((s) => s.toggleTheme);
   const theme             = useUIStore((s) => s.theme);
-  const logout            = useAuthStore((s) => s.logout);
+  const logout            = useAuthStore((s) => s.clearAuth);
   const navigate          = useNavigate();
   const [search, setSearch] = useState('');
 
@@ -199,7 +199,7 @@ export function CommandPalette() {
                 </div>
                 <div className="flex items-center gap-1 opacity-60">
                   <CommandIcon className="h-3 w-3" />
-                  <span>GoPass PM</span>
+                  <span>Tasku</span>
                 </div>
               </div>
             </Command>

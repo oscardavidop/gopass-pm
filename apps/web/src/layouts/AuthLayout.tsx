@@ -10,7 +10,7 @@ export function AuthLayout() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-sm">
               G
             </div>
-            <span className="font-semibold text-lg tracking-tight">GoPass PM</span>
+            <span className="font-semibold text-lg tracking-tight">Tasku</span>
           </div>
           <p className="text-muted-foreground text-sm">Project management for modern teams</p>
         </div>

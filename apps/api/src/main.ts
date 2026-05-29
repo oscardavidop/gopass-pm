@@ -48,7 +48,7 @@ async function bootstrap() {
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('GoPass PM API')
+    .setTitle('Tasku API')
     .setDescription('Project management platform — REST API documentation')
     .setVersion('1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')

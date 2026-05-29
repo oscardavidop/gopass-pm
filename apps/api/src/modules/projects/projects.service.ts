@@ -8,10 +8,14 @@ import { PrismaService } from '../../shared/database/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsGateway,
+  ) {}
 
   async create(dto: CreateProjectDto, userId: string) {
     return this.prisma.project.create({
@@ -123,11 +127,25 @@ export class ProjectsService {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    return this.prisma.projectMember.upsert({
+    const result = await this.prisma.projectMember.upsert({
       where: { projectId_userId: { projectId, userId: memberId } },
       create: { projectId, userId: memberId },
       update: {},
     });
+
+    // Notify the newly added member via WebSocket
+    const adder = project.members.find((m) => m.userId === currentUserId);
+    this.events.emitToUser(memberId, 'notification', {
+      type: 'project_updated',
+      title: 'You were added to a project',
+      body: `You have been added to "${project.name}"`,
+      projectId,
+      actorName: adder?.user
+        ? `${(adder.user as any).firstName} ${(adder.user as any).lastName}`.trim()
+        : 'A team member',
+    });
+
+    return result;
   }
 
   async removeMember(projectId: string, memberId: string, currentUserId: string, userRole: Role) {
@@ -159,7 +177,7 @@ export class ProjectsService {
           },
         },
       },
-      _count: { select: { tasks: { where: { deletedAt: null } } } },
+      _count: { select: { tasks: { where: { deletedAt: null } }, members: true } },
     };
   }
 }

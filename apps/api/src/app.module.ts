@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { PrismaModule } from './shared/database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -9,6 +10,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { EventsModule } from './modules/events/events.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { EventsModule } from './modules/events/events.module';
         limit: 100,
       },
     ]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -29,6 +32,7 @@ import { EventsModule } from './modules/events/events.module';
     TasksModule,
     DashboardModule,
     EventsModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

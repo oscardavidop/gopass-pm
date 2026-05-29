@@ -1,3 +1,4 @@
+import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Mail, User, Shield, Key, Loader2, Check } from 'lucide-react';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/store/auth.store';
+import { useUpdateProfile } from '@/hooks/useUsers';
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN:   'Admin',
@@ -18,13 +20,26 @@ const ROLE_VARIANT: Record<string, any> = {
   ADMIN: 'destructive', MANAGER: 'warning', USER: 'secondary',
 };
 
+interface FormValues {
+  firstName: string;
+  lastName: string;
+  bio: string;
+}
+
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
-  const [saved, setSaved] = useState(false);
+  const updateProfile = useUpdateProfile();
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const { register, handleSubmit, formState: { isDirty } } = useForm<FormValues>({
+    defaultValues: {
+      firstName: user?.firstName ?? '',
+      lastName:  user?.lastName  ?? '',
+      bio:       user?.bio       ?? '',
+    },
+  });
+
+  const onSubmit = (data: FormValues) => {
+    updateProfile.mutate(data);
   };
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
@@ -32,7 +47,6 @@ export function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 page-enter">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Profile</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Manage your personal information and account.</p>
@@ -51,7 +65,11 @@ export function ProfilePage() {
                     size="2xl"
                     online
                   />
-                  <button className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Change avatar (coming soon)"
+                  >
                     <Camera className="h-5 w-5 text-white" />
                   </button>
                 </div>
@@ -67,6 +85,7 @@ export function ProfilePage() {
                       <Shield className="h-3 w-3 mr-1" />
                       {ROLE_LABEL[user?.role ?? 'USER']}
                     </Badge>
+                    <span className="text-xs text-muted-foreground">@{user?.username}</span>
                   </div>
                 </div>
               </div>
@@ -74,7 +93,7 @@ export function ProfilePage() {
           </Card>
         </motion.div>
 
-        {/* Personal info */}
+        {/* Personal info form */}
         <motion.div variants={item}>
           <Card>
             <CardHeader>
@@ -83,54 +102,71 @@ export function ProfilePage() {
                 Personal information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">First name</label>
+                    <input
+                      {...register('firstName', { required: true })}
+                      className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Last name</label>
+                    <input
+                      {...register('lastName', { required: true })}
+                      className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">First name</label>
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
                   <input
-                    defaultValue={user?.firstName}
-                    className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled
+                    value={user?.email}
+                    className="w-full px-3 py-2 text-sm bg-secondary/40 border border-input rounded-lg text-muted-foreground cursor-not-allowed"
                   />
                 </div>
+
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Last name</label>
-                  <input
-                    defaultValue={user?.lastName}
-                    className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  <label className="text-xs font-medium text-muted-foreground">Bio</label>
+                  <textarea
+                    {...register('bio')}
+                    rows={3}
+                    placeholder="Tell your team a bit about yourself…"
+                    className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Email</label>
-                <input
-                  defaultValue={user?.email}
-                  type="email"
-                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Bio</label>
-                <textarea
-                  rows={3}
-                  placeholder="Tell your team a little about yourself…"
-                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button onClick={handleSave} size="sm">
-                  {saved ? (
-                    <><Check className="h-3.5 w-3.5 mr-1.5 text-emerald-300" />Saved!</>
-                  ) : 'Save changes'}
-                </Button>
-              </div>
+                <div className="flex justify-end pt-1">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={updateProfile.isPending || !isDirty}
+                  >
+                    {updateProfile.isPending ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Saving…
+                      </>
+                    ) : updateProfile.isSuccess ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 mr-1.5" />
+                        Saved
+                      </>
+                    ) : (
+                      'Save changes'
+                    )}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Security */}
+        {/* Security section */}
         <motion.div variants={item}>
           <Card>
             <CardHeader>
@@ -139,53 +175,22 @@ export function ProfilePage() {
                 Security
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Current password</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">New password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Confirm password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end pt-1">
-                <Button variant="outline" size="sm">Update password</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Danger zone */}
-        <motion.div variants={item}>
-          <Card className="border-destructive/30">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-destructive">Danger zone</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Delete account</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Once deleted, your account cannot be recovered.</p>
+                  <p className="text-sm font-medium">Password</p>
+                  <p className="text-xs text-muted-foreground">Change your account password</p>
                 </div>
-                <Button variant="destructive" size="sm">Delete account</Button>
+                <Button variant="outline" size="sm" disabled title="Coming soon">
+                  Change password
+                </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Active sessions</p>
+                  <p className="text-xs text-muted-foreground">Manage devices logged in to your account</p>
+                </div>
+                <Badge variant="secondary">1 active</Badge>
               </div>
             </CardContent>
           </Card>

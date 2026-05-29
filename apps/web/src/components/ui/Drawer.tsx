@@ -63,6 +63,7 @@ const DrawerContent = React.forwardRef<
         'data-[state=closed]:translate-x-full transition-transform duration-300 ease-in',
         className,
       )}
+      // style={{ margin: 0 }} // Override Radix's default margin
       {...props}
     >
       {children}

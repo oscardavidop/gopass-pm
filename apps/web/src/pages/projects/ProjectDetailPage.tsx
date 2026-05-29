@@ -1,20 +1,21 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Users, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Plus, LayoutGrid } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { KanbanBoard } from '@/features/tasks/KanbanBoard';
 import { TaskForm } from '@/features/tasks/TaskForm';
 import { TaskDrawer } from '@/features/tasks/TaskDrawer';
 import { TaskFilters } from '@/features/tasks/TaskFilters';
 import { PresenceAvatars } from '@/components/shared/PresenceAvatars';
+import { MemberManager } from '@/features/projects/MemberManager';
 import { useProject } from '@/hooks/useProjects';
 import { useProjectTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useAuthStore } from '@/store/auth.store';
 import { type Priority, type Task, type TaskStatus } from '@/types/task.types';
 
 const STATUS_VARIANT: Record<string, any> = {
@@ -44,6 +45,8 @@ export function ProjectDetailPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
+  const currentUser = useAuthStore((s) => s.user);
+
   const debouncedSearch = useDebounce(search, 300);
 
   const { data: project, isLoading: projectLoading } = useProject(id!);
@@ -62,6 +65,11 @@ export function ProjectDetailPage() {
   const members = useMemo(
     () => project?.members?.map(({ user }) => user) ?? [],
     [project],
+  );
+
+  const currentProjectRole = useMemo(
+    () => project?.members?.find((m) => m.userId === currentUser?.id)?.role ?? 'MEMBER',
+    [project, currentUser],
   );
 
   const doneCount = useMemo(() => tasks.filter((t) => t.status === 'DONE').length, [tasks]);
@@ -165,25 +173,16 @@ export function ProjectDetailPage() {
 
         <div className="flex items-center gap-3">
           {/* Presence (online users) */}
-          <PresenceAvatars projectId={id} />
+          <PresenceAvatars projectId={id ?? ''} />
 
-          {/* Members */}
-          {members.length > 0 && (
-            <div className="flex items-center gap-2">
-              <AvatarGroup
-                users={members.map((member) => ({
-                  id: member.id,
-                  firstName: member.firstName,
-                  lastName: member.lastName,
-                  avatar: member.avatar,
-                }))}
-                max={4}
-                size="sm"
-              />
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                {members.length} member{members.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+          {/* Members — modal trigger */}
+          {project && (
+            <MemberManager
+              projectId={id!}
+              members={project.members}
+              currentUserId={currentUser?.id ?? ''}
+              currentRole={currentProjectRole}
+            />
           )}
 
           {/* Progress */}

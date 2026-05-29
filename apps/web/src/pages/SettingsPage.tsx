@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Moon, Sun, Bell, Globe, Palette, Check } from 'lucide-react';
+import { Moon, Sun, Bell, Globe, Palette, Check, Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/hooks/useTheme';
+import { usePreferencesStore } from '@/store/preferences.store';
 import { cn } from '@/utils/cn';
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -34,14 +34,32 @@ const THEMES: { value: ThemeOption; label: string; icon: typeof Moon }[] = [
   { value: 'dark',  label: 'Dark',  icon: Moon },
 ];
 
+const TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Sao_Paulo',
+  'America/Bogota',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Australia/Sydney',
+];
+
+const LANGUAGES = [
+  { value: 'en', label: 'English (US)' },
+  { value: 'es', label: 'Español' },
+  { value: 'pt', label: 'Português' },
+  { value: 'fr', label: 'Français' },
+];
+
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const [notifications, setNotifications] = useState({
-    taskAssigned:   true,
-    taskDue:        true,
-    projectUpdates: false,
-    weekly:         true,
-  });
+  const prefs = usePreferencesStore();
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
   const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
@@ -50,7 +68,7 @@ export function SettingsPage() {
     <div className="max-w-2xl mx-auto space-y-6 page-enter">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Customize your GoPass PM experience.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Customize your Tasku experience.</p>
       </div>
 
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
@@ -67,7 +85,7 @@ export function SettingsPage() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium mb-3">Theme</p>
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {THEMES.map(({ value, label, icon: Icon }) => (
                     <button
                       key={value}
@@ -90,7 +108,7 @@ export function SettingsPage() {
           </Card>
         </motion.div>
 
-        {/* Notifications */}
+        {/* Notifications — persisted to localStorage via Zustand */}
         <motion.div variants={item}>
           <Card>
             <CardHeader>
@@ -100,13 +118,16 @@ export function SettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground -mt-1">
+                Preferences are saved locally and applied to realtime notifications.
+              </p>
               {(
                 [
-                  { key: 'taskAssigned',   label: 'Task assigned to me',    desc: 'Get notified when a task is assigned to you' },
-                  { key: 'taskDue',        label: 'Task due date reminder',  desc: 'Alert 24h before a task is due' },
-                  { key: 'projectUpdates', label: 'Project updates',         desc: 'When a project status changes' },
-                  { key: 'weekly',         label: 'Weekly digest',           desc: 'Summary of your week every Monday' },
-                ] as const
+                  { key: 'taskAssigned'   as const, label: 'Task assigned to me',   desc: 'Get notified when a task is assigned to you' },
+                  { key: 'taskDue'        as const, label: 'Task due date reminder', desc: 'Alert 24h before a task is due' },
+                  { key: 'projectUpdates' as const, label: 'Project updates',        desc: 'When a project status changes' },
+                  { key: 'weekly'         as const, label: 'Weekly digest',          desc: 'Summary of your week every Monday' },
+                ]
               ).map(({ key, label, desc }) => (
                 <div key={key} className="flex items-center justify-between py-1">
                   <div>
@@ -114,8 +135,8 @@ export function SettingsPage() {
                     <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
                   <Toggle
-                    checked={notifications[key]}
-                    onChange={(v) => setNotifications((prev) => ({ ...prev, [key]: v }))}
+                    checked={prefs.notifications[key]}
+                    onChange={(v) => prefs.setNotification(key, v)}
                   />
                 </div>
               ))}
@@ -123,7 +144,7 @@ export function SettingsPage() {
           </Card>
         </motion.div>
 
-        {/* Language */}
+        {/* Language & Region */}
         <motion.div variants={item}>
           <Card>
             <CardHeader>
@@ -135,27 +156,31 @@ export function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Language</label>
-                <select className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="en">English (US)</option>
-                  <option value="es">Español</option>
-                  <option value="pt">Português</option>
-                  <option value="fr">Français</option>
+                <select
+                  value={prefs.language}
+                  onChange={(e) => prefs.setLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {LANGUAGES.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Timezone</label>
-                <select className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option>UTC-5 (Eastern Time)</option>
-                  <option>UTC-6 (Central Time)</option>
-                  <option>UTC-7 (Mountain Time)</option>
-                  <option>UTC-8 (Pacific Time)</option>
-                  <option>UTC+0 (London)</option>
-                  <option>UTC+1 (Central Europe)</option>
+                <select
+                  value={prefs.timezone}
+                  onChange={(e) => prefs.setTimezone(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {TIMEZONES.map((tz) => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
                 </select>
               </div>
-              <div className="flex justify-end pt-1">
-                <Button size="sm">Save preferences</Button>
-              </div>
+              <p className="text-xs text-muted-foreground pt-1">
+                Preferences saved automatically — no save needed.
+              </p>
             </CardContent>
           </Card>
         </motion.div>

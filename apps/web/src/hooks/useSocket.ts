@@ -10,7 +10,7 @@ let socketInstance: Socket | null = null;
 
 function getSocket(token: string): Socket {
   if (socketInstance) return socketInstance;
-  socketInstance?.disconnect();
+  if (socketInstance !== null) (socketInstance as Socket).disconnect();
   socketInstance = io(`${WS_URL}/events`, {
     auth: { token },
     transports: ['websocket'],
@@ -32,6 +32,7 @@ export function disconnectSocket() {
 /** Hook: connect to /events namespace, subscribe to global + project room events */
 export function useSocket(projectId?: string) {
   const token       = useAuthStore((s) => s.accessToken);
+  const currentUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const addNotif    = useNotificationsStore((s) => s.addNotification);
   const socketRef   = useRef<Socket | null>(null);
@@ -55,6 +56,8 @@ export function useSocket(projectId?: string) {
     /* ── Task events ── */
     const onTaskCreated = (task: any) => {
       if (task.projectId) invalidate(task.projectId);
+      // Don't notify the person who created the task
+      if (currentUser && task.creatorId === currentUser.id) return;
       addNotif({
         type: 'task_created',
         title: 'New task created',
@@ -79,10 +82,25 @@ export function useSocket(projectId?: string) {
     socket.on('task:updated', onTaskUpdated);
     socket.on('task:deleted', onTaskDeleted);
 
+    /* ── Server-pushed notifications (cron jobs, assignments, etc.) ── */
+    const onNotification = (data: any) => {
+      addNotif({
+        type: data.type,
+        title: data.title,
+        body: data.body ?? data.message ?? '',
+        projectId: data.projectId,
+        taskId: data.taskId,
+        taskTitle: data.taskTitle,
+        actorName: data.actorName,
+      });
+    };
+    socket.on('notification', onNotification);
+
     return () => {
       socket.off('task:created', onTaskCreated);
       socket.off('task:updated', onTaskUpdated);
       socket.off('task:deleted', onTaskDeleted);
+      socket.off('notification', onNotification);
       if (projectId) socket.emit('leave:project', projectId);
     };
   }, [token, projectId, invalidate, addNotif, queryClient]);

@@ -7,8 +7,10 @@ export type NotificationType =
   | 'task_deleted'
   | 'task_assigned'
   | 'task_overdue'
+  | 'task_due_reminder'
   | 'comment_added'
   | 'project_updated'
+  | 'weekly_digest'
   | 'mention';
 
 export interface AppNotification {
@@ -42,6 +44,18 @@ export const useNotificationsStore = create<NotificationsState>()(
       unread: 0,
 
       addNotification: (n) => {
+        // Deduplicate: skip if same type+title+taskId appeared within 2 seconds
+        const existing = get().notifications;
+        const now = Date.now();
+        const isDuplicate = existing.some(
+          (e) =>
+            e.type === n.type &&
+            e.title === n.title &&
+            (n.taskId ? e.taskId === n.taskId : true) &&
+            now - new Date(e.createdAt).getTime() < 2000,
+        );
+        if (isDuplicate) return;
+
         const newItem: AppNotification = {
           ...n,
           id: crypto.randomUUID(),

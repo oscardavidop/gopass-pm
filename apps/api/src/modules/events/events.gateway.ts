@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../shared/database/prisma.service';
 
 interface PresenceUser {
   id: string;
@@ -36,6 +37,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -51,14 +53,20 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       client.data.userId = payload.sub;
+      // JWT payload only has sub/email/role — fetch real user data from DB
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { id: true, firstName: true, lastName: true, avatar: true },
+      });
+      if (!user) { client.disconnect(); return; }
       client.data.user = {
-        id: payload.sub,
-        firstName: payload.firstName ?? '',
-        lastName: payload.lastName ?? '',
-        avatar: payload.avatar ?? null,
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatar: user.avatar,
       };
       client.join(`user:${payload.sub}`);
-      this.logger.log(`Client connected: ${client.id} (user: ${payload.sub})`);
+      this.logger.log(`Client connected: ${client.id} (user: ${user.firstName} ${user.lastName})`);
     } catch {
       client.disconnect();
     }
@@ -115,5 +123,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitTaskDeleted(projectId: string, taskId: string) {
     this.server.to(`project:${projectId}`).emit('task:deleted', { id: taskId, projectId });
+  }
+
+  /** Emit a notification directly to a specific user's private room */
+  emitToUser(userId: string, event: string, data: unknown) {
+    this.server.to(`user:${userId}`).emit(event, data);
   }
 }

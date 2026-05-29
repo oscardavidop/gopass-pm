@@ -4,148 +4,211 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { motion } from 'framer-motion';
-import { Calendar, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Calendar, LayoutGrid, AlertCircle, CalendarDays } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { projectsService } from '@/services/projects.service';
 import { tasksService } from '@/services/tasks.service';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/utils/cn';
 
-const PRIORITY_BG: Record<string, string> = {
-  LOW:      '#64748b',
-  MEDIUM:   '#3b82f6',
-  HIGH:     '#f59e0b',
-  CRITICAL: '#ef4444',
+const PRIORITY_CONFIG: Record<string, { bg: string; dot: string; label: string }> = {
+  LOW:      { bg: '#475569', dot: 'bg-slate-500',  label: 'Low' },
+  MEDIUM:   { bg: '#3b82f6', dot: 'bg-blue-500',   label: 'Medium' },
+  HIGH:     { bg: '#f59e0b', dot: 'bg-amber-500',  label: 'High' },
+  CRITICAL: { bg: '#ef4444', dot: 'bg-red-500',    label: 'Critical' },
 };
+
+function CalendarSkeleton() {
+  return (
+    <div className="space-y-1 p-4">
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <Skeleton key={i} className="h-7" />
+        ))}
+      </div>
+      {Array.from({ length: 5 }).map((_, row) => (
+        <div key={row} className="grid grid-cols-7 gap-1">
+          {Array.from({ length: 7 }).map((_, col) => (
+            <Skeleton key={col} className="h-24" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function CalendarPage() {
   const navigate = useNavigate();
   const [view, setView] = useState<'dayGridMonth' | 'dayGridWeek'>('dayGridMonth');
 
-  /* Fetch all projects then all their tasks */
-  const { data: projectsData } = useQuery({
+  const projectsQuery = useQuery({
     queryKey: ['projects', 'all-for-calendar'],
-    queryFn: () => projectsService.list({ limit: 100 } as any),
+    queryFn: () => projectsService.list({ limit: 100 }),
   });
-  const projects: any[] = projectsData?.items ?? projectsData ?? [];
+  const projects = useMemo(() => projectsQuery.data?.items ?? [], [projectsQuery.data]);
+  const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
 
-  const projectIds: string[] = projects.map((p: any) => p.id);
-
-  const tasksQueries = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ['calendar-tasks', projectIds.join(',')],
     queryFn: async () => {
-      if (!projectIds.length) return [];
       const results = await Promise.all(
-        projectIds.map((id) => tasksService.listByProject(id, { limit: 200 } as any)),
+        projectIds.map((id) => tasksService.listByProject(id, { limit: 500 })),
       );
-      return results.flatMap((r: any) => r?.items ?? r ?? []);
+      return results.flatMap((r) => r?.items ?? []);
     },
     enabled: projectIds.length > 0,
+    staleTime: 30_000,
   });
 
+  // TQ v5: disabled query has isLoading=false but isPending=true
+  const isLoading =
+    projectsQuery.isLoading ||
+    (projectIds.length > 0 && (tasksQuery.isLoading || tasksQuery.isPending));
+
+  const isError = projectsQuery.isError || tasksQuery.isError;
+
+  const allTasks = tasksQuery.data ?? [];
+
   const events = useMemo(() => {
-    const tasks: any[] = tasksQueries.data ?? [];
-    return tasks
-      .filter((t: any) => !!t.dueDate)
-      .map((t: any) => {
-        const project = projects.find((p: any) => p.id === t.projectId);
+    const now = new Date();
+    return allTasks
+      .filter((t) => !!t.dueDate)
+      .map((t) => {
+        const cfg = PRIORITY_CONFIG[t.priority] ?? PRIORITY_CONFIG.MEDIUM;
+        const isOverdue = t.dueDate != null && new Date(t.dueDate) < now && t.status !== 'DONE';
         return {
           id: t.id,
           title: t.title,
-          date: t.dueDate,
-          backgroundColor: PRIORITY_BG[t.priority] ?? '#6366f1',
-          borderColor: PRIORITY_BG[t.priority] ?? '#6366f1',
-          textColor: '#ffffff',
-          extendedProps: { task: t, project },
+          start: t.dueDate!,
+          allDay: true,
+          backgroundColor: isOverdue ? '#dc2626' : cfg.bg,
+          borderColor: 'transparent',
+          textColor: '#fff',
+          extendedProps: { task: t, isOverdue },
         };
       });
-  }, [tasksQueries.data, projects]);
+  }, [allTasks]);
+
+  const overdueCount = events.filter((e) => e.extendedProps.isOverdue).length;
+  const noDueDateCount = allTasks.filter((t) => !t.dueDate).length;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="space-y-6"
+      className="space-y-5"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Calendar</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Tasks with due dates across all projects</p>
+          <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {isLoading
+              ? 'Loading tasks…'
+              : events.length > 0
+              ? <>
+                  {events.length} task{events.length !== 1 ? 's' : ''} with due dates
+                  {noDueDateCount > 0 && (
+                    <span className="ml-2 text-muted-foreground/70">· {noDueDateCount} without dates</span>
+                  )}
+                </>
+              : allTasks.length > 0
+              ? `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} found — none have a due date`
+              : 'No tasks in your projects'}
+            {overdueCount > 0 && (
+              <span className="ml-2 text-red-400 font-medium">· {overdueCount} overdue</span>
+            )}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-accent/40 rounded-lg p-1">
-          <button
-            onClick={() => setView('dayGridMonth')}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-              view === 'dayGridMonth'
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Calendar className="h-3.5 w-3.5" />
-            Month
-          </button>
-          <button
-            onClick={() => setView('dayGridWeek')}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-              view === 'dayGridWeek'
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Week
-          </button>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        {Object.entries(PRIORITY_BG).map(([p, c]) => (
-          <div key={p} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c }} />
-            {p.charAt(0) + p.slice(1).toLowerCase()}
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground">
+            {Object.entries(PRIORITY_CONFIG).map(([p, cfg]) => (
+              <div key={p} className="flex items-center gap-1.5">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', cfg.dot)} />
+                {cfg.label}
+              </div>
+            ))}
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full shrink-0 bg-red-600" />
+              Overdue
+            </div>
           </div>
-        ))}
+
+          <div className="flex items-center gap-1 bg-secondary/60 rounded-lg p-1 border border-border">
+            <button
+              onClick={() => setView('dayGridMonth')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                view === 'dayGridMonth'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              Month
+            </button>
+            <button
+              onClick={() => setView('dayGridWeek')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                view === 'dayGridWeek'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Week
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Calendar */}
-      {events.length === 0 && !tasksQueries.isLoading ? (
+      {isError ? (
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Failed to load calendar data. Please refresh.
+        </div>
+      ) : isLoading ? (
+        <div className="rounded-xl border border-border bg-card calendar-container">
+          <CalendarSkeleton />
+        </div>
+      ) : events.length === 0 ? (
         <EmptyState
-          icon={<Calendar className="h-7 w-7" />}
-          title="No tasks with due dates"
-          description="Tasks with due dates will appear here. Set a due date on any task to see it on the calendar."
+          icon={<CalendarDays className="h-7 w-7" />}
+          title={allTasks.length > 0 ? 'No tasks have a due date' : 'No tasks yet'}
+          description={
+            allTasks.length > 0
+              ? `You have ${allTasks.length} task${allTasks.length !== 1 ? 's' : ''}, but none have a due date set. Open any task, set a due date, and it will appear here.`
+              : 'Create tasks and set due dates to see them on the calendar.'
+          }
           primaryAction={{ label: 'Go to Projects', onClick: () => navigate('/projects') }}
         />
       ) : (
-        <div className="card p-4 rounded-xl border border-border bg-card calendar-container">
+        <div className="rounded-xl border border-border bg-card calendar-container overflow-hidden">
           <FullCalendar
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView={view}
             key={view}
             events={events}
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: '',
-            }}
+            headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
             height="auto"
             eventClick={({ event }) => {
               const task = event.extendedProps.task;
               if (task?.projectId) navigate(`/projects/${task.projectId}`);
             }}
-            eventContent={({ event }) => (
-              <div className="px-1.5 py-0.5 truncate text-[11px] font-medium">
-                {event.title}
-              </div>
-            )}
-            dayCellClassNames="hover:bg-accent/30 transition-colors cursor-pointer"
-            dayMaxEvents={4}
+            eventContent={({ event }) => {
+              const { isOverdue } = event.extendedProps;
+              return (
+                <div className="flex items-center gap-1 px-1.5 py-0.5 w-full overflow-hidden" title={event.title}>
+                  {isOverdue && <AlertCircle className="h-2.5 w-2.5 shrink-0 text-white/90" />}
+                  <span className="truncate text-[11px] font-medium leading-none text-white">{event.title}</span>
+                </div>
+              );
+            }}
+            dayCellClassNames="hover:bg-accent/20 transition-colors"
+            dayMaxEvents={3}
             moreLinkText={(n) => `+${n} more`}
           />
         </div>

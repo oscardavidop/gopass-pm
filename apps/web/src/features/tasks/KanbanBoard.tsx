@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCorners,
@@ -34,17 +35,33 @@ interface KanbanBoardProps {
 export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [localOrder, setLocalOrder] = useState<Record<string, string[]>>({});
+  /** Tracks tasks that have been dragged cross-column but not yet confirmed by server */
+  const [localStatus, setLocalStatus] = useState<Record<string, Task['status']>>({});
 
   const updateStatus = useUpdateTaskStatus();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        // Require 8px of movement before drag starts — prevents accidental drag on click
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        // 250ms hold OR 8px distance on touch
+        delay: 250,
+        tolerance: 8,
+      },
+    }),
   );
 
   const columns = useMemo(() => {
     const grouped: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], REVIEW: [], DONE: [] };
     tasks.forEach((task) => {
-      if (grouped[task.status]) grouped[task.status].push(task);
+      // Use local override status if this task was dragged but server hasn't confirmed yet
+      const effectiveStatus = localStatus[task.id] ?? task.status;
+      if (grouped[effectiveStatus]) grouped[effectiveStatus].push({ ...task, status: effectiveStatus });
     });
 
     Object.keys(grouped).forEach((status) => {
@@ -69,27 +86,36 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
   const handleDragOver = useCallback(({ active, over }: DragOverEvent) => {
     if (!over) return;
     const overId = over.id as string;
-    const sourceStatus = tasks.find((t) => t.id === active.id)?.status;
+    const taskId = active.id as string;
+    const sourceStatus = localStatus[taskId] ?? tasks.find((t) => t.id === taskId)?.status;
     const destStatus =
       COLUMNS.find((c) => c.id === overId)?.id ??
-      tasks.find((t) => t.id === overId)?.status;
+      (localStatus[tasks.find((t) => t.id === overId)?.id ?? ''] ?? tasks.find((t) => t.id === overId)?.status);
 
     if (!sourceStatus || !destStatus || sourceStatus === destStatus) return;
+
+    // Optimistically update the task's status for the columns memo
+    setLocalStatus((prev) => ({ ...prev, [taskId]: destStatus as Task['status'] }));
 
     setLocalOrder((prev) => {
       const srcOrder = prev[sourceStatus] ?? columns[sourceStatus].map((t) => t.id);
       const dstOrder = prev[destStatus] ?? columns[destStatus].map((t) => t.id);
-      const newSrc = srcOrder.filter((id) => id !== (active.id as string));
+      const newSrc = srcOrder.filter((id) => id !== taskId);
       const overIndex = dstOrder.findIndex((id) => id === overId);
       const insertAt = overIndex >= 0 ? overIndex : dstOrder.length;
-      const newDst = [...dstOrder.slice(0, insertAt), active.id as string, ...dstOrder.slice(insertAt)];
+      const newDst = [...dstOrder.slice(0, insertAt), taskId, ...dstOrder.slice(insertAt)];
       return { ...prev, [sourceStatus]: newSrc, [destStatus]: newDst };
     });
-  }, [tasks, columns]);
+  }, [tasks, columns, localStatus]);
 
   const handleDragEnd = useCallback(({ active, over }: DragEndEvent) => {
     setActiveTask(null);
-    if (!over) return;
+    if (!over) {
+      // Drag cancelled — rollback local status
+      setLocalStatus((prev) => { const { [active.id as string]: _, ...rest } = prev; return rest; });
+      setLocalOrder({});
+      return;
+    }
 
     const overId = over.id as string;
     const task = tasks.find((t) => t.id === active.id);
@@ -101,13 +127,29 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
 
     if (!destColumn) return;
 
-    if (task.status !== destColumn) {
-      updateStatus.mutate({ id: task.id, status: destColumn as Task['status'] });
-      setLocalOrder((prev) => {
-        const { [task.status]: _s, [destColumn]: _d, ...rest } = prev;
-        return rest;
-      });
+    const prevStatus = task.status;
+    if (prevStatus !== destColumn) {
+      updateStatus.mutate(
+        { id: task.id, status: destColumn as Task['status'] },
+        {
+          onSuccess: () => {
+            // Clear local override — server is now source of truth
+            setLocalStatus((prev) => { const { [task.id]: _, ...rest } = prev; return rest; });
+            setLocalOrder((prev) => {
+              const { [prevStatus]: _s, [destColumn]: _d, ...rest } = prev;
+              return rest;
+            });
+          },
+          onError: () => {
+            // Rollback optimistic update
+            setLocalStatus((prev) => { const { [task.id]: _, ...rest } = prev; return rest; });
+            setLocalOrder({});
+          },
+        },
+      );
     } else {
+      // Same-column reorder — clear local status override if any
+      setLocalStatus((prev) => { const { [active.id as string]: _, ...rest } = prev; return rest; });
       const colOrder = localOrder[task.status] ?? columns[task.status].map((t) => t.id);
       const oldIdx = colOrder.indexOf(active.id as string);
       const newIdx = colOrder.indexOf(overId);
@@ -118,7 +160,7 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
         }));
       }
     }
-  }, [tasks, columns, localOrder, updateStatus]);
+  }, [tasks, columns, localOrder, localStatus, updateStatus]);
 
   return (
     <DndContext
@@ -128,7 +170,10 @@ export function KanbanBoard({ tasks, onTaskClick, onAddTask, onQuickAdd }: Kanba
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-3 overflow-x-auto pb-6 min-h-[calc(100vh-320px)]">
+      <div
+        className="flex gap-3 overflow-x-auto pb-6 min-h-[calc(100vh-320px)]"
+        style={{ userSelect: activeTask ? 'none' : undefined }}
+      >
         {COLUMNS.map((col) => (
           <KanbanColumn
             key={col.id}

@@ -1,4 +1,4 @@
-# GoPass PM
+# Tasku
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white&style=for-the-badge" />
@@ -37,7 +37,7 @@
 
 ## Overview
 
-GoPass PM is a modern, production-ready SaaS project management platform built for a Senior Full Stack evaluation. It demonstrates enterprise-level architecture, clean code, and thoughtful UX — the kind of product a well-funded startup would ship.
+Tasku is a modern, production-ready SaaS project management platform built for a Senior Full Stack evaluation. It demonstrates enterprise-level architecture, clean code, and thoughtful UX — the kind of product a well-funded startup would ship.
 
 The application is fully functional end-to-end: create projects, invite team members, manage tasks via a drag-and-drop Kanban board, view deadlines on a calendar, receive live notifications when teammates update tasks, and use the blazing-fast command palette to navigate anywhere instantly.
 
@@ -401,7 +401,7 @@ MIT — For technical evaluation purposes only.
 
 ## Visión general
 
-GoPass PM es una aplicación SaaS de gestión de proyectos y tareas que demuestra arquitectura empresarial, buenas prácticas y código limpio en un stack moderno.
+Tasku es una aplicación SaaS de gestión de proyectos y tareas que demuestra arquitectura empresarial, buenas prácticas y código limpio en un stack moderno.
 
 **Funcionalidades principales:**
 

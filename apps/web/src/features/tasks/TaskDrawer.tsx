@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   X, Pencil, Trash2, Calendar, Flag, Tag, MessageSquare,
   CheckSquare, Square, Plus, Clock, ChevronRight, Loader2,
@@ -10,9 +10,12 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useTask, useDeleteTask, useAddComment } from '@/hooks/useTasks';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/Select';
+import { useTask, useDeleteTask, useAddComment, useUpdateTask } from '@/hooks/useTasks';
 import { timeAgo, formatDate } from '@/utils/formatters';
-import { type Task } from '@/types/task.types';
+import { type Task, type TaskStatus, type Priority } from '@/types/task.types';
 import { cn } from '@/utils/cn';
 
 /* ─── config maps ──────────────────────────────────────────── */
@@ -53,6 +56,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const { data: task, isLoading } = useTask(taskId ?? '');
   const deleteTask  = useDeleteTask();
   const addComment  = useAddComment(taskId ?? '');
+  const updateTask  = useUpdateTask();
 
   const handleDelete = useCallback(async () => {
     if (!taskId) return;
@@ -97,6 +101,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 380, damping: 35 }}
+            style={{ marginTop: 0 }} // Override Radix's default margin
             className={cn(
               'fixed inset-y-0 right-0 z-50 flex flex-col',
               'w-full max-w-[460px] bg-card shadow-2xl',
@@ -155,17 +160,60 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                   {/* Meta grid */}
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-background/60 border border-border text-sm">
                     <MetaRow label="Status">
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn('w-2 h-2 rounded-full', statusCfg?.dot)} />
-                        <span>{statusCfg?.label}</span>
+                      <div className="relative flex items-center">
+                        {updateTask.isPending && (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground absolute -left-4" />
+                        )}
+                        <Select
+                          value={task.status}
+                          disabled={updateTask.isPending}
+                          onValueChange={(v) =>
+                            updateTask.mutate({ id: task.id, data: { status: v as TaskStatus } })
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-auto min-w-[120px] border-0 bg-transparent px-1.5 py-0 text-xs focus:ring-0 hover:bg-accent rounded-md disabled:opacity-60 disabled:cursor-not-allowed">
+                            <SelectValue>
+                              <div className="flex items-center gap-1.5">
+                                <span className={cn('w-2 h-2 rounded-full', statusCfg?.dot)} />
+                                <span>{statusCfg?.label}</span>
+                              </div>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="TODO">To do</SelectItem>
+                            <SelectItem value="IN_PROGRESS">In progress</SelectItem>
+                            <SelectItem value="REVIEW">Review</SelectItem>
+                            <SelectItem value="DONE">Done</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </MetaRow>
 
                     <MetaRow label="Priority">
-                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', priorityCfg?.bg, priorityCfg?.color)}>
-                        <Flag className="h-3 w-3" />
-                        {priorityCfg?.label}
-                      </span>
+                      <div className="relative flex items-center">
+                        <Select
+                          value={task.priority}
+                          disabled={updateTask.isPending}
+                          onValueChange={(v) =>
+                            updateTask.mutate({ id: task.id, data: { priority: v as Priority } })
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-auto min-w-[110px] border-0 bg-transparent px-1.5 py-0 text-xs focus:ring-0 hover:bg-accent rounded-md disabled:opacity-60 disabled:cursor-not-allowed">
+                            <SelectValue>
+                              <span className={cn('inline-flex items-center gap-1', priorityCfg?.color)}>
+                                <Flag className="h-3 w-3" />
+                                {priorityCfg?.label}
+                              </span>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="LOW">Low</SelectItem>
+                            <SelectItem value="MEDIUM">Medium</SelectItem>
+                            <SelectItem value="HIGH">High</SelectItem>
+                            <SelectItem value="CRITICAL">Critical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </MetaRow>
 
                     {(task as any).assignee && (
@@ -379,6 +427,60 @@ function SubtasksPanel({ task }: { task: Task }) {
   );
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  TODO: 'To do',
+  IN_PROGRESS: 'In progress',
+  REVIEW: 'Review',
+  DONE: 'Done',
+};
+const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  CRITICAL: 'Critical',
+};
+
+function describeActivityLog(log: any): React.ReactNode {
+  const old = log.oldValue ?? {};
+  const next = log.newValue ?? {};
+
+  if (log.action === 'UPDATED') {
+    const parts: string[] = [];
+    if (old.status) {
+      parts.push(
+        `changed status from "${STATUS_LABELS[old.status] ?? old.status}" to "${STATUS_LABELS[next.status] ?? next.status}"`,
+      );
+    }
+    if (old.priority) {
+      parts.push(
+        `changed priority from "${PRIORITY_LABELS[old.priority] ?? old.priority}" to "${PRIORITY_LABELS[next.priority] ?? next.priority}"`,
+      );
+    }
+    if (old.assigneeId !== undefined) {
+      parts.push('changed the assignee');
+    }
+    if (parts.length > 0) {
+      return (
+        <span className="text-muted-foreground">
+          {parts.map((p, i) => (
+            <span key={i}>
+              {i > 0 ? ' and ' : ''}
+              {p}
+            </span>
+          ))}
+        </span>
+      );
+    }
+    return <span className="text-muted-foreground">updated this task</span>;
+  }
+
+  if (log.action === 'CREATED') return <span className="text-muted-foreground">created this task</span>;
+  if (log.action === 'DELETED') return <span className="text-muted-foreground">deleted this task</span>;
+  if (log.action === 'COMMENT_ADDED') return <span className="text-muted-foreground">added a comment</span>;
+
+  return <span className="text-muted-foreground lowercase">{log.action.replace(/_/g, ' ')}</span>;
+}
+
 function ActivityPanel({ logs }: { logs: any[] }) {
   if (!logs.length) {
     return (
@@ -401,7 +503,7 @@ function ActivityPanel({ logs }: { logs: any[] }) {
           <div className="flex-1 min-w-0">
             <p className="text-xs">
               <span className="font-medium text-foreground">{log.user.firstName}</span>{' '}
-              <span className="text-muted-foreground lowercase">{log.action.replace(/_/g, ' ')}</span>
+              {describeActivityLog(log)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(log.createdAt)}</p>
           </div>

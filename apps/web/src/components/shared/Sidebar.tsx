@@ -18,6 +18,8 @@ import { useLogout } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { TooltipProvider } from '@/components/ui/Tooltip';
+import logoLight from '../../../assets/img/logo-light.png';
+import logoDark from '../../../assets/img/logo-dark.png';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -27,7 +29,7 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { sidebarCollapsed, toggleSidebar, theme } = useUIStore();
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -50,23 +52,24 @@ export function Sidebar() {
             sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5',
           )}
         >
-          <div className="w-7 h-7 rounded-lg gradient-primary shadow-glow-sm flex items-center justify-center text-white font-bold text-xs shrink-0 select-none">
-            G
-          </div>
-          <AnimatePresence>
-            {!sidebarCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -6 }}
-                transition={{ duration: 0.15 }}
-                className="flex flex-col leading-none"
-              >
-                <span className="font-semibold text-sm tracking-tight">GoPass PM</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Project manager</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Collapsed: small icon; Expanded: full logo */}
+          {sidebarCollapsed ? (
+            <img
+              src={theme === 'dark' ? logoDark : logoLight}
+              alt="GoPass PM"
+              className="h-7 w-7 object-contain shrink-0 select-none"
+            />
+          ) : (
+            <motion.img
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -6 }}
+              transition={{ duration: 0.15 }}
+              src={theme === 'dark' ? logoDark : logoLight}
+              alt="GoPass PM"
+              className="h-8 object-contain max-w-[140px] select-none"
+            />
+          )}
         </div>
 
         {/* Nav */}

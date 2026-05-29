@@ -28,7 +28,7 @@ export function LoginPage() {
     <Card>
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
-        <p className="text-sm text-muted-foreground">Welcome back to GoPass PM</p>
+        <p className="text-sm text-muted-foreground">Welcome back to Tasku</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">

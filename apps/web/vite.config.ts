@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['tasku.pro'],
     port: 3000,
     proxy: {
       '/api': {
