@@ -1,20 +1,30 @@
 import { Outlet } from 'react-router-dom';
+import { useTheme } from '@/hooks/useTheme';
+import logoLight from '../../assets/img/logo-light.png';
+import logoDark from '../../assets/img/logo-dark.png';
 
 export function AuthLayout() {
+  const { isDark } = useTheme();
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
-      <div className="relative w-full max-w-md px-4">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-sm">
-              G
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      <div className="absolute inset-0 bg-grid opacity-35 pointer-events-none" />
+      <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
+
+      <div className="relative min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-7">
+            <div className="inline-flex items-center gap-2.5 mb-2 rounded-full border border-border/70 bg-card/60 px-3 py-1.5 backdrop-blur-sm">
+              <img src={isDark ? logoDark : logoLight} alt="Tasku" className="h-6 w-6 object-contain" />
+              <span className="font-semibold text-sm tracking-tight">Tasku</span>
             </div>
-            <span className="font-semibold text-lg tracking-tight">Tasku</span>
+            <p className="text-muted-foreground text-sm">Enterprise project management, built for high-velocity teams</p>
           </div>
-          <p className="text-muted-foreground text-sm">Project management for modern teams</p>
+          <div className="glass rounded-2xl p-2">
+            <Outlet />
+          </div>
         </div>
-        <Outlet />
       </div>
     </div>
   );

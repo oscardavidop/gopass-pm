@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useRegister } from '@/hooks/useAuth';
+import { SocialAuthButtons } from '@/components/shared/SocialAuthButtons';
 
 const schema = z.object({
   firstName: z.string().min(2, 'Min 2 chars').max(50),
@@ -28,12 +29,22 @@ export function RegisterPage() {
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   return (
-    <Card>
+    <Card className="border-border/60 bg-card/90 backdrop-blur-md shadow-xl shadow-primary/5">
       <CardHeader>
         <CardTitle>Create account</CardTitle>
-        <p className="text-sm text-muted-foreground">Start managing projects today</p>
+        <p className="text-sm text-muted-foreground">Build your workspace in seconds, scale it for years.</p>
       </CardHeader>
       <CardContent>
+        <SocialAuthButtons className="mb-4" />
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border/70" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground tracking-wide">Or create with email</span>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit((data) => register(data))} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input

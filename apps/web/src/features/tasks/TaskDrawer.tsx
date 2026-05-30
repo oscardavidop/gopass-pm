@@ -473,11 +473,21 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                     {activeTab === 'details' && (
                       <SubtasksPanel
                         task={task as Task}
-                        onCreate={async (title) => addSubtask.mutateAsync({ title })}
-                        onToggle={async (subtaskId, completed) => updateSubtask.mutateAsync({ subtaskId, data: { completed } })}
-                        onRename={async (subtaskId, title) => updateSubtask.mutateAsync({ subtaskId, data: { title } })}
-                        onDelete={async (subtaskId) => deleteSubtask.mutateAsync({ subtaskId })}
-                        onReorder={async (orderedIds) => reorderSubtasks.mutateAsync({ orderedIds })}
+                        onCreate={async (title) => {
+                          await addSubtask.mutateAsync({ title });
+                        }}
+                        onToggle={async (subtaskId, completed) => {
+                          await updateSubtask.mutateAsync({ subtaskId, data: { completed } });
+                        }}
+                        onRename={async (subtaskId, title) => {
+                          await updateSubtask.mutateAsync({ subtaskId, data: { title } });
+                        }}
+                        onDelete={async (subtaskId) => {
+                          await deleteSubtask.mutateAsync({ subtaskId });
+                        }}
+                        onReorder={async (orderedIds) => {
+                          await reorderSubtasks.mutateAsync({ orderedIds });
+                        }}
                         isBusy={addSubtask.isPending || updateSubtask.isPending || deleteSubtask.isPending || reorderSubtasks.isPending}
                       />
                     )}

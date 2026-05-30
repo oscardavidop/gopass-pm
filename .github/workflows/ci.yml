@@ -42,6 +42,14 @@ jobs:
         working-directory: apps/web
         run: npm run lint
 
+      - name: Typecheck API
+        working-directory: apps/api
+        run: npm run typecheck
+
+      - name: Typecheck Web
+        working-directory: apps/web
+        run: npm run typecheck
+
   # ─── Backend tests ──────────────────────────────────────────────────────────
   test-api:
     name: API tests
@@ -76,11 +84,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://gopass:gopass_test@localhost:5432/gopass_test
       REDIS_URL: redis://localhost:6379
-      JWT_SECRET: ci-test-secret-not-for-production
+      JWT_ACCESS_SECRET: ci-test-access-secret-not-for-production
       JWT_REFRESH_SECRET: ci-test-refresh-secret-not-for-production
-      JWT_EXPIRES_IN: 15m
+      JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
-      PORT: 3001
+      API_PORT: 3001
       NODE_ENV: test
 
     steps:

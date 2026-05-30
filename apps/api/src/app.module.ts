@@ -12,6 +12,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { EventsModule } from './modules/events/events.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { AiModule } from './modules/ai/ai.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AiModule } from './modules/ai/ai.module';
     EventsModule,
     SchedulerModule,
     AiModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

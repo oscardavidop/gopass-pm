@@ -27,6 +27,11 @@ async function bootstrap() {
     origin: corsOrigins.split(',').map((o) => o.trim()),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  });
+
+  app.enableVersioning({
+    type: VersioningType.URI,
   });
 
   // Global prefix
@@ -55,19 +60,25 @@ async function bootstrap() {
     .addTag('Auth', 'Authentication endpoints')
     .addTag('Users', 'User management')
     .addTag('Projects', 'Project management')
+    .addTag('Workflows', 'Task workflow and lifecycle')
     .addTag('Tasks', 'Task management')
+    .addTag('Notifications', 'Notification operations')
+    .addTag('Activity', 'Activity and audit trail')
     .addTag('AI', 'AI structured generation endpoints')
+    .addTag('Settings', 'User and workspace settings')
     .addTag('Dashboard', 'Analytics and metrics')
+    .addTag('Health', 'Service probes')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document, {
+  SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: { persistAuthorization: true },
+    jsonDocumentUrl: 'api/docs-json',
   });
 
   await app.listen(port);
   console.log(`\n🚀 API running on http://localhost:${port}/${prefix}`);
-  console.log(`📚 Swagger docs at http://localhost:${port}/docs\n`);
+  console.log(`📚 Swagger docs at http://localhost:${port}/api/docs\n`);
 }
 
 bootstrap();

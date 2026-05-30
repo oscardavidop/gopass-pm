@@ -28,6 +28,33 @@ services:
     volumes:
       - redis_dev_data:/data
 
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: gopass_api_dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./apps/api/.env
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=development
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: gopass_web_dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '3000:80'
+
 volumes:
   postgres_dev_data:
   redis_dev_data:

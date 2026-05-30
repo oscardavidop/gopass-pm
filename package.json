@@ -15,6 +15,7 @@
     "db:studio": "npm run prisma:studio -w apps/api",
     "db:reset": "npm run prisma:reset -w apps/api",
     "lint": "npm run lint -w apps/api && npm run lint -w apps/web",
+    "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
     "test": "npm run test -w apps/api"
   },
   "devDependencies": {

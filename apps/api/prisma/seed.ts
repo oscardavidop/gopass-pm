@@ -4,6 +4,18 @@ import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+const notificationModel = (prisma as PrismaClient & {
+  notification: {
+    deleteMany: (args: any) => Promise<any>;
+    createMany: (args: any) => Promise<any>;
+  };
+}).notification;
+
+const activityLogModel = prisma.activityLog as {
+  deleteMany: (args: any) => Promise<any>;
+  createMany: (args: any) => Promise<any>;
+};
+
 async function main() {
   console.log('🌱 Seeding database...');
 
@@ -135,6 +147,17 @@ async function main() {
   });
 
   console.log('✅ Projects created');
+
+  // Keep seed idempotent for task-related entities.
+  await notificationModel.deleteMany({
+    where: { userId: { in: [admin.id, manager.id, user1.id, user2.id] } },
+  });
+  await activityLogModel.deleteMany({
+    where: { projectId: { in: [project1.id, project2.id, project3.id] } },
+  });
+  await prisma.task.deleteMany({
+    where: { projectId: { in: [project1.id, project2.id, project3.id] } },
+  });
 
   // ── Tasks for Project 1 ────────────────────────
   const tasks: Prisma.TaskUncheckedCreateInput[] = [
@@ -270,7 +293,59 @@ async function main() {
     await prisma.task.create({ data: taskData });
   }
 
+  const project1Tasks = await prisma.task.findMany({ where: { projectId: project1.id } });
+  const firstTask = project1Tasks[0];
+
+  if (firstTask) {
+    await activityLogModel.createMany({
+      data: [
+        {
+          action: 'CREATED',
+          entity: 'Task',
+          entityId: firstTask.id,
+          userId: admin.id,
+          taskId: firstTask.id,
+          projectId: project1.id,
+        },
+        {
+          action: 'UPDATED',
+          entity: 'Task',
+          entityId: firstTask.id,
+          userId: manager.id,
+          taskId: firstTask.id,
+          projectId: project1.id,
+          newValue: { status: 'DONE' },
+        },
+      ],
+    });
+  }
+
+  await notificationModel.createMany({
+    data: [
+      {
+        userId: manager.id,
+        title: 'Task assigned',
+        body: 'You were assigned to Setup CI/CD pipeline',
+        type: 'task_assigned',
+      },
+      {
+        userId: user1.id,
+        title: 'Project invitation accepted',
+        body: 'Welcome to Design System project',
+        type: 'project_update',
+        readAt: new Date(),
+      },
+      {
+        userId: user2.id,
+        title: 'New comment on task',
+        body: 'A teammate commented on JWT authentication task',
+        type: 'comment',
+      },
+    ],
+  });
+
   console.log('✅ Tasks created');
+  console.log('✅ Notifications and activity logs created');
   console.log('\n🎉 Seed completed successfully!\n');
   console.log('Demo accounts:');
   console.log('  admin@gopass.dev    / Admin123!   (ADMIN)');

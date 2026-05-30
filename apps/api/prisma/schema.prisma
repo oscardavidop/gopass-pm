@@ -42,6 +42,14 @@ enum Priority {
   CRITICAL
 }
 
+enum OAuthProvider {
+  GOOGLE
+  GITHUB
+  MICROSOFT
+  DISCORD
+  LINKEDIN
+}
+
 // ──────────────────────────── Models ───────────────────────────
 
 model User {
@@ -66,6 +74,9 @@ model User {
   comments       Comment[]
   activityLogs   ActivityLog[]
   refreshTokens  RefreshToken[]
+  oauthAccounts  OAuthAccount[]
+  resetTokens    PasswordResetToken[]
+  notifications  Notification[]
 
   @@index([email])
   @@index([username])
@@ -89,6 +100,7 @@ model Project {
 
   members ProjectMember[]
   tasks   Task[]
+  activityLogs ActivityLog[]
 
   @@index([ownerId])
   @@index([status])
@@ -106,6 +118,8 @@ model ProjectMember {
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
   @@map("project_members")
 }
 
@@ -137,6 +151,7 @@ model Task {
   @@index([assigneeId])
   @@index([status])
   @@index([priority])
+  @@index([dueDate])
   @@map("tasks")
 }
 
@@ -183,11 +198,15 @@ model ActivityLog {
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
+  projectId String? @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   taskId String? @map("task_id")
   task   Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([taskId])
+  @@index([projectId])
+  @@index([createdAt])
   @@index([entity, entityId])
   @@map("activity_logs")
 }
@@ -206,4 +225,66 @@ model RefreshToken {
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
+}
+
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  provider          OAuthProvider
+  providerAccountId String        @map("provider_account_id")
+  accessToken       String?       @map("access_token")
+  refreshToken      String?       @map("refresh_token")
+  expiresAt         DateTime?     @map("expires_at")
+  scope             String?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  body      String?
+  type      String
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([readAt])
+  @@map("notifications")
+}
+
+model EmailPreview {
+  id        String   @id @default(uuid())
+  to        String
+  subject   String
+  kind      String
+  html      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("email_previews")
 }

@@ -3,11 +3,14 @@ import {
   Post,
   Get,
   Body,
+  Param,
+  Query,
   Req,
   Res,
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -16,6 +19,9 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { OAuthLoginDto } from './dto/oauth-login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -45,6 +51,38 @@ export class AuthController {
     );
     this.setRefreshCookie(res, result.refreshToken);
     return { user: result.user, accessToken: result.accessToken };
+  }
+
+  @Post('oauth/:provider')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @ApiOperation({ summary: 'Login or register with OAuth provider' })
+  async oauth(
+    @Param('provider') providerRaw: string,
+    @Body() dto: OAuthLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const provider = this.parseProvider(providerRaw);
+    const result = await this.authService.oauthLogin(provider, dto, req.headers['user-agent'], req.ip);
+    this.setRefreshCookie(res, result.refreshToken);
+    return { user: result.user, accessToken: result.accessToken };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @ApiOperation({ summary: 'Request a password reset link' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @ApiOperation({ summary: 'Reset password with one-time token' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @Post('refresh')
@@ -92,6 +130,24 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user' })
   me(@CurrentUser() user: any) {
     return user;
+  }
+
+  @Get('email-previews')
+  @ApiOperation({ summary: 'List local email previews (SEND_REAL_EMAIL=false)' })
+  listPreviews(@Query('limit') limit?: string) {
+    return this.authService.listEmailPreviews(limit ? Number(limit) : undefined);
+  }
+
+  @Get('email-previews/:id')
+  @ApiOperation({ summary: 'Get local email preview details' })
+  getPreview(@Param('id') id: string) {
+    return this.authService.getEmailPreview(id);
+  }
+
+  private parseProvider(providerRaw: string): string {
+    const value = providerRaw.toUpperCase();
+    if (['GOOGLE', 'GITHUB', 'MICROSOFT', 'DISCORD', 'LINKEDIN'].includes(value)) return value;
+    throw new BadRequestException('Unsupported OAuth provider');
   }
 
   private setRefreshCookie(res: Response, token: string) {

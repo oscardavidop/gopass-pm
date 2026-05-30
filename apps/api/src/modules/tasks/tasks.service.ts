@@ -175,6 +175,7 @@ export class TasksService {
           oldValue: oldValues,
           newValue: changes.reduce((acc, key) => ({ ...acc, [key]: (updated as any)[key] }), {}),
           userId,
+          projectId: task.projectId,
           taskId: id,
         },
       });
@@ -264,6 +265,7 @@ export class TasksService {
         entityId: subtask.id,
         newValue: { title: subtask.title, position: subtask.position },
         userId,
+        projectId: task.projectId,
         taskId,
       },
     });
@@ -303,6 +305,7 @@ export class TasksService {
         oldValue: { title: subtask.title, completed: subtask.completed, position: subtask.position },
         newValue: { title: updated.title, completed: updated.completed, position: updated.position },
         userId,
+        projectId: task.projectId,
         taskId,
       },
     });
@@ -334,6 +337,7 @@ export class TasksService {
         entityId: subtaskId,
         oldValue: { title: subtask.title, position: subtask.position },
         userId,
+        projectId: task.projectId,
         taskId,
       },
     });
@@ -395,6 +399,7 @@ export class TasksService {
         entityId: taskId,
         newValue: { orderedIds },
         userId,
+        projectId: task.projectId,
         taskId,
       },
     });

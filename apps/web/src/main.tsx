@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 
 import App from './App';
 import './index.css';
+import { AppErrorBoundary } from '@/components/shared/AppErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +21,9 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
       <Toaster
         position="bottom-center"
         reverseOrder={false}
