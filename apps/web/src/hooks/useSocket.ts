@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 import { useNotificationsStore } from '@/store/notifications.store';
+import { useCollaborationStore } from '@/store/collaboration.store';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000';
 
@@ -35,7 +37,11 @@ export function useSocket(projectId?: string) {
   const currentUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const addNotif    = useNotificationsStore((s) => s.addNotification);
+  const setProjectPresence = useCollaborationStore((s) => s.setProjectPresence);
+  const setTaskPresence = useCollaborationStore((s) => s.setTaskPresence);
+  const pushTaskHighlight = useCollaborationStore((s) => s.pushTaskHighlight);
   const socketRef   = useRef<Socket | null>(null);
+  const lastToastAtRef = useRef<Record<string, number>>({});
   // Use state so consumers (usePresence) re-render when socket becomes available
   const [socket, setSocket] = useState<Socket | null>(null);
 
@@ -48,6 +54,12 @@ export function useSocket(projectId?: string) {
   addNotifRef.current = addNotif;
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
+  const setProjectPresenceRef = useRef(setProjectPresence);
+  setProjectPresenceRef.current = setProjectPresence;
+  const setTaskPresenceRef = useRef(setTaskPresence);
+  setTaskPresenceRef.current = setTaskPresence;
+  const pushTaskHighlightRef = useRef(pushTaskHighlight);
+  pushTaskHighlightRef.current = pushTaskHighlight;
 
   // ── Effect 1: connect once + register ALL event handlers ──────────────────
   // Only re-runs when the access token changes (new login / token refresh).
@@ -79,6 +91,51 @@ export function useSocket(projectId?: string) {
       });
     };
 
+    const formatActorName = (actor?: any) => {
+      if (!actor) return 'A teammate';
+      return [actor.firstName, actor.lastName].filter(Boolean).join(' ').trim() || 'A teammate';
+    };
+
+    const notifyCollab = ({
+      dedupeKey,
+      message,
+      icon,
+      cooldownMs = 9000,
+    }: {
+      dedupeKey: string;
+      message: string;
+      icon: string;
+      cooldownMs?: number;
+    }) => {
+      const now = Date.now();
+      const lastAt = lastToastAtRef.current[dedupeKey] ?? 0;
+      if (now - lastAt < cooldownMs) return;
+      lastToastAtRef.current[dedupeKey] = now;
+      toast(message, { icon });
+    };
+
+    const onTaskCreatedRealtime = (payload: any) => {
+      if (!payload?.taskId || !payload?.projectId) return;
+      pushTaskHighlightRef.current({
+        taskId: payload.taskId,
+        projectId: payload.projectId,
+        actor: payload.actor,
+        kind: 'created',
+        message: `${formatActorName(payload.actor)} created this task`,
+        timestamp: payload.timestamp ?? new Date().toISOString(),
+      });
+
+      if (payload.actor?.id && payload.actor.id !== currentUserRef.current?.id) {
+        notifyCollab({
+          dedupeKey: `task.created:${payload.projectId}:${payload.taskId}`,
+          message: `${formatActorName(payload.actor)} created a task`,
+          icon: '✨',
+        });
+      }
+
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+    };
+
     // Direct cache update — instant for all members, no extra HTTP request
     const onTaskUpdated = (task: any) => {
       if (!task.projectId) return;
@@ -100,6 +157,86 @@ export function useSocket(projectId?: string) {
       queryClientRef.current.invalidateQueries({ queryKey: ['dashboard'] });
     };
 
+    const onTaskUpdatedRealtime = (payload: any) => {
+      if (!payload?.taskId || !payload?.projectId) return;
+      pushTaskHighlightRef.current({
+        taskId: payload.taskId,
+        projectId: payload.projectId,
+        actor: payload.actor,
+        kind: 'updated',
+        message: `${formatActorName(payload.actor)} updated this task`,
+        timestamp: payload.timestamp ?? new Date().toISOString(),
+      });
+
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+    };
+
+    const onTaskMovedRealtime = (payload: any) => {
+      if (!payload?.taskId || !payload?.projectId) return;
+      pushTaskHighlightRef.current({
+        taskId: payload.taskId,
+        projectId: payload.projectId,
+        actor: payload.actor,
+        kind: 'moved',
+        message: `${formatActorName(payload.actor)} moved this task`,
+        from: payload.from,
+        to: payload.to,
+        timestamp: payload.timestamp ?? new Date().toISOString(),
+      }, 8000);
+
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+    };
+
+    const onTaskDeletedRealtime = (payload: any) => {
+      if (!payload?.taskId || !payload?.projectId) return;
+      if (payload.actor?.id && payload.actor.id !== currentUserRef.current?.id) {
+        notifyCollab({
+          dedupeKey: `task.deleted:${payload.projectId}:${payload.taskId}`,
+          message: `${formatActorName(payload.actor)} deleted a task`,
+          icon: '🗑️',
+          cooldownMs: 12000,
+        });
+      }
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+    };
+
+    const onProjectUpdatedRealtime = (payload: any) => {
+      if (!payload?.projectId) return;
+      queryClientRef.current.invalidateQueries({ queryKey: ['projects'] });
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+
+      if (payload.actor?.id && payload.actor.id !== currentUserRef.current?.id) {
+        notifyCollab({
+          dedupeKey: `project.updated:${payload.projectId}`,
+          message: `${formatActorName(payload.actor)} updated project`,
+          icon: '📁',
+          cooldownMs: 12000,
+        });
+      }
+    };
+
+    const onTaskPresence = (payload: any) => {
+      if (!payload?.projectId || !payload?.taskId) return;
+      setTaskPresenceRef.current({
+        projectId: payload.projectId,
+        taskId: payload.taskId,
+        viewing: payload.viewing ?? [],
+        editing: payload.editing ?? [],
+      });
+    };
+
+    const onPresenceUpdate = (payload: any) => {
+      if (!projectId) return;
+      const users = Array.isArray(payload) ? payload : payload?.users;
+      if (!Array.isArray(users)) return;
+      setProjectPresenceRef.current(projectId, users);
+    };
+
+    const onActivityCreated = () => {
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+      queryClientRef.current.invalidateQueries({ queryKey: ['tasks'] });
+    };
+
     const onTaskDeleted = ({ id, projectId }: { id: string; projectId: string }) => {
       queryClientRef.current.invalidateQueries({ queryKey: ['tasks', 'project', projectId] });
       queryClientRef.current.invalidateQueries({ queryKey: ['dashboard'] });
@@ -109,6 +246,14 @@ export function useSocket(projectId?: string) {
     s.on('task:created', onTaskCreated);
     s.on('task:updated', onTaskUpdated);
     s.on('task:deleted', onTaskDeleted);
+    s.on('task.created', onTaskCreatedRealtime);
+    s.on('task.updated', onTaskUpdatedRealtime);
+    s.on('task.moved', onTaskMovedRealtime);
+    s.on('task.deleted', onTaskDeletedRealtime);
+    s.on('project.updated', onProjectUpdatedRealtime);
+    s.on('task.presence', onTaskPresence);
+    s.on('presence:update', onPresenceUpdate);
+    s.on('activity.created', onActivityCreated);
 
     /* ── Member events ── */
     const onMemberAdded = (data: any) => {
@@ -162,6 +307,14 @@ export function useSocket(projectId?: string) {
       s.off('task:created', onTaskCreated);
       s.off('task:updated', onTaskUpdated);
       s.off('task:deleted', onTaskDeleted);
+      s.off('task.created', onTaskCreatedRealtime);
+      s.off('task.updated', onTaskUpdatedRealtime);
+      s.off('task.moved', onTaskMovedRealtime);
+      s.off('task.deleted', onTaskDeletedRealtime);
+      s.off('project.updated', onProjectUpdatedRealtime);
+      s.off('task.presence', onTaskPresence);
+      s.off('presence:update', onPresenceUpdate);
+      s.off('activity.created', onActivityCreated);
       s.off('project:member_added', onMemberAdded);
       s.off('project:member_removed', onMemberRemoved);
       s.off('notification', onNotification);

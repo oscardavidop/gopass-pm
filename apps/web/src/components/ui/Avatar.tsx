@@ -22,7 +22,7 @@ interface AvatarProps {
   /** Show green online indicator dot */
   online?: boolean;
   /** Custom fallback color — defaults to indigo palette based on initials */
-  color?: string;
+  color?: string | null;
 }
 
 function getInitials(firstName?: string, lastName?: string): string {
@@ -55,9 +55,10 @@ export function Avatar({
   size = 'md',
   className,
   online,
+  color,
 }: AvatarProps) {
   const initials = getInitials(firstName, lastName);
-  const colorClass = seedColor(initials);
+  const colorClass = color ? '' : seedColor(initials);
 
   return (
     <span className={cn('relative inline-flex shrink-0', className)}>
@@ -74,6 +75,7 @@ export function Avatar({
             'flex h-full w-full items-center justify-center rounded-full font-semibold',
             colorClass,
           )}
+          style={color ? { backgroundColor: `${color}22`, color } : undefined}
         >
           {initials}
         </AvatarPrimitive.Fallback>

@@ -102,7 +102,7 @@ export class ProjectsService {
       throw new ForbiddenException('Only project admins can update the project');
     }
 
-    return this.prisma.project.update({
+    const updated = await this.prisma.project.update({
       where: { id },
       data: {
         ...dto,
@@ -111,6 +111,29 @@ export class ProjectsService {
       },
       include: this.projectIncludes(),
     });
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true },
+    });
+    this.events.emitProjectUpdated(id, updated, actor);
+
+    const activity = await this.prisma.activityLog.create({
+      data: {
+        action: 'UPDATED',
+        entity: 'Project',
+        entityId: id,
+        newValue: dto as any,
+        userId,
+        projectId: id,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(id, activity);
+
+    return updated;
   }
 
   async remove(id: string, userId: string, userRole: Role) {
@@ -181,7 +204,7 @@ export class ProjectsService {
       actorName,
     });
 
-    await this.prisma.activityLog.create({
+    const activity = await this.prisma.activityLog.create({
       data: {
         action: 'INVITED_MEMBER',
         entity: 'ProjectMember',
@@ -194,7 +217,11 @@ export class ProjectsService {
         userId: currentUserId,
         projectId,
       },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
     });
+    this.events.emitActivityCreated(projectId, activity);
 
     if (newMemberUser?.email) {
       const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
@@ -248,7 +275,7 @@ export class ProjectsService {
       members: {
         include: {
           user: {
-            select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
+            select: { id: true, firstName: true, lastName: true, avatar: true, email: true, collaborationColor: true },
           },
         },
       },

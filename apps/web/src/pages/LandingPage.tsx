@@ -60,10 +60,10 @@ function Section({ children, className = '', id }: { children: React.ReactNode; 
 function Pill({ children, color = 'default' }: { children: React.ReactNode; color?: 'default' | 'ai' | 'green' | 'amber' | 'red' }) {
   const colorMap: Record<string, string> = {
     default: 'border-border/80 bg-secondary/60 text-muted-foreground',
-    ai:      'border-primary/40 bg-primary/10 text-primary',
-    green:   'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    amber:   'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    red:     'border-red-500/40 bg-red-500/10 text-red-500',
+    ai: 'border-primary/40 bg-primary/10 text-primary',
+    green: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    amber: 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    red: 'border-red-500/40 bg-red-500/10 text-red-500',
   };
   return <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${colorMap[color]}`}>{children}</span>;
 }
@@ -73,8 +73,8 @@ function ScreenPlaceholder({ label, hint, aspect = '16/9', glow = 'primary', cla
 }) {
   const glowMap: Record<string, string> = {
     primary: 'rgba(99,102,241,0.28)',
-    ai:      'rgba(168,85,247,0.28)',
-    orange:  'rgba(251,146,60,0.22)',
+    ai: 'rgba(168,85,247,0.28)',
+    orange: 'rgba(251,146,60,0.22)',
   };
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-slate-950 shadow-2xl ${className}`} style={{ aspectRatio: aspect }}>
@@ -121,8 +121,9 @@ function LandingNavbar({ onNavigate }: { onNavigate: (to: string) => void }) {
     <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'border-b border-border/60 bg-background/90 backdrop-blur-xl shadow-sm' : 'bg-transparent'}`}>
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5 md:px-8">
         <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5">
-          <img src={isDark ? logoDark : logoLight} alt="Tasku" className="h-8 w-8 object-contain" />
-          <span className="text-base font-bold tracking-tight text-foreground">Tasku</span>
+          <img src={isDark ? logoDark : logoLight} alt="Tasku" className="object-contain" style={{
+            width: '130px',
+          }} />
         </button>
         <nav className="hidden items-center gap-1 md:flex">
           {navLinks.map((link) => (

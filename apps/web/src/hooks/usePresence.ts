@@ -6,7 +6,9 @@ export interface PresenceUser {
   firstName: string;
   lastName: string;
   avatar?: string | null;
+  collaborationColor?: string | null;
   socketId: string;
+  status?: 'online' | 'idle';
 }
 
 /**
@@ -28,7 +30,12 @@ export function usePresence(projectId: string | undefined): PresenceUser[] {
     const onPresenceUpdate = (data: PresenceUser[]) => setUsers(data);
     socket.on('presence:update', onPresenceUpdate);
 
+    const heartbeat = window.setInterval(() => {
+      socket.emit('presence:heartbeat', projectId);
+    }, 20_000);
+
     return () => {
+      window.clearInterval(heartbeat);
       socket.emit('presence:leave', projectId);
       socket.off('presence:update', onPresenceUpdate);
     };

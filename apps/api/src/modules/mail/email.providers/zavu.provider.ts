@@ -15,8 +15,6 @@ export class ZavuProvider implements EmailProvider {
             throw new Error('Missing ZAVU_SENDER_ID environment variable');
         }
 
-        console.log('ZavuProvider.sendTemplate called with:', input);
-
         const zavu = this.getClient();
         const response = await zavu.messages.send(
             {
@@ -53,7 +51,6 @@ export class ZavuProvider implements EmailProvider {
 
         let ZavuCtor: any;
         try {
-            const mod = Zavudev
             ZavuCtor =  Zavudev
         } catch {
             throw new Error('Package @zavudev/sdk is not installed');

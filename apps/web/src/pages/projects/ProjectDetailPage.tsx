@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge, ChevronDown, Bot, FilePenLine } from 'lucide-react';
+import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge, ChevronDown, Bot, FilePenLine, CalendarDays, Rows3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
@@ -13,13 +13,16 @@ import { AiTaskCreateDrawer } from '@/features/tasks/AiTaskCreateDrawer';
 import { ManualTaskCreateDrawer } from '@/features/tasks/ManualTaskCreateDrawer';
 import { TaskForm } from '@/features/tasks/TaskForm';
 import { TaskDrawer } from '@/features/tasks/TaskDrawer';
-import { TaskFilters } from '@/features/tasks/TaskFilters';
+import { TaskFilters, type TaskGroupBy } from '@/features/tasks/TaskFilters';
+import { TaskListView } from '@/features/tasks/TaskListView';
+import { TaskCalendarView } from '@/features/tasks/TaskCalendarView';
 import { PresenceAvatars } from '@/components/shared/PresenceAvatars';
 import { MemberManager } from '@/features/projects/MemberManager';
 import { useProject } from '@/hooks/useProjects';
 import { useProjectTasks, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuthStore } from '@/store/auth.store';
+import { trackUiEvent } from '@/utils/analytics';
 import { stripRichText } from '@/utils/richText';
 import { type Priority, type Task, type TaskStatus } from '@/types/task.types';
 
@@ -44,7 +47,11 @@ export function ProjectDetailPage() {
 
   const [search, setSearch] = useState('');
   const [priority, setPriority] = useState<Priority | ''>('');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [labelFilter, setLabelFilter] = useState('');
+  const [groupBy, setGroupBy] = useState<TaskGroupBy>('none');
+  const [viewMode, setViewMode] = useState<'board' | 'list' | 'calendar'>('board');
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const [manualCreateOpen, setManualCreateOpen] = useState(false);
   const [taskEditOpen, setTaskEditOpen] = useState(false);
@@ -56,6 +63,19 @@ export function ProjectDetailPage() {
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
   const currentUser = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    if (!id) return;
+    const stored = window.localStorage.getItem(`project-view:${id}`);
+    if (stored === 'board' || stored === 'list' || stored === 'calendar') {
+      setViewMode(stored);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    window.localStorage.setItem(`project-view:${id}`, viewMode);
+  }, [id, viewMode]);
 
   // Redirect if the current user gets removed from this project in real-time
   useEffect(() => {
@@ -113,6 +133,7 @@ export function ProjectDetailPage() {
   const { data: tasksData, isLoading: tasksLoading } = useProjectTasks(id!, {
     search: debouncedSearch || undefined,
     priority: priority || undefined,
+    status: statusFilter || undefined,
     assigneeId: assigneeFilter || undefined,
     limit: 200,
   });
@@ -121,6 +142,11 @@ export function ProjectDetailPage() {
   const deleteTask = useDeleteTask();
 
   const tasks = tasksData?.items ?? [];
+  const visibleTasks = useMemo(() => {
+    const labelQuery = labelFilter.trim().toLowerCase();
+    if (!labelQuery) return tasks;
+    return tasks.filter((task) => task.tags.some((tag) => tag.toLowerCase().includes(labelQuery)));
+  }, [tasks, labelFilter]);
   const members = useMemo(
     () => project?.members?.map(({ user }) => user) ?? [],
     [project],
@@ -131,19 +157,32 @@ export function ProjectDetailPage() {
     [project, currentUser],
   );
 
-  const doneCount = useMemo(() => tasks.filter((t) => t.status === 'DONE').length, [tasks]);
-  const progress  = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const doneCount = useMemo(() => visibleTasks.filter((t) => t.status === 'DONE').length, [visibleTasks]);
+  const progress = visibleTasks.length ? Math.round((doneCount / visibleTasks.length) * 100) : 0;
   const projectDescriptionPreview = useMemo(
     () => stripRichText(project?.description ?? ''),
     [project?.description],
   );
-  const inProgressCount = useMemo(() => tasks.filter((t) => t.status === 'IN_PROGRESS').length, [tasks]);
-  const reviewCount = useMemo(() => tasks.filter((t) => t.status === 'REVIEW').length, [tasks]);
-  const todoCount = useMemo(() => tasks.filter((t) => t.status === 'TODO').length, [tasks]);
+  const inProgressCount = useMemo(() => visibleTasks.filter((t) => t.status === 'IN_PROGRESS').length, [visibleTasks]);
+  const reviewCount = useMemo(() => visibleTasks.filter((t) => t.status === 'REVIEW').length, [visibleTasks]);
+  const todoCount = useMemo(() => visibleTasks.filter((t) => t.status === 'TODO').length, [visibleTasks]);
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTaskId(task.id);
-  }, []);
+    trackUiEvent({ event: 'Task Opened', payload: { taskId: task.id, source: viewMode } });
+  }, [viewMode]);
+
+  const handleInlineUpdate = useCallback(async (
+    taskId: string,
+    data: Partial<{ status: TaskStatus; priority: Priority; assigneeId: string | null; dueDate: string | null; tags: string[] }>,
+  ) => {
+    await updateTask.mutateAsync({ id: taskId, data: data as any });
+    trackUiEvent({ event: 'Task Edited', payload: { taskId, fields: Object.keys(data), source: 'list' } });
+  }, [updateTask]);
+
+  const handleBulkDelete = useCallback(async (taskIds: string[]) => {
+    await Promise.all(taskIds.map((taskId) => deleteTask.mutateAsync(taskId)));
+  }, [deleteTask]);
 
   const handleAddTask = useCallback((status: string) => {
     setDefaultStatus(status as TaskStatus);
@@ -211,12 +250,12 @@ export function ProjectDetailPage() {
       <div className="premium-panel p-4 md:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-3">
-          <Link
-            to="/projects"
-            className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+            <Link
+              to="/projects"
+              className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
 
             <div
               className="w-10 h-10 rounded-xl shadow-sm shrink-0 border border-border/60"
@@ -263,7 +302,16 @@ export function ProjectDetailPage() {
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-t border-border/60 pt-3.5">
           <div className="flex flex-wrap items-center gap-3">
             {/* Presence (online users) */}
-            <PresenceAvatars projectId={id ?? ''} />
+            <PresenceAvatars
+              projectId={id ?? ''}
+              members={project?.members?.map((member) => ({
+                id: member.user.id,
+                firstName: member.user.firstName,
+                lastName: member.user.lastName,
+                avatar: member.user.avatar,
+                collaborationColor: (member.user as any).collaborationColor,
+              })) ?? []}
+            />
 
             {/* Members — modal trigger */}
             {project && (
@@ -277,7 +325,7 @@ export function ProjectDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {tasks.length > 0 && (
+            {visibleTasks.length > 0 && (
               <div className="hidden sm:flex items-center gap-2">
                 <div className="inline-flex items-center gap-1 rounded-full border border-border/75 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
                   <Gauge className="h-3 w-3" />
@@ -349,16 +397,41 @@ export function ProjectDetailPage() {
       {/* ── Filters ── */}
       <TaskFilters
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => {
+          setSearch(value);
+          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'search' } });
+        }}
         priority={priority}
-        onPriorityChange={(value) => setPriority(value as Priority | '')}
+        onPriorityChange={(value) => {
+          setPriority(value as Priority | '');
+          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'priority', value } });
+        }}
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value as TaskStatus | '');
+          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'status', value } });
+        }}
         assigneeId={assigneeFilter}
-        onAssigneeChange={setAssigneeFilter}
+        onAssigneeChange={(value) => {
+          setAssigneeFilter(value);
+          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'assignee', value } });
+        }}
+        labelFilter={labelFilter}
+        onLabelFilterChange={(value) => {
+          setLabelFilter(value);
+          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'labels', value } });
+        }}
+        groupBy={groupBy}
+        onGroupByChange={(value) => {
+          setGroupBy(value);
+          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'groupBy', value } });
+        }}
         members={members}
       />
 
-      {/* ── Stats bar ── */}
-      {tasks.length > 0 && (
+      {/* ── Stats bar and view switcher ── */}
+      <div className="flex items-center justify-between">
+      {visibleTasks.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <CircleDashed className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
@@ -379,26 +452,77 @@ export function ProjectDetailPage() {
         </div>
       )}
 
-      {/* ── Kanban ── */}
-      {tasksLoading ? (
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="min-w-[272px] space-y-2">
-              <Skeleton className="h-10 w-full rounded-xl" />
-              <div className="space-y-2 p-2">
-                {Array.from({ length: 3 }).map((_, j) => (
-                  <Skeleton key={j} className="h-24 w-full rounded-lg" />
-                ))}
+      <div className="inline-flex rounded-xl border border-border bg-background p-1">
+        {[
+          { key: 'board', icon: LayoutGrid, label: t('project.view.board', { defaultValue: 'Board' }) },
+          { key: 'list', icon: Rows3, label: t('project.view.list', { defaultValue: 'List' }) },
+          { key: 'calendar', icon: CalendarDays, label: t('project.view.calendar', { defaultValue: 'Calendar' }) },
+        ].map((item) => {
+          const Icon = item.icon;
+          const active = viewMode === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${active
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                }`}
+              onClick={() => {
+                setViewMode(item.key as 'board' | 'list' | 'calendar');
+                trackUiEvent({ event: 'View Switched', payload: { view: item.key, projectId: id } });
+              }}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+      </div>
+
+      {/* ── Views ── */}
+      {viewMode === 'board' && (
+        tasksLoading ? (
+          <div className="flex gap-3 overflow-x-auto pb-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="min-w-[272px] space-y-2">
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <div className="space-y-2 p-2">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <Skeleton key={j} className="h-24 w-full rounded-lg" />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <KanbanBoard
-          tasks={tasks}
+            ))}
+          </div>
+        ) : (
+          <KanbanBoard
+            tasks={visibleTasks}
+            onTaskClick={handleTaskClick}
+            onAddTask={handleAddTask}
+            onQuickAdd={handleQuickAdd}
+          />
+        )
+      )}
+
+      {viewMode === 'list' && (
+        <TaskListView
+          tasks={visibleTasks}
+          loading={tasksLoading}
+          projectName={project.name}
+          groupBy={groupBy}
+          members={members}
           onTaskClick={handleTaskClick}
-          onAddTask={handleAddTask}
-          onQuickAdd={handleQuickAdd}
+          onInlineUpdate={handleInlineUpdate}
+          onDeleteTasks={handleBulkDelete}
+        />
+      )}
+
+      {viewMode === 'calendar' && (
+        <TaskCalendarView
+          tasks={visibleTasks}
+          onTaskClick={handleTaskClick}
         />
       )}
 

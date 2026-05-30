@@ -11,9 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/Select';
+import { PremiumSelect, type PremiumSelectOption } from '@/components/ui/PremiumSelect';
 import {
   useTask,
   useDeleteTask,
@@ -25,6 +23,7 @@ import {
   useReorderSubtasks,
 } from '@/hooks/useTasks';
 import { useGenerateSubtasksAi, useImproveDescriptionAi, useSuggestPriorityAi } from '@/hooks/useAi';
+import { useSocketInstance } from '@/hooks/useSocket';
 import { timeAgo } from '@/utils/formatters';
 import { isRichTextEmpty, sanitizeRichText } from '@/utils/richText';
 import { type Task, type TaskStatus, type Priority } from '@/types/task.types';
@@ -32,6 +31,8 @@ import { cn } from '@/utils/cn';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { translateByKey } from '@/i18n/translate';
+import { useCollaborationStore } from '@/store/collaboration.store';
+import { AvatarGroup } from '@/components/ui/Avatar';
 
 /* ─── config maps ──────────────────────────────────────────── */
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -75,6 +76,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const [dueDateDraft, setDueDateDraft] = useState('');
 
   const { data: task, isLoading } = useTask(taskId ?? '');
+  const socket = useSocketInstance();
   const deleteTask  = useDeleteTask();
   const addComment  = useAddComment(taskId ?? '');
   const updateTask  = useUpdateTask();
@@ -102,6 +104,33 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const priorityCfg = task ? (PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.MEDIUM) : null;
   const statusCfg   = task ? (STATUS_CONFIG[task.status]     ?? STATUS_CONFIG.TODO)     : null;
   const borderColor = task ? (PRIORITY_BORDER[task.priority] ?? 'border-l-slate-500/60') : '';
+  const taskPresence = useCollaborationStore((state) => (task ? state.taskPresenceByProject[task.projectId]?.[task.id] : undefined));
+  const viewers = taskPresence?.viewing ?? [];
+  const editors = taskPresence?.editing ?? [];
+  const titleEditor = editors.find((entry) => entry.field === 'title');
+  const descriptionEditor = editors.find((entry) => entry.field === 'description');
+
+  useEffect(() => {
+    if (!socket || !task || !taskId) return;
+    socket.emit('task:viewing', { projectId: task.projectId, taskId, active: true });
+    return () => {
+      socket.emit('task:presence:leave', { projectId: task.projectId, taskId });
+    };
+  }, [socket, task, taskId]);
+
+  const statusOptions: PremiumSelectOption<TaskStatus>[] = [
+    { value: 'TODO', label: 'To do' },
+    { value: 'IN_PROGRESS', label: 'In progress' },
+    { value: 'REVIEW', label: 'Review' },
+    { value: 'DONE', label: 'Done' },
+  ];
+
+  const priorityOptions: PremiumSelectOption<Priority>[] = [
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+    { value: 'CRITICAL', label: 'Critical', badge: '!' },
+  ];
 
   useEffect(() => {
     if (!task) return;
@@ -282,16 +311,28 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                     <div className="flex items-start justify-between gap-2">
                       <input
                         value={titleDraft}
+                        onFocus={() => {
+                          if (!socket || !task) return;
+                          socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: true, field: 'title' });
+                        }}
+                        onBlur={() => {
+                          if (socket && task) {
+                            socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: false, field: 'title' });
+                          }
+                          if (!autosave) persistDraft();
+                        }}
                         onChange={(e) => {
                           setTitleDraft(e.target.value);
                           setDraftDirty(true);
                         }}
-                        onBlur={() => {
-                          if (!autosave) persistDraft();
-                        }}
                         className="w-full bg-transparent text-lg font-semibold leading-snug outline-none border border-transparent rounded-lg px-1.5 py-1 hover:border-border/60 focus:border-primary/40"
                         placeholder="Task title"
                       />
+                      {titleEditor && (
+                        <span className="text-[11px] text-muted-foreground">
+                          Editing by {titleEditor.user.firstName}
+                        </span>
+                      )}
                       <button
                         onClick={() => setAutosave((v) => !v)}
                         className={cn(
@@ -305,17 +346,33 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         Autosave {autosave ? 'on' : 'off'}
                       </button>
                     </div>
-                    <RichTextEditor
-                      label="Description"
-                      value={descDraft}
-                      onChange={(nextValue) => {
-                        setDescDraft(nextValue);
-                        setDraftDirty(true);
+                    {descriptionEditor && (
+                      <span className="text-[11px] text-muted-foreground">
+                        Editing by {descriptionEditor.user.firstName}
+                      </span>
+                    )}
+                    <div
+                      onFocusCapture={() => {
+                        if (!socket || !task) return;
+                        socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: true, field: 'description' });
                       }}
-                      maxLength={5000}
-                      minHeightClassName="min-h-[140px]"
-                      placeholder="Add context, acceptance criteria or implementation notes..."
-                    />
+                      onBlurCapture={() => {
+                        if (!socket || !task) return;
+                        socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: false, field: 'description' });
+                      }}
+                    >
+                      <RichTextEditor
+                        label="Description"
+                        value={descDraft}
+                        onChange={(nextValue) => {
+                          setDescDraft(nextValue);
+                          setDraftDirty(true);
+                        }}
+                        maxLength={5000}
+                        minHeightClassName="min-h-[140px]"
+                        placeholder="Add context, acceptance criteria or implementation notes..."
+                      />
+                    </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleImproveDescription} isLoading={improveDescriptionAi.isPending}>
                         Improve description
@@ -329,6 +386,21 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">{autosave ? 'Changes are saved automatically' : 'Manual save mode'}</span>
+                      {(viewers.length > 0 || editors.length > 0) && (
+                        <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <AvatarGroup
+                            users={[...viewers, ...editors.map((entry) => entry.user)].map((user) => ({
+                              id: user.id,
+                              firstName: user.firstName,
+                              lastName: user.lastName,
+                              avatar: user.avatar,
+                            }))}
+                            size="xs"
+                            max={4}
+                          />
+                          {editors.length > 0 ? `${editors[0].user.firstName} is editing...` : `${viewers[0].firstName} is viewing this task`}
+                        </span>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -349,55 +421,29 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         {updateTask.isPending && (
                           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground absolute -left-4" />
                         )}
-                        <Select
+                        <PremiumSelect
                           value={task.status}
                           disabled={updateTask.isPending}
-                          onValueChange={(v) =>
-                            updateTask.mutate({ id: task.id, data: { status: v as TaskStatus } })
-                          }
-                        >
-                          <SelectTrigger className="h-7 w-auto min-w-[120px] border-0 bg-transparent px-1.5 py-0 text-xs focus:ring-0 hover:bg-accent rounded-md disabled:opacity-60 disabled:cursor-not-allowed">
-                            <SelectValue>
-                              <div className="flex items-center gap-1.5">
-                                <span className={cn('w-2 h-2 rounded-full', statusCfg?.dot)} />
-                                <span>{statusCfg?.label}</span>
-                              </div>
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="TODO">To do</SelectItem>
-                            <SelectItem value="IN_PROGRESS">In progress</SelectItem>
-                            <SelectItem value="REVIEW">Review</SelectItem>
-                            <SelectItem value="DONE">Done</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          onValueChange={(value) => updateTask.mutate({ id: task.id, data: { status: value as TaskStatus } })}
+                          options={statusOptions}
+                          size="sm"
+                          ariaLabel="Status"
+                          triggerClassName="h-7 min-w-[132px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-xl"
+                        />
                       </div>
                     </MetaRow>
 
                     <MetaRow label="Priority">
                       <div className="relative flex items-center">
-                        <Select
+                        <PremiumSelect
                           value={task.priority}
                           disabled={updateTask.isPending}
-                          onValueChange={(v) =>
-                            updateTask.mutate({ id: task.id, data: { priority: v as Priority } })
-                          }
-                        >
-                          <SelectTrigger className="h-7 w-auto min-w-[110px] border-0 bg-transparent px-1.5 py-0 text-xs focus:ring-0 hover:bg-accent rounded-md disabled:opacity-60 disabled:cursor-not-allowed">
-                            <SelectValue>
-                              <span className={cn('inline-flex items-center gap-1', priorityCfg?.color)}>
-                                <Flag className="h-3 w-3" />
-                                {priorityCfg?.label}
-                              </span>
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="LOW">Low</SelectItem>
-                            <SelectItem value="MEDIUM">Medium</SelectItem>
-                            <SelectItem value="HIGH">High</SelectItem>
-                            <SelectItem value="CRITICAL">Critical</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          onValueChange={(value) => updateTask.mutate({ id: task.id, data: { priority: value as Priority } })}
+                          options={priorityOptions}
+                          size="sm"
+                          ariaLabel="Priority"
+                          triggerClassName="h-7 min-w-[126px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-xl"
+                        />
                       </div>
                     </MetaRow>
 
@@ -420,8 +466,17 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         <input
                           type="date"
                           value={dueDateDraft}
+                          onFocus={() => {
+                            if (!socket || !task) return;
+                            socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: true, field: 'dueDate' });
+                          }}
                           onChange={(e) => setDueDateDraft(e.target.value)}
-                          onBlur={(e) => saveDueDate(e.target.value)}
+                          onBlur={(e) => {
+                            if (socket && task) {
+                              socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: false, field: 'dueDate' });
+                            }
+                            saveDueDate(e.target.value);
+                          }}
                           className="h-7 rounded-md border border-input bg-background/70 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>

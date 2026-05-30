@@ -62,7 +62,24 @@ export class TasksService {
       });
     });
 
-    this.events.emitTaskCreated(projectId, task);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskCreated(projectId, task, { actor });
+
+    const activity = await this.prisma.activityLog.create({
+      data: {
+        action: 'CREATED',
+        entity: 'Task',
+        entityId: task.id,
+        newValue: { title: task.title, status: task.status, priority: task.priority },
+        userId,
+        projectId,
+        taskId: task.id,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(projectId, activity);
     return task;
   }
 
@@ -169,7 +186,12 @@ export class TasksService {
       include: this.taskIncludes(),
     });
 
-    this.events.emitTaskUpdated(updated.projectId, updated);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskUpdated(updated.projectId, updated, {
+      actor,
+      oldValue: oldValues,
+      changedFields: changes,
+    });
 
     const assigneeChanged = dto.assigneeId !== undefined && dto.assigneeId !== task.assigneeId;
     if (assigneeChanged && updated.assigneeId) {
@@ -229,7 +251,7 @@ export class TasksService {
 
     // Audit log
     if (changes.length > 0) {
-      await this.prisma.activityLog.create({
+      const activity = await this.prisma.activityLog.create({
         data: {
           action: 'UPDATED',
           entity: 'Task',
@@ -240,7 +262,11 @@ export class TasksService {
           projectId: task.projectId,
           taskId: id,
         },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+        },
       });
+      this.events.emitActivityCreated(task.projectId, activity);
     }
 
     return updated;
@@ -266,7 +292,27 @@ export class TasksService {
       data: { deletedAt: new Date() },
     });
 
-    this.events.emitTaskDeleted(task.projectId, id);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskDeleted(task.projectId, id, {
+      actor,
+      task: { id: task.id, title: task.title, status: task.status, priority: task.priority },
+    });
+
+    const activity = await this.prisma.activityLog.create({
+      data: {
+        action: 'DELETED',
+        entity: 'Task',
+        entityId: id,
+        oldValue: { title: task.title, status: task.status, priority: task.priority },
+        userId,
+        projectId: task.projectId,
+        taskId: id,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(task.projectId, activity);
     return deleted;
   }
 
@@ -320,7 +366,7 @@ export class TasksService {
       },
     });
 
-    await this.prisma.activityLog.create({
+    const activity = await this.prisma.activityLog.create({
       data: {
         action: 'SUBTASK_CREATED',
         entity: 'Subtask',
@@ -330,14 +376,22 @@ export class TasksService {
         projectId: task.projectId,
         taskId,
       },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
     });
+    this.events.emitActivityCreated(task.projectId, activity);
 
     const updatedTask = await this.prisma.task.findUniqueOrThrow({
       where: { id: taskId },
       include: this.taskIncludes(),
     });
 
-    this.events.emitTaskUpdated(task.projectId, updatedTask);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskUpdated(task.projectId, updatedTask, {
+      actor,
+      changedFields: ['subtasks'],
+    });
     return subtask;
   }
 
@@ -359,7 +413,7 @@ export class TasksService {
       },
     });
 
-    await this.prisma.activityLog.create({
+    const activity = await this.prisma.activityLog.create({
       data: {
         action: 'SUBTASK_UPDATED',
         entity: 'Subtask',
@@ -370,13 +424,21 @@ export class TasksService {
         projectId: task.projectId,
         taskId,
       },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
     });
+    this.events.emitActivityCreated(task.projectId, activity);
 
     const updatedTask = await this.prisma.task.findUniqueOrThrow({
       where: { id: taskId },
       include: this.taskIncludes(),
     });
-    this.events.emitTaskUpdated(task.projectId, updatedTask);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskUpdated(task.projectId, updatedTask, {
+      actor,
+      changedFields: ['subtasks'],
+    });
 
     return updated;
   }
@@ -392,7 +454,7 @@ export class TasksService {
 
     await this.prisma.subtask.delete({ where: { id: subtaskId } });
 
-    await this.prisma.activityLog.create({
+    const activity = await this.prisma.activityLog.create({
       data: {
         action: 'SUBTASK_DELETED',
         entity: 'Subtask',
@@ -402,7 +464,11 @@ export class TasksService {
         projectId: task.projectId,
         taskId,
       },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
     });
+    this.events.emitActivityCreated(task.projectId, activity);
 
     const rest = await this.prisma.subtask.findMany({
       where: { parentTaskId: taskId },
@@ -423,7 +489,11 @@ export class TasksService {
       where: { id: taskId },
       include: this.taskIncludes(),
     });
-    this.events.emitTaskUpdated(task.projectId, updatedTask);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskUpdated(task.projectId, updatedTask, {
+      actor,
+      changedFields: ['subtasks'],
+    });
 
     return { id: subtaskId };
   }
@@ -454,7 +524,7 @@ export class TasksService {
       ),
     );
 
-    await this.prisma.activityLog.create({
+    const activity = await this.prisma.activityLog.create({
       data: {
         action: 'SUBTASK_REORDERED',
         entity: 'Subtask',
@@ -464,13 +534,21 @@ export class TasksService {
         projectId: task.projectId,
         taskId,
       },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
     });
+    this.events.emitActivityCreated(task.projectId, activity);
 
     const updatedTask = await this.prisma.task.findUniqueOrThrow({
       where: { id: taskId },
       include: this.taskIncludes(),
     });
-    this.events.emitTaskUpdated(task.projectId, updatedTask);
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskUpdated(task.projectId, updatedTask, {
+      actor,
+      changedFields: ['subtasks'],
+    });
 
     return updatedTask.subtasks;
   }
@@ -491,10 +569,10 @@ export class TasksService {
   private taskIncludes() {
     return {
       assignee: {
-        select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
+        select: { id: true, firstName: true, lastName: true, avatar: true, email: true, collaborationColor: true },
       },
       creator: {
-        select: { id: true, firstName: true, lastName: true, avatar: true },
+        select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true },
       },
       subtasks: {
         orderBy: { position: 'asc' as const },
@@ -517,5 +595,18 @@ export class TasksService {
     const parsed = new Date(raw);
     if (Number.isNaN(parsed.getTime())) return undefined;
     return parsed;
+  }
+
+  private async getActorSnapshot(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
+        collaborationColor: true,
+      },
+    });
   }
 }

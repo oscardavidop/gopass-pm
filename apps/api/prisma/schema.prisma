@@ -60,6 +60,7 @@ model User {
   firstName String    @map("first_name")
   lastName  String    @map("last_name")
   avatar    String?
+  collaborationColor String? @map("collaboration_color")
   bio       String?
   role      Role      @default(USER)
   isActive  Boolean   @default(true) @map("is_active")

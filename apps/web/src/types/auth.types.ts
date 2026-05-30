@@ -7,6 +7,7 @@ export interface User {
   firstName: string;
   lastName: string;
   avatar: string | null;
+  collaborationColor?: string | null;
   bio: string | null;
   role: Role;
   isActive: boolean;

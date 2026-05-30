@@ -3,10 +3,11 @@ import { CSS } from '@dnd-kit/utilities';
 import { Calendar, MessageSquare, GripVertical, Flag } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-import { Avatar } from '@/components/ui/Avatar';
+import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
 import { formatDate } from '@/utils/formatters';
 import { cn } from '@/utils/cn';
 import { type Task } from '@/types/task.types';
+import { useCollaborationStore } from '@/store/collaboration.store';
 
 const PRIORITY_CONFIG: Record<string, { border: string; bg: string; label: string }> = {
   LOW:      { border: 'border-l-slate-400',   bg: 'bg-slate-400',   label: 'Low' },
@@ -34,6 +35,18 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
   const priorityConfig = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
+  const highlight = useCollaborationStore((state) => state.taskHighlights[task.id]);
+  const taskPresence = useCollaborationStore((state) => state.taskPresenceByProject[task.projectId]?.[task.id]);
+  const hasHighlight = !!highlight && highlight.expiresAt > Date.now();
+  const viewers = taskPresence?.viewing ?? [];
+  const actorName = highlight?.actor?.firstName ?? 'Team';
+  const highlightLabel = highlight
+    ? highlight.kind === 'moved'
+      ? `Moved by ${actorName}`
+      : highlight.kind === 'created'
+        ? `Created by ${actorName}`
+        : `Edited by ${actorName}`
+    : '';
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
@@ -47,14 +60,28 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
           'bg-card border border-border/85 rounded-xl cursor-pointer group',
           'border-l-[3px]', priorityConfig.border,
           'hover:shadow-md hover:border-border hover:bg-accent/20 transition-all duration-150',
+          hasHighlight && 'ring-2 ring-offset-0',
           isDragging && 'card-drag-shadow ring-2 ring-primary/30',
         )}
         style={{
           userSelect: 'none',
+          ...(hasHighlight
+            ? {
+                borderColor: highlight?.actor?.collaborationColor ?? undefined,
+                boxShadow: `0 0 0 1px ${highlight?.actor?.collaborationColor ?? 'transparent'}, 0 8px 18px -12px ${(highlight?.actor?.collaborationColor ?? '#3b82f6')}66`,
+              }
+            : undefined),
         }}
         onClick={() => onClick?.(task)}
       >
         <div className="p-3.5" {...listeners}>
+          {hasHighlight && (
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: highlight?.actor?.collaborationColor ?? '#64748b' }} />
+              {highlightLabel}
+            </div>
+          )}
+
           <div className="flex items-start gap-2">
             {/* Drag handle */}
             <button
@@ -120,10 +147,27 @@ export function TaskCard({ task, onClick, isDragging }: TaskCardProps) {
                     firstName={task.assignee.firstName}
                     lastName={task.assignee.lastName}
                     size="xs"
+                    color={task.assignee.collaborationColor}
                     className="shrink-0"
                   />
                 )}
               </div>
+
+              {viewers.length > 0 && (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/60 px-2 py-1">
+                  <span className="text-[10px] text-muted-foreground">Live viewers</span>
+                  <AvatarGroup
+                    users={viewers.map((viewer) => ({
+                      id: viewer.id,
+                      firstName: viewer.firstName,
+                      lastName: viewer.lastName,
+                      avatar: viewer.avatar,
+                    }))}
+                    size="xs"
+                    max={4}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

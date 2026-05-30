@@ -20,6 +20,17 @@ import { EmailService } from '../mail/email.service';
 
 type OAuthProviderInput = 'GOOGLE' | 'GITHUB' | 'MICROSOFT' | 'DISCORD' | 'LINKEDIN';
 
+const COLLABORATION_PALETTE = [
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ef4444',
+  '#06b6d4',
+  '#84cc16',
+  '#ec4899',
+];
+
 
 interface OAuthAccountModel {
   findUnique: (args: any) => Promise<any>;
@@ -71,6 +82,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        collaborationColor: this.pickCollaborationColor(dto.email),
       },
       select: {
         id: true,
@@ -78,6 +90,7 @@ export class AuthService {
         username: true,
         firstName: true,
         lastName: true,
+        collaborationColor: true,
         role: true,
         avatar: true,
         createdAt: true,
@@ -219,6 +232,7 @@ export class AuthService {
             password: randomPassword,
             firstName: profile.firstName || 'User',
             lastName: profile.lastName || normalized.toLowerCase(),
+            collaborationColor: this.pickCollaborationColor(profile.email),
             role: Role.USER,
           },
         });
@@ -473,5 +487,14 @@ export class AuthService {
       refreshToken: tokenJson.refresh_token ? String(tokenJson.refresh_token) : undefined,
       expiresAt: tokenJson.expires_in ? new Date(Date.now() + Number(tokenJson.expires_in) * 1000) : undefined,
     };
+  }
+
+  private pickCollaborationColor(seed: string) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash << 5) - hash + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    return COLLABORATION_PALETTE[Math.abs(hash) % COLLABORATION_PALETTE.length];
   }
 }

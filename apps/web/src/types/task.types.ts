@@ -48,8 +48,8 @@ export interface Task {
   subtasks: Subtask[];
   projectId: string;
   assigneeId: string | null;
-  assignee: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'> | null;
-  creator: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'>;
+  assignee: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar' | 'collaborationColor'> | null;
+  creator: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar' | 'collaborationColor'>;
   _count: { comments: number };
   createdAt: string;
   updatedAt: string;
@@ -59,7 +59,7 @@ export interface Comment {
   id: string;
   content: string;
   authorId: string;
-  author: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'>;
+  author: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar' | 'collaborationColor'>;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,7 +72,7 @@ export interface ActivityLog {
   oldValue: Record<string, any> | null;
   newValue: Record<string, any> | null;
   createdAt: string;
-  user: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'>;
+  user: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar' | 'collaborationColor'>;
   task: { id: string; title: string } | null;
 }
 
