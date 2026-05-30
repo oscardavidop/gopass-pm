@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { changeLocale } from '@/i18n';
+import { detectBrowserLocale, normalizeLocale } from '@/i18n/locale';
 
 export interface NotificationPreferences {
   taskAssigned: boolean;
@@ -27,13 +29,17 @@ export const usePreferencesStore = create<PreferencesState>()(
         weekly:         true,
       },
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
-      language: 'en',
+      language: normalizeLocale(detectBrowserLocale()),
 
       setNotification: (key, value) =>
         set((s) => ({ notifications: { ...s.notifications, [key]: value } })),
 
       setTimezone: (tz) => set({ timezone: tz }),
-      setLanguage: (lang) => set({ language: lang }),
+      setLanguage: (lang) => {
+        const safe = normalizeLocale(lang);
+        void changeLocale(safe);
+        set({ language: safe });
+      },
     }),
     {
       name: 'gopass-preferences',

@@ -23,24 +23,7 @@ import { TooltipProvider } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import logoLight from '../../../assets/img/logo-light.png';
 import logoDark from '../../../assets/img/logo-dark.png';
-
-const navSections = [
-  {
-    title: 'Workspace',
-    items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Projects', href: '/projects', icon: FolderKanban },
-      { label: 'Calendar', href: '/calendar', icon: Calendar },
-    ],
-  },
-  {
-    title: 'System',
-    items: [
-      { label: 'Team', href: '/profile', icon: Users },
-      { label: 'Settings', href: '/settings', icon: Settings },
-    ],
-  },
-];
+import { useTranslation } from 'react-i18next';
 
 function SidebarContent({
   collapsed,
@@ -51,6 +34,7 @@ function SidebarContent({
   mobile?: boolean;
   onClose?: () => void;
 }) {
+  const { t } = useTranslation();
   const { theme, toggleSidebar, openCommandPalette } = useUIStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -68,6 +52,23 @@ function SidebarContent({
   };
 
   const shellWidth = collapsed ? 'w-[72px]' : 'w-[272px]';
+  const navSections = [
+    {
+      title: t('sidebar.workspace', { defaultValue: 'Workspace' }),
+      items: [
+        { label: t('projects.dashboard', { defaultValue: 'Dashboard' }), href: '/dashboard', icon: LayoutDashboard },
+        { label: t('projects.title', { defaultValue: 'Projects' }), href: '/projects', icon: FolderKanban },
+        { label: t('calendar.title', { defaultValue: 'Calendar' }), href: '/calendar', icon: Calendar },
+      ],
+    },
+    {
+      title: t('sidebar.system', { defaultValue: 'System' }),
+      items: [
+        { label: t('sidebar.team', { defaultValue: 'Team' }), href: '/profile', icon: Users },
+        { label: t('app.settings', { defaultValue: 'Settings' }), href: '/settings', icon: Settings },
+      ],
+    },
+  ];
 
   return (
     <aside
@@ -87,7 +88,7 @@ function SidebarContent({
           <button
             onClick={onClose}
             className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
-            aria-label="Close sidebar"
+            aria-label={t('sidebar.close', { defaultValue: 'Close sidebar' })}
           >
             <X className="h-4 w-4" />
           </button>
@@ -108,8 +109,8 @@ function SidebarContent({
           {!collapsed && (
             <>
               <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-semibold text-foreground">Tasku Workspace</p>
-                <p className="text-[11px] text-muted-foreground">Enterprise plan</p>
+                <p className="truncate text-sm font-semibold text-foreground">{t('sidebar.workspaceName', { defaultValue: 'Tasku Workspace' })}</p>
+                <p className="text-[11px] text-muted-foreground">{t('sidebar.enterprisePlan', { defaultValue: 'Enterprise plan' })}</p>
               </div>
               <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
             </>
@@ -126,7 +127,7 @@ function SidebarContent({
               onClick={handleOpenCreateProject}
             >
               <Plus className="h-3.5 w-3.5" />
-              Project
+              {t('projects.newProject', { defaultValue: 'New project' })}
             </Button>
             <Button
               size="sm"
@@ -138,7 +139,7 @@ function SidebarContent({
               }}
             >
               <Command className="h-3.5 w-3.5" />
-              Palette
+              {t('commandPalette.title', { defaultValue: 'Palette' })}
             </Button>
           </div>
         )}
@@ -171,7 +172,7 @@ function SidebarContent({
                       {active && (
                         <motion.span
                           layoutId={mobile ? 'sidebar-active-mobile' : 'sidebar-active-desktop'}
-                          className="absolute left-1 top-1/2 h-5 -translate-y-1/2 rounded-full border-l-2 border-primary"
+                          className="absolute left-1 top-1/1 h-5 rounded-full border-l-2 border-primary"
                         />
                       )}
 
@@ -230,13 +231,13 @@ function SidebarContent({
           )}
         >
           {mobile ? <Menu className="h-3.5 w-3.5" /> : <PanelLeft className="h-3.5 w-3.5" />}
-          {!collapsed && <span>{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>}
+          {!collapsed && <span>{collapsed ? t('sidebar.expand', { defaultValue: 'Expand sidebar' }) : t('sidebar.collapse', { defaultValue: 'Collapse sidebar' })}</span>}
         </button>
 
         {!collapsed && (
           <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-400">
             <Sparkles className="h-3 w-3" />
-            <span>Realtime collaboration active</span>
+            <span>{t('sidebar.realtimeCollaborationActive', { defaultValue: 'Realtime collaboration active' })}</span>
           </div>
         )}
       </div>

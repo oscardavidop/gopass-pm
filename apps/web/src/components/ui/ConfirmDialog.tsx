@@ -4,6 +4,7 @@
 import * as React from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { AlertTriangle, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { cn } from '@/utils/cn';
 
@@ -24,12 +25,13 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'destructive',
   isLoading,
   onConfirm,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialogPrimitive.Portal>
@@ -40,11 +42,12 @@ export function ConfirmDialog({
           )}
         />
         <AlertDialogPrimitive.Content
-          className={cn(
-            'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
-            'w-full max-w-md rounded-xl border border-border bg-card shadow-xl p-6',
-            'data-[state=open]:animate-scale-in',
-          )}
+       className={cn(
+  'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
+  'w-full max-w-md rounded-xl border border-border bg-card shadow-xl p-6',
+  'data-[state=open]:animate-scale-in'
+)}
+
         >
           <div className="flex gap-4">
             {variant === 'destructive' && (
@@ -67,7 +70,7 @@ export function ConfirmDialog({
           <div className="mt-6 flex justify-end gap-3">
             <AlertDialogPrimitive.Cancel asChild>
               <Button variant="outline" size="sm" disabled={isLoading}>
-                {cancelLabel}
+                {cancelLabel || t('common.cancel')}
               </Button>
             </AlertDialogPrimitive.Cancel>
             <AlertDialogPrimitive.Action asChild>
@@ -78,7 +81,7 @@ export function ConfirmDialog({
                 onClick={onConfirm}
               >
                 {variant === 'destructive' && <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-                {confirmLabel}
+                {confirmLabel || t('common.confirm', { defaultValue: 'Confirm' })}
               </Button>
             </AlertDialogPrimitive.Action>
           </div>

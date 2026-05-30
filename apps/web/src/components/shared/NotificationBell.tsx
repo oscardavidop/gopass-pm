@@ -5,9 +5,11 @@ import {
   PlusSquare, Edit3, AlertTriangle, MessageSquare, FolderKanban,
 } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
+import { useTranslation } from 'react-i18next';
 import { useNotificationsStore, type AppNotification } from '@/store/notifications.store';
 import { timeAgo } from '@/utils/formatters';
 import { cn } from '@/utils/cn';
+import { translateByKey } from '@/i18n/translate';
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
   task_created:   { icon: PlusSquare,   color: 'text-indigo-400',  bg: 'bg-indigo-400/10' },
@@ -23,6 +25,7 @@ const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: 
 export function NotificationBell() {
   const { notifications, unread, markRead, markAllRead, dismiss, clearAll } =
     useNotificationsStore();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const prevUnread = useRef(unread);
 
@@ -44,7 +47,7 @@ export function NotificationBell() {
             'relative p-2 rounded-lg hover:bg-accent transition-colors',
             pulse && 'animate-[pulse-glow_0.6s_ease-out]',
           )}
-          aria-label="Notifications"
+          aria-label={t('app.notifications')}
         >
           <Bell className="h-4 w-4 text-muted-foreground" />
           <AnimatePresence>
@@ -77,10 +80,10 @@ export function NotificationBell() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Notifications</span>
+                <span className="text-sm font-semibold">{t('app.notifications')}</span>
                 {unread > 0 && (
                   <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">
-                    {unread} new
+                    {unread}
                   </span>
                 )}
               </div>
@@ -91,14 +94,14 @@ export function NotificationBell() {
                     className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 px-2 py-1 rounded-md hover:bg-accent"
                   >
                     <Check className="h-3 w-3" />
-                    Mark all read
+                    {t('notification.markAllRead', { defaultValue: 'Mark all read' })}
                   </button>
                 )}
                 {notifications.length > 0 && (
                   <button
                     onClick={clearAll}
                     className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    title="Clear all"
+                    title={t('notification.clearAll', { defaultValue: 'Clear all' })}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -112,8 +115,8 @@ export function NotificationBell() {
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <Bell className="h-10 w-10 mb-3 opacity-20" />
-                    <p className="text-sm font-medium">All caught up!</p>
-                    <p className="text-xs opacity-60 mt-1">No notifications yet</p>
+                    <p className="text-sm font-medium">{t('notification.emptyTitle', { defaultValue: 'All caught up!' })}</p>
+                    <p className="text-xs opacity-60 mt-1">{t('notification.emptyBody', { defaultValue: 'No notifications yet' })}</p>
                   </div>
                 ) : (
                   notifications.map((n) => (
@@ -143,8 +146,11 @@ function NotificationItem({
   onRead: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.task_updated;
   const Icon = cfg.icon;
+  const title = n.i18nKey ? translateByKey(n.i18nKey, n.i18nParams, n.title || n.type) : (n.title || n.type);
+  const body = n.body || (n.taskTitle ? t('notification.taskFallbackBody', { defaultValue: '{{task}}', task: n.taskTitle }) : '');
 
   return (
     <motion.div
@@ -165,9 +171,9 @@ function NotificationItem({
 
       <div className="flex-1 min-w-0">
         <p className={cn('text-sm leading-snug', !n.read && 'font-medium')}>
-          {n.title}
+          {title}
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.body}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">{body}</p>
         <p className="text-xs text-muted-foreground/60 mt-1">{timeAgo(n.createdAt)}</p>
       </div>
 

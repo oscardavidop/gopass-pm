@@ -17,8 +17,10 @@ export type NotificationType =
 export interface AppNotification {
   id: string;
   type: NotificationType;
-  title: string;
-  body: string;
+  title?: string;
+  body?: string;
+  i18nKey?: string;
+  i18nParams?: Record<string, unknown>;
   read: boolean;
   createdAt: string;
   projectId?: string;
@@ -45,13 +47,13 @@ export const useNotificationsStore = create<NotificationsState>()(
       unread: 0,
 
       addNotification: (n) => {
-        // Deduplicate: skip if same type+title+taskId appeared within 2 seconds
+        // Deduplicate by translated key/title and task scope within a short time window
         const existing = get().notifications;
         const now = Date.now();
         const isDuplicate = existing.some(
           (e) =>
             e.type === n.type &&
-            e.title === n.title &&
+            (e.title === n.title || e.i18nKey === n.i18nKey) &&
             (n.taskId ? e.taskId === n.taskId : true) &&
             now - new Date(e.createdAt).getTime() < 2000,
         );

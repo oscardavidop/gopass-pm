@@ -69,7 +69,8 @@ export function useSocket(projectId?: string) {
       if (currentUserRef.current && task.creatorId === currentUserRef.current.id) return;
       addNotifRef.current({
         type: 'task_created',
-        title: 'New task created',
+        i18nKey: 'notification.taskCreatedRealtime',
+        i18nParams: { task: task.title },
         body: task.title,
         projectId: task.projectId,
         taskId: task.id,
@@ -147,6 +148,8 @@ export function useSocket(projectId?: string) {
         type: data.type,
         title: data.title,
         body: data.body ?? data.message ?? '',
+        i18nKey: data.i18nKey,
+        i18nParams: data.i18nParams,
         projectId: data.projectId,
         taskId: data.taskId,
         taskTitle: data.taskTitle,

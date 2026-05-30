@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth.store';
+import { usePreferencesStore } from '@/store/preferences.store';
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api/v1',
@@ -10,7 +11,9 @@ export const api = axios.create({
 // Inject access token on every request
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
+  const locale = usePreferencesStore.getState().language;
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (locale) config.headers['Accept-Language'] = locale;
   return config;
 });
 

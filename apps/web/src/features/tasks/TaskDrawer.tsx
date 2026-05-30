@@ -30,6 +30,8 @@ import { isRichTextEmpty, sanitizeRichText } from '@/utils/richText';
 import { type Task, type TaskStatus, type Priority } from '@/types/task.types';
 import { cn } from '@/utils/cn';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
+import { translateByKey } from '@/i18n/translate';
 
 /* ─── config maps ──────────────────────────────────────────── */
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -62,6 +64,7 @@ interface TaskDrawerProps {
 
 /* ─── component ─────────────────────────────────────────────── */
 export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
+  const { t } = useTranslation();
   const [commentText, setCommentText]   = useState('');
   const [deleteOpen, setDeleteOpen]     = useState(false);
   const [activeTab, setActiveTab]       = useState<'details' | 'activity' | 'comments'>('details');
@@ -154,7 +157,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const handleImproveDescription = useCallback(async () => {
     if (!task) return;
     if (!descDraft.trim()) {
-      toast.error('Add a description first');
+      toast.error(translateByKey('task.addDescriptionFirst', undefined, 'Add a description first'));
       return;
     }
     const response = await improveDescriptionAi.mutateAsync({
@@ -164,7 +167,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
     });
     setDescDraft(response.improvedDescription);
     setDraftDirty(true);
-    toast.success('Description improved');
+    toast.success(translateByKey('ai.descriptionImproved', undefined, 'Description improved'));
   }, [task, titleDraft, descDraft, improveDescriptionAi]);
 
   const handleGenerateSubtasks = useCallback(async () => {
@@ -180,7 +183,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
     for (const subtask of response.subtasks) {
       await addSubtask.mutateAsync({ title: subtask.title });
     }
-    toast.success('AI subtasks created');
+    toast.success(translateByKey('ai.subtasksCreated', undefined, 'AI subtasks created'));
   }, [task, titleDraft, descDraft, generateSubtasksAi, addSubtask]);
 
   const handleSuggestPriority = useCallback(async () => {
@@ -195,7 +198,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
       id: task.id,
       data: { priority: response.priority },
     });
-    toast.success(`Priority updated to ${response.priority}`);
+    toast.success(t('ai.priorityUpdated', { defaultValue: 'Priority updated to {{priority}}', priority: response.priority }));
   }, [task, titleDraft, descDraft, dueDateDraft, suggestPriorityAi, updateTask]);
 
   return (
@@ -518,9 +521,9 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
       <ConfirmDialog
         open={deleteOpen && !deleteTask.isPending}
         onOpenChange={setDeleteOpen}
-        title="Delete task"
-        description="This action cannot be undone. The task and all its data will be permanently deleted."
-        confirmLabel="Delete task"
+        title={t('task.deleteTitle', { defaultValue: 'Delete task' })}
+        description={t('task.deletePermanentDescription', { defaultValue: 'This action cannot be undone. The task and all its data will be permanently deleted.' })}
+        confirmLabel={t('task.deleteAction', { defaultValue: 'Delete task' })}
         variant="destructive"
         isLoading={deleteTask.isPending}
         onConfirm={handleDelete}

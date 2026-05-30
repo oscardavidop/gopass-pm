@@ -5,22 +5,25 @@ import { z } from 'zod';
 import { Mail, Lock } from 'lucide-react';
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useLogin } from '@/hooks/useAuth';
 import { SocialAuthButtons } from '@/components/shared/SocialAuthButtons';
+import { translateByKey } from '@/i18n/translate';
 
 const schema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(8, 'Minimum 8 characters'),
+  email: z.string().email('validation.invalidEmail'),
+  password: z.string().min(8, 'validation.minLength'),
 });
 
 type FormData = z.infer<typeof schema>;
 
 export function LoginPage() {
   const { mutate: login, isPending } = useLogin();
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -41,8 +44,8 @@ export function LoginPage() {
   return (
     <Card className="border-border/60 bg-card/90 backdrop-blur-md shadow-xl shadow-primary/5">
       <CardHeader>
-        <CardTitle>Sign in</CardTitle>
-        <p className="text-sm text-muted-foreground">Welcome back. Continue where your team left off.</p>
+        <CardTitle>{t('auth.login.title', { defaultValue: 'Sign in' })}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t('auth.login.subtitle', { defaultValue: 'Welcome back. Continue where your team left off.' })}</p>
       </CardHeader>
       <CardContent>
         <SocialAuthButtons className="mb-4" />
@@ -52,41 +55,42 @@ export function LoginPage() {
           </div>
           <div className="relative flex justify-center text-xs uppercase">
             <span className="bg-card px-2 text-muted-foreground tracking-wide">Or use email</span>
+            
           </div>
         </div>
 
         <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">
           <Input
-            label="Email"
+            label={t('auth.email', { defaultValue: 'Email' })}
             type="email"
             placeholder="you@example.com"
             icon={<Mail />}
-            error={errors.email?.message}
+            error={errors.email?.message ? translateByKey(errors.email.message, undefined, errors.email.message) : undefined}
             {...register('email')}
           />
           <Input
-            label="Password"
+            label={t('auth.password', { defaultValue: 'Password' })}
             type="password"
             placeholder="••••••••"
             icon={<Lock />}
-            error={errors.password?.message}
+            error={errors.password?.message ? translateByKey(errors.password.message, undefined, errors.password.message) : undefined}
             {...register('password')}
           />
           <Button type="submit" className="w-full" loading={isPending}>
-            Sign in
+            {t('auth.login.title', { defaultValue: 'Sign in' })}
           </Button>
 
           <div className="text-right">
             <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
-              Forgot your password?
+              {t('auth.forgotPassword', { defaultValue: 'Forgot your password?' })}
             </Link>
           </div>
         </form>
 
         <div className="mt-4 text-center text-sm text-muted-foreground">
-          Don't have an account?{' '}
+          {t('auth.noAccount', { defaultValue: "Don't have an account?" })}{' '}
           <Link to="/register" className="text-primary hover:underline font-medium">
-            Create one
+            {t('auth.createAccount', { defaultValue: 'Create one' })}
           </Link>
         </div>
 

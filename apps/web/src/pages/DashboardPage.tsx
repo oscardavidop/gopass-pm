@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   FolderKanban, CheckCircle2, Clock, AlertTriangle,
   TrendingUp, TrendingDown, ArrowRight, Zap, Plus, Sparkles, Gauge,
@@ -33,6 +34,7 @@ function greeting() {
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const { data: stats, isLoading: statsLoading }       = useDashboardStats();
   const { data: timeline, isLoading: timelineLoading } = useDashboardTimeline();
@@ -44,12 +46,12 @@ export function DashboardPage() {
 
   const kpis = useMemo(() => stats
     ? [
-        { label: 'Total Projects', value: stats.projects.total, sub: `${stats.projects.active} active`, icon: FolderKanban, color: 'text-indigo-400', bg: 'bg-indigo-500/10', trend: +12 },
-        { label: 'Tasks Done',     value: stats.tasks.done,     sub: `${stats.tasks.completionRate}% rate`,    icon: CheckCircle2,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', trend: +8 },
-        { label: 'In Progress',    value: stats.tasks.byStatus?.IN_PROGRESS ?? 0, sub: 'tasks active', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500/10', trend: 0 },
-        { label: 'Overdue',        value: stats.tasks.overdue,  sub: 'need attention', icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10', trend: -3 },
+        { label: t('dashboard.totalProjects', { defaultValue: 'Total Projects' }), value: stats.projects.total, sub: t('dashboard.activeCount', { defaultValue: '{{count}} active', count: stats.projects.active }), icon: FolderKanban, color: 'text-indigo-400', bg: 'bg-indigo-500/10', trend: +12 },
+        { label: t('dashboard.tasksDone', { defaultValue: 'Tasks Done' }), value: stats.tasks.done, sub: t('dashboard.rate', { defaultValue: '{{count}}% rate', count: stats.tasks.completionRate }), icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10', trend: +8 },
+        { label: t('status.inProgress'), value: stats.tasks.byStatus?.IN_PROGRESS ?? 0, sub: t('dashboard.tasksActive', { defaultValue: 'tasks active' }), icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500/10', trend: 0 },
+        { label: t('dashboard.overdue', { defaultValue: 'Overdue' }), value: stats.tasks.overdue, sub: t('dashboard.needAttention', { defaultValue: 'need attention' }), icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10', trend: -3 },
       ]
-    : [], [stats]);
+    : [], [stats, t]);
 
   const pieData = useMemo(() => stats?.tasks.byStatus
     ? Object.entries(stats.tasks.byStatus).map(([name, value]) => ({ name, value }))
@@ -68,11 +70,11 @@ export function DashboardPage() {
             {greeting()}, {user?.firstName} 👋
           </motion.h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Executive snapshot of your workspace performance.
+            {t('dashboard.subtitle', { defaultValue: 'Executive snapshot of your workspace performance.' })}
           </p>
           <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
             <Sparkles className="h-3 w-3" />
-            Realtime insights active
+            {t('dashboard.realtimeInsights', { defaultValue: 'Realtime insights active' })}
           </div>
         </div>
 
@@ -85,7 +87,7 @@ export function DashboardPage() {
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground"
             >
               <Plus className="h-3.5 w-3.5" />
-              New project
+              {t('projects.newProject', { defaultValue: 'New project' })}
             </motion.button>
           </Link>
           <Link to="/projects">
@@ -95,7 +97,7 @@ export function DashboardPage() {
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground"
             >
               <FolderKanban className="h-3.5 w-3.5" />
-              All projects
+              {t('dashboard.allProjects', { defaultValue: 'All projects' })}
               <ArrowRight className="h-3 w-3" />
             </motion.button>
           </Link>
@@ -145,9 +147,9 @@ export function DashboardPage() {
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-sm font-medium flex items-center gap-2">
                   <Gauge className="h-4 w-4 text-cyan-400" />
-                  Overall completion rate
+                  {t('dashboard.overallCompletionRate', { defaultValue: 'Overall completion rate' })}
                 </span>
-                <span className="text-sm font-bold gradient-primary bg-clip-text text-transparent">
+                <span className="text-sm font-bold bg-clip-text">
                   {stats.tasks.completionRate}%
                 </span>
               </div>
@@ -160,7 +162,7 @@ export function DashboardPage() {
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                {stats.tasks.done} of {stats.tasks.total} tasks completed
+                {t('dashboard.tasksCompleted', { defaultValue: '{{done}} of {{total}} tasks completed', done: stats.tasks.done, total: stats.tasks.total })}
               </p>
             </CardContent>
           </Card>
@@ -171,7 +173,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Task activity (last 30 days)</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t('dashboard.taskActivity30d', { defaultValue: 'Task activity (last 30 days)' })}</CardTitle>
           </CardHeader>
           <CardContent>
             {timelineLoading ? (
@@ -193,8 +195,8 @@ export function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => v.slice(5)} />
                   <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                   <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="created" stroke="#6366f1" strokeWidth={2} fill="url(#gc)" name="Created" />
-                  <Area type="monotone" dataKey="done"    stroke="#10b981" strokeWidth={2} fill="url(#gd)" name="Done" />
+                  <Area type="monotone" dataKey="created" stroke="#6366f1" strokeWidth={2} fill="url(#gc)" name={t('common.created', { defaultValue: 'Created' })} />
+                  <Area type="monotone" dataKey="done"    stroke="#10b981" strokeWidth={2} fill="url(#gd)" name={t('status.done')} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -203,7 +205,7 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Tasks by status</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t('dashboard.tasksByStatus', { defaultValue: 'Tasks by status' })}</CardTitle>
           </CardHeader>
           <CardContent>
             {pieData.length > 0 ? (
@@ -219,7 +221,7 @@ export function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t('common.noDataYet', { defaultValue: 'No data yet' })}</div>
             )}
           </CardContent>
         </Card>
@@ -231,9 +233,9 @@ export function DashboardPage() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">Projects</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t('projects.title', { defaultValue: 'Projects' })}</CardTitle>
               <Link to="/projects" className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-                View all <ArrowRight className="h-3 w-3" />
+                {t('common.viewAll', { defaultValue: 'View all' })} <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           </CardHeader>
@@ -241,7 +243,7 @@ export function DashboardPage() {
             {(projectsOverview ?? []).length === 0 ? (
               <div className="text-center py-6 text-muted-foreground text-sm">
                 <FolderKanban className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                No projects yet
+                {t('projects.emptyTitle', { defaultValue: 'No projects yet' })}
               </div>
             ) : (
               projectsOverview?.slice(0, 5).map((p: any) => (
@@ -271,7 +273,7 @@ export function DashboardPage() {
         {/* Activity */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Recent activity</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t('dashboard.recentActivity', { defaultValue: 'Recent activity' })}</CardTitle>
           </CardHeader>
           <CardContent>
             {activityLoading ? (
@@ -289,7 +291,7 @@ export function DashboardPage() {
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                 {(activity ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">No recent activity</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">{t('dashboard.noRecentActivity', { defaultValue: 'No recent activity' })}</p>
                 ) : (
                   (activity ?? []).map((log: any) => (
                     <div key={log.id} className="flex gap-3">

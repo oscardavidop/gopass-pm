@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useUsers, useAddMember, useRemoveMember } from '@/hooks/useUsers';
-import { Avatar } from '@/components/ui/Avatar';
+import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Dialog } from '@/components/ui/Dialog';
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import type { ProjectMember } from '@/types/project.types';
+import { useTranslation } from 'react-i18next';
 
 const ROLE_ICON: Record<string, typeof User> = {
   OWNER: Crown,
@@ -22,12 +23,6 @@ const ROLE_COLOR: Record<string, string> = {
   OWNER: 'text-amber-400',
   ADMIN: 'text-primary',
   MEMBER: 'text-muted-foreground',
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  OWNER: 'Owner',
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
 };
 
 interface MemberManagerProps {
@@ -42,80 +37,50 @@ export function MemberManagerTrigger({
   onClick,
 }: {
   members: ProjectMember[];
-  onClick: () => void;
+  onClick?: () => void;
 }) {
-  const users = members.map((m) => m.user).filter(Boolean);
+  const { t } = useTranslation();
+  const users = members
+    .map((m) => m.user)
+    .filter((u): u is NonNullable<ProjectMember['user']> => Boolean(u));
 
   return (
     <button
-      onClick={onClick}
-      className="
-        group flex items-center gap-3
-        rounded-2xl
-        bg-[#0b1220]/80
-        px-3 py-2
-        hover:bg-[#111827]
-        transition-all duration-200
-      "
-      title="Manage team members"
+      onClick={() => onClick?.()}
+      className="group flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-3 py-2 backdrop-blur-sm transition-all duration-200 hover:bg-accent/70"
+      title={t('member.manageTeamMembers', { defaultValue: 'Manage team members' })}
     >
       {/* Avatars */}
-      <div className="flex items-center -space-x-2">
-        {users.slice(0, 5).map((u, index) => (
-          <div
-            key={u!.id}
-            style={{ zIndex: users.length - index }}
-            className="transition-transform duration-200 group-hover:-translate-y-0.5"
-          >
-            <Avatar
-              src={(u as any).avatar}
-              firstName={u!.firstName}
-              lastName={u!.lastName}
-              size="xs"
-              className=""
-            />
-          </div>
-        ))}
-
-        {users.length > 5 && (
-          <div
-            className="
-              w-7 h-7 rounded-full
-              border-2 border-[#0b1220]
-              bg-[#1f2937]
-              flex items-center justify-center
-              text-[11px] font-semibold
-              text-gray-300
-            "
-          >
-            +{users.length - 5}
-          </div>
-        )}
+      <div className="transition-transform duration-200 group-hover:-translate-y-0.5">
+        <AvatarGroup
+          users={users.map((u) => ({
+            id: u.id,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            avatar: (u as any).avatar,
+          }))}
+          max={5}
+          size="sm"
+          className="-space-x-2"
+        />
       </div>
 
       {/* Text */}
       <div className="hidden sm:flex flex-col items-start leading-tight">
-        <span className="text-sm font-medium text-white">
-          Team
+        <span className="text-sm font-medium text-foreground">
+          {t('member.team', { defaultValue: 'Team' })}
         </span>
 
-        <span className="text-[11px] text-gray-400">
-          {members.length} member{members.length !== 1 ? 's' : ''}
+        <span className="text-[11px] text-muted-foreground">
+          {t('member.membersCount', { defaultValue: '{{count}} members', count: members.length })}
         </span>
       </div>
 
       {/* Icon */}
       <div
-        className="
-          hidden md:flex
-          items-center justify-center
-          w-8 h-8 rounded-xl
-          bg-white/5
-          group-hover:bg-white/10
-          transition-colors
-        "
+        className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl bg-background/70 transition-colors group-hover:bg-accent"
       >
-        <Users className="h-4 w-4 text-gray-400 group-hover:text-white transition-colors" />
+        <Users className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
       </div>
     </button>
   );
@@ -123,6 +88,7 @@ export function MemberManagerTrigger({
 
 /** Modal content */
 export function MemberManager({ projectId, members, currentUserId, currentRole }: MemberManagerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -139,6 +105,11 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
   const memberIds = new Set(members.map((m) => m.userId));
   const canManage = currentRole === 'OWNER' || currentRole === 'ADMIN';
   const eligibleUsers = allUsers.filter((u) => !memberIds.has(u.id));
+  const roleLabel: Record<string, string> = {
+    OWNER: t('member.roleOwner', { defaultValue: 'Owner' }),
+    ADMIN: t('member.roleAdmin', { defaultValue: 'Admin' }),
+    MEMBER: t('member.roleMember', { defaultValue: 'Member' }),
+  };
 
   const handleAdd = useCallback(
     (userId: string) => {
@@ -167,12 +138,12 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
     <>
       <MemberManagerTrigger members={members} onClick={() => setOpen(true)} />
 
-      <Dialog open={open} onClose={() => setOpen(false)} title="Team members" className="max-w-md">
+      <Dialog open={open} onClose={() => setOpen(false)} title={t('member.teamMembers', { defaultValue: 'Team members' })} className="max-w-md">
         <div className="space-y-4">
           {/* Current members list */}
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
             {members.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No members yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('member.noMembersYet', { defaultValue: 'No members yet.' })}</p>
             )}
             {members.sort((a, b) => {
               // Owners first
@@ -202,20 +173,20 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       {m.user?.firstName} {m.user?.lastName}
-                      {isSelf && <span className="text-xs text-muted-foreground ml-1">(you)</span>}
+                      {isSelf && <span className="text-xs text-muted-foreground ml-1">({t('member.you', { defaultValue: 'you' })})</span>}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">{(m.user as any)?.email}</p>
                   </div>
                   <div className={cn('flex items-center gap-1 text-xs font-medium', ROLE_COLOR[m.role])}>
                     <RoleIcon className="h-3 w-3" />
-                    {ROLE_LABEL[m.role]}
+                    {roleLabel[m.role]}
                   </div>
                   {canManage && !isOwner && !isSelf && (
                     <button
                       onClick={() => handleRemove(m.userId)}
                       disabled={isRemoving}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-destructive disabled:cursor-not-allowed"
-                      title="Remove member"
+                      title={t('member.removeMember', { defaultValue: 'Remove member' })}
                     >
                       {isRemoving ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -234,7 +205,7 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
             <div className="border-t border-border pt-4 space-y-3">
               <h4 className="text-sm font-semibold flex items-center gap-2">
                 <UserPlus className="h-4 w-4" />
-                Add team member
+                {t('member.addTeamMember', { defaultValue: 'Add team member' })}
               </h4>
 
               {/* Search */}
@@ -242,7 +213,7 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="Search by name or email…"
+                  placeholder={t('member.searchByNameOrEmail', { defaultValue: 'Search by name or email…' })}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
@@ -253,7 +224,7 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
               <div className="max-h-48 overflow-y-auto space-y-1">
                 {!debouncedSearch && (
                   <p className="text-xs text-muted-foreground text-center py-3">
-                    Type a name or email to search users
+                    {t('member.typeNameOrEmail', { defaultValue: 'Type a name or email to search users' })}
                   </p>
                 )}
                 {debouncedSearch && usersLoading && (
@@ -271,7 +242,7 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
                 )}
                 {debouncedSearch && !usersLoading && eligibleUsers.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-3">
-                    No users found. They may already be a member.
+                    {t('member.noUsersFound', { defaultValue: 'No users found. They may already be a member.' })}
                   </p>
                 )}
                 {eligibleUsers.map((u) => {

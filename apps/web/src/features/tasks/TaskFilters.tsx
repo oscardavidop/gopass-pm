@@ -1,4 +1,5 @@
 import { Search, X, SlidersHorizontal, UserRound, Flag } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
@@ -21,6 +22,7 @@ export function TaskFilters({
   onAssigneeChange,
   members = [],
 }: TaskFiltersProps) {
+  const { t } = useTranslation();
   const hasFilters = search || priority || assigneeId;
 
   const clear = () => {
@@ -34,7 +36,7 @@ export function TaskFilters({
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <SlidersHorizontal className="h-3.5 w-3.5" />
-          Smart filters
+          {t('task.smartFilters', { defaultValue: 'Smart filters' })}
         </div>
         {hasFilters && (
           <Button
@@ -44,7 +46,7 @@ export function TaskFilters({
             className="h-7 px-2.5 text-xs"
           >
             <X className="h-3.5 w-3.5" />
-            Clear all
+            {t('common.clearAll', { defaultValue: 'Clear all' })}
           </Button>
         )}
       </div>
@@ -52,7 +54,7 @@ export function TaskFilters({
       <div className="flex flex-col gap-2 lg:flex-row">
         <div className="flex-1">
           <Input
-            placeholder="Search by title, label or context..."
+            placeholder={t('task.searchByTitleLabelContext', { defaultValue: 'Search by title, label or context...' })}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             leftIcon={<Search className="h-4 w-4" />}
@@ -65,11 +67,11 @@ export function TaskFilters({
           onChange={(e) => onPriorityChange(e.target.value)}
           className="h-10 w-full rounded-xl border border-input/90 bg-background/85 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring lg:w-44"
         >
-          <option value="">All priorities</option>
-          <option value="LOW">Low</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="HIGH">High</option>
-          <option value="CRITICAL">Critical</option>
+          <option value="">{t('task.allPriorities', { defaultValue: 'All priorities' })}</option>
+          <option value="LOW">{t('priority.low')}</option>
+          <option value="MEDIUM">{t('priority.medium')}</option>
+          <option value="HIGH">{t('priority.high')}</option>
+          <option value="CRITICAL">{t('priority.critical')}</option>
         </select>
 
         {members.length > 0 && (
@@ -78,7 +80,7 @@ export function TaskFilters({
             onChange={(e) => onAssigneeChange(e.target.value)}
             className="h-10 w-full rounded-xl border border-input/90 bg-background/85 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring lg:w-52"
           >
-            <option value="">All assignees</option>
+            <option value="">{t('task.allAssignees', { defaultValue: 'All assignees' })}</option>
             {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.firstName} {m.lastName}
@@ -99,7 +101,7 @@ export function TaskFilters({
           {assigneeId && (
             <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-secondary/75 px-2 py-1 text-muted-foreground">
               <UserRound className="h-3 w-3" />
-              Assignee selected
+              {t('task.assigneeSelected', { defaultValue: 'Assignee selected' })}
             </span>
           )}
         </div>

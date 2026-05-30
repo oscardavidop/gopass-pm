@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
 import { Moon, Sun, Bell, Globe, Palette, Check, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/hooks/useTheme';
 import { usePreferencesStore } from '@/store/preferences.store';
 import { cn } from '@/utils/cn';
+import { getLocaleLabel, getSupportedLocales } from '@/i18n/locale';
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -51,15 +53,13 @@ const TIMEZONES = [
 ];
 
 const LANGUAGES = [
-  { value: 'en', label: 'English (US)' },
-  { value: 'es', label: 'Español' },
-  { value: 'pt', label: 'Português' },
-  { value: 'fr', label: 'Français' },
+  ...getSupportedLocales().map((value) => ({ value, label: getLocaleLabel(value) })),
 ];
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const prefs = usePreferencesStore();
+  const { t } = useTranslation();
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
   const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
@@ -67,8 +67,8 @@ export function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 page-enter">
       <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Customize your Tasku experience.</p>
+        <h1 className="text-2xl font-bold">{t('app.settings')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('app.settingsDescription')}</p>
       </div>
 
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
@@ -79,12 +79,12 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Palette className="h-4 w-4" />
-                Appearance
+                {t('app.appearance')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-sm font-medium mb-3">Theme</p>
+                <p className="text-sm font-medium mb-3">{t('app.theme')}</p>
                 <div className="grid grid-cols-2 gap-3">
                   {THEMES.map(({ value, label, icon: Icon }) => (
                     <button
@@ -98,7 +98,7 @@ export function SettingsPage() {
                       )}
                     >
                       <Icon className="h-5 w-5" />
-                      <span className="text-xs font-medium">{label}</span>
+                      <span className="text-xs font-medium">{value === 'light' ? t('theme.light') : t('theme.dark')}</span>
                       {theme === value && <Check className="h-3 w-3" />}
                     </button>
                   ))}
@@ -114,19 +114,19 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                Notifications
+                {t('app.notifications')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground -mt-1">
-                Preferences are saved locally and applied to realtime notifications.
+                {t('app.autoSaved')}
               </p>
               {(
                 [
-                  { key: 'taskAssigned'   as const, label: 'Task assigned to me',   desc: 'Get notified when a task is assigned to you' },
-                  { key: 'taskDue'        as const, label: 'Task due date reminder', desc: 'Alert 24h before a task is due' },
-                  { key: 'projectUpdates' as const, label: 'Project updates',        desc: 'When a project status changes' },
-                  { key: 'weekly'         as const, label: 'Weekly digest',          desc: 'Summary of your week every Monday' },
+                  { key: 'taskAssigned'   as const, label: t('notification.taskAssigned'),   desc: t('notification.taskAssignedDesc') },
+                  { key: 'taskDue'        as const, label: t('notification.taskDue'), desc: t('notification.taskDueDesc') },
+                  { key: 'projectUpdates' as const, label: t('notification.projectUpdates'),        desc: t('notification.projectUpdatesDesc') },
+                  { key: 'weekly'         as const, label: t('notification.weekly'),          desc: t('notification.weeklyDesc') },
                 ]
               ).map(({ key, label, desc }) => (
                 <div key={key} className="flex items-center justify-between py-1">
@@ -150,12 +150,12 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Globe className="h-4 w-4" />
-                Language & Region
+                {t('app.languageRegion')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Language</label>
+                <label className="text-xs font-medium text-muted-foreground">{t('app.language')}</label>
                 <select
                   value={prefs.language}
                   onChange={(e) => prefs.setLanguage(e.target.value)}
@@ -167,7 +167,7 @@ export function SettingsPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Timezone</label>
+                <label className="text-xs font-medium text-muted-foreground">{t('app.timezone')}</label>
                 <select
                   value={prefs.timezone}
                   onChange={(e) => prefs.setTimezone(e.target.value)}
@@ -179,7 +179,7 @@ export function SettingsPage() {
                 </select>
               </div>
               <p className="text-xs text-muted-foreground pt-1">
-                Preferences saved automatically — no save needed.
+                {t('app.autoSaved')}
               </p>
             </CardContent>
           </Card>

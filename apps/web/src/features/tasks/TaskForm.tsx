@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Calendar, Flag, Sparkles, Tag, UserRound, Wand2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,6 +20,7 @@ import {
 } from '@/hooks/useAi';
 import { isRichTextEmpty } from '@/utils/richText';
 import { appendAiSectionsToDescription } from '@/utils/aiTaskFormat';
+import { translateByKey } from '@/i18n/translate';
 import { type AiGeneratedTask } from '@/types/ai.types';
 import { type Task } from '@/types/task.types';
 
@@ -46,6 +48,7 @@ interface TaskFormProps {
 }
 
 export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, defaultStatus, members = [] }: TaskFormProps) {
+  const { t } = useTranslation();
   const isEditing = !!task;
   const [aiPreviewOpen, setAiPreviewOpen] = useState(false);
   const [aiDraft, setAiDraft] = useState<AiGeneratedTask | null>(null);
@@ -156,13 +159,13 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
     setValue('priority', draft.priority, { shouldDirty: true, shouldValidate: true });
     setValue('tags', draft.labels.join(', '), { shouldDirty: true, shouldValidate: true });
     setAiPreviewOpen(false);
-    toast.success('AI draft applied. Review and save your task.');
+    toast.success(translateByKey('ai.draftApplied', undefined, 'AI draft applied. Review and save your task.'));
   };
 
   const handleImproveDescription = async () => {
     const currentDescription = getValues('description')?.trim();
     if (!currentDescription) {
-      toast.error('Write a short description first');
+      toast.error(translateByKey('task.writeDescriptionFirst', undefined, 'Write a short description first'));
       return;
     }
 
@@ -173,13 +176,13 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
     });
 
     setValue('description', response.improvedDescription, { shouldDirty: true, shouldValidate: true });
-    toast.success('Description improved with AI');
+    toast.success(translateByKey('ai.descriptionImproved', undefined, 'Description improved with AI'));
   };
 
   const handleGenerateSubtasks = async () => {
     const title = getValues('title')?.trim();
     if (!title) {
-      toast.error('Add a task title first');
+      toast.error(translateByKey('task.addTitleFirst', undefined, 'Add a task title first'));
       return;
     }
 
@@ -195,13 +198,13 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
     });
 
     setValue('description', merged, { shouldDirty: true, shouldValidate: true });
-    toast.success('Subtasks generated and inserted into description');
+    toast.success(translateByKey('ai.subtasksInserted', undefined, 'Subtasks generated and inserted into description'));
   };
 
   const handleSuggestPriority = async () => {
     const title = getValues('title')?.trim();
     if (!title) {
-      toast.error('Add a task title first');
+      toast.error(translateByKey('task.addTitleFirst', undefined, 'Add a task title first'));
       return;
     }
 
@@ -213,7 +216,7 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
     });
 
     setValue('priority', response.priority, { shouldDirty: true, shouldValidate: true });
-    toast.success(`Priority suggested: ${response.priority}`);
+    toast.success(t('ai.prioritySuggested', { defaultValue: 'Priority suggested: {{priority}}', priority: response.priority }));
   };
 
   const handleSuggestTitles = async () => {
@@ -229,7 +232,7 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
       title={
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          {isEditing ? 'Edit Task' : 'Create Task'}
+          {isEditing ? t('task.edit', { defaultValue: 'Edit Task' }) : t('task.create', { defaultValue: 'Create Task' })}
         </div>
       }
       className="max-w-2xl"
@@ -318,16 +321,16 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
               <div className="rounded-xl border border-border/70 bg-card/70 p-3">
                 <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <Flag className="h-3.5 w-3.5" />
-                  Priority
+                  {t('task.priority', { defaultValue: 'Priority' })}
                 </label>
                 <select
                   {...field}
                   className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
+                  <option value="LOW">{t('priority.low')}</option>
+                  <option value="MEDIUM">{t('priority.medium')}</option>
+                  <option value="HIGH">{t('priority.high')}</option>
+                  <option value="CRITICAL">{t('priority.critical')}</option>
                 </select>
               </div>
             )}
@@ -339,23 +342,23 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
               <div className="rounded-xl border border-border/70 bg-card/70 p-3">
                 <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Status
+                  {t('task.status', { defaultValue: 'Status' })}
                 </label>
                 <select
                   {...field}
                   className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="TODO">To do</option>
-                  <option value="IN_PROGRESS">In progress</option>
-                  <option value="REVIEW">Review</option>
-                  <option value="DONE">Done</option>
+                  <option value="TODO">{t('status.todo')}</option>
+                  <option value="IN_PROGRESS">{t('status.inProgress')}</option>
+                  <option value="REVIEW">{t('status.review')}</option>
+                  <option value="DONE">{t('status.done')}</option>
                 </select>
               </div>
             )}
           />
 
           <div className="rounded-xl border border-border/70 bg-card/70 p-3">
-            <Input label="Due date" type="date" className="h-10 rounded-xl" leftIcon={<Calendar className="h-4 w-4" />} {...register('dueDate')} />
+            <Input label={t('task.dueDate', { defaultValue: 'Due date' })} type="date" className="h-10 rounded-xl" leftIcon={<Calendar className="h-4 w-4" />} {...register('dueDate')} />
           </div>
 
           {members.length > 0 && (
@@ -366,13 +369,13 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
                 <div className="rounded-xl border border-border/70 bg-card/70 p-3">
                   <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <UserRound className="h-3.5 w-3.5" />
-                    Assignee
+                    {t('task.assignee', { defaultValue: 'Assignee' })}
                   </label>
                   <select
                     {...field}
                     className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">{t('task.unassigned')}</option>
                     {members.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.firstName} {m.lastName}
@@ -387,8 +390,8 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
 
         <div className="rounded-xl border border-border/70 bg-card/70 p-3">
           <Input
-            label="Tags"
-            placeholder="bug, frontend, design"
+            label={t('task.tags')}
+            placeholder={t('task.tagsPlaceholder2', { defaultValue: 'bug, frontend, design' })}
             leftIcon={<Tag className="h-4 w-4" />}
             className="h-10 rounded-xl"
             {...register('tags')}
@@ -397,10 +400,10 @@ export function TaskForm({ open, onClose, onSubmit, projectId, task, isLoading, 
 
         <div className="flex gap-2 pt-1">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" className="flex-1" isLoading={isLoading}>
-            {isEditing ? 'Save changes' : 'Create task'}
+            {isEditing ? t('common.saveChanges') : t('task.create')}
           </Button>
         </div>
       </form>

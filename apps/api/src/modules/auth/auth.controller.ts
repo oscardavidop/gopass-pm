@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -36,7 +37,7 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(dto);
     this.setRefreshCookie(res, result.refreshToken);
-    return { user: result.user, accessToken: result.accessToken };
+    return { data: { user: result.user, accessToken: result.accessToken }, i18nKey: 'auth.registerSuccess' };
   }
 
   @Post('login')
@@ -50,7 +51,7 @@ export class AuthController {
       req.ip,
     );
     this.setRefreshCookie(res, result.refreshToken);
-    return { user: result.user, accessToken: result.accessToken };
+    return { data: { user: result.user, accessToken: result.accessToken }, i18nKey: 'auth.loginSuccess' };
   }
 
   @Post('oauth/:provider')
@@ -66,7 +67,7 @@ export class AuthController {
     const provider = this.parseProvider(providerRaw);
     const result = await this.authService.oauthLogin(provider, dto, req.headers['user-agent'], req.ip);
     this.setRefreshCookie(res, result.refreshToken);
-    return { user: result.user, accessToken: result.accessToken };
+    return { data: { user: result.user, accessToken: result.accessToken }, i18nKey: 'auth.loginSuccess' };
   }
 
   @Post('forgot-password')
@@ -91,14 +92,11 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.['refresh_token'];
     if (!token) {
-      return res.status(HttpStatus.UNAUTHORIZED).json({
-        success: false,
-        message: 'No refresh token provided',
-      });
+      throw new UnauthorizedException({ i18nKey: 'auth.noRefreshToken' });
     }
     const result = await this.authService.refresh(token);
     this.setRefreshCookie(res, result.refreshToken);
-    return { accessToken: result.accessToken };
+    return { data: { accessToken: result.accessToken }, i18nKey: 'auth.loginSuccess' };
   }
 
   @Post('logout')
@@ -110,7 +108,7 @@ export class AuthController {
     const token = req.cookies?.['refresh_token'];
     if (token) await this.authService.logout(token);
     res.clearCookie('refresh_token');
-    return { message: 'Logged out successfully' };
+    return { data: { ok: true }, i18nKey: 'auth.logoutSuccess' };
   }
 
   @Post('logout-all')
@@ -121,7 +119,7 @@ export class AuthController {
   async logoutAll(@CurrentUser('id') userId: string, @Res({ passthrough: true }) res: Response) {
     await this.authService.logoutAll(userId);
     res.clearCookie('refresh_token');
-    return { message: 'All sessions terminated' };
+    return { data: { ok: true }, i18nKey: 'auth.logoutAllSuccess' };
   }
 
   @Get('me')
@@ -147,7 +145,7 @@ export class AuthController {
   private parseProvider(providerRaw: string): string {
     const value = providerRaw.toUpperCase();
     if (['GOOGLE', 'GITHUB', 'MICROSOFT', 'DISCORD', 'LINKEDIN'].includes(value)) return value;
-    throw new BadRequestException('Unsupported OAuth provider');
+    throw new BadRequestException({ i18nKey: 'auth.oauthProviderUnsupported' });
   }
 
   private setRefreshCookie(res: Response, token: string) {

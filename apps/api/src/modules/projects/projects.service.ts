@@ -154,8 +154,8 @@ export class ProjectsService {
     // 2. Notify the newly added member privately
     this.events.emitToUser(memberId, 'notification', {
       type: 'project_updated',
-      title: 'You were added to a project',
-      body: `You have been added to "${project.name}"`,
+      i18nKey: 'notification.projectMemberAdded',
+      i18nParams: { projectName: project.name },
       projectId,
       actorName,
     });

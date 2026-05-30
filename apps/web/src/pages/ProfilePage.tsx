@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Mail, User, Shield, Key, Loader2, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -9,12 +10,6 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/store/auth.store';
 import { useUpdateProfile } from '@/hooks/useUsers';
-
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN:   'Admin',
-  MANAGER: 'Manager',
-  USER:    'Member',
-};
 
 const ROLE_VARIANT: Record<string, any> = {
   ADMIN: 'destructive', MANAGER: 'warning', USER: 'secondary',
@@ -27,6 +22,7 @@ interface FormValues {
 }
 
 export function ProfilePage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const updateProfile = useUpdateProfile();
 
@@ -48,8 +44,8 @@ export function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 page-enter">
       <div>
-        <h1 className="text-2xl font-bold">Profile</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your personal information and account.</p>
+        <h1 className="text-2xl font-bold">{t('profile.title', { defaultValue: 'Profile' })}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('profile.subtitle', { defaultValue: 'Manage your personal information and account.' })}</p>
       </div>
 
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
@@ -68,7 +64,7 @@ export function ProfilePage() {
                   <button
                     type="button"
                     className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Change avatar (coming soon)"
+                    title={t('profile.changeAvatarSoon', { defaultValue: 'Change avatar (coming soon)' })}
                   >
                     <Camera className="h-5 w-5 text-white" />
                   </button>
@@ -83,7 +79,7 @@ export function ProfilePage() {
                   <div className="flex items-center gap-2 mt-2.5">
                     <Badge variant={ROLE_VARIANT[user?.role ?? 'USER']}>
                       <Shield className="h-3 w-3 mr-1" />
-                      {ROLE_LABEL[user?.role ?? 'USER']}
+                      {t(`role.${(user?.role ?? 'USER').toLowerCase()}`, { defaultValue: user?.role ?? 'USER' })}
                     </Badge>
                     <span className="text-xs text-muted-foreground">@{user?.username}</span>
                   </div>
@@ -99,21 +95,21 @@ export function ProfilePage() {
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Personal information
+                {t('profile.personalInformation', { defaultValue: 'Personal information' })}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">First name</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('profile.firstName')}</label>
                     <input
                       {...register('firstName', { required: true })}
                       className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Last name</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('profile.lastName')}</label>
                     <input
                       {...register('lastName', { required: true })}
                       className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
@@ -122,7 +118,7 @@ export function ProfilePage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('auth.email')}</label>
                   <input
                     disabled
                     value={user?.email}
@@ -131,11 +127,11 @@ export function ProfilePage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Bio</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('profile.bio', { defaultValue: 'Bio' })}</label>
                   <textarea
                     {...register('bio')}
                     rows={3}
-                    placeholder="Tell your team a bit about yourself…"
+                    placeholder={t('profile.bioPlaceholder', { defaultValue: 'Tell your team a bit about yourself...' })}
                     className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                   />
                 </div>
@@ -149,15 +145,15 @@ export function ProfilePage() {
                     {updateProfile.isPending ? (
                       <>
                         <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                        Saving…
+                        {t('common.saving', { defaultValue: 'Saving...' })}
                       </>
                     ) : updateProfile.isSuccess ? (
                       <>
                         <Check className="h-3.5 w-3.5 mr-1.5" />
-                        Saved
+                        {t('common.saved', { defaultValue: 'Saved' })}
                       </>
                     ) : (
-                      'Save changes'
+                      t('common.saveChanges', { defaultValue: 'Save changes' })
                     )}
                   </Button>
                 </div>
@@ -172,25 +168,25 @@ export function ProfilePage() {
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Key className="h-4 w-4" />
-                Security
+                {t('profile.security', { defaultValue: 'Security' })}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Password</p>
-                  <p className="text-xs text-muted-foreground">Change your account password</p>
+                  <p className="text-sm font-medium">{t('auth.password')}</p>
+                  <p className="text-xs text-muted-foreground">{t('profile.changePassword', { defaultValue: 'Change your account password' })}</p>
                 </div>
-                <Button variant="outline" size="sm" disabled title="Coming soon">
-                  Change password
+                <Button variant="outline" size="sm" disabled title={t('common.comingSoon', { defaultValue: 'Coming soon' })}>
+                  {t('profile.changePasswordAction', { defaultValue: 'Change password' })}
                 </Button>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Active sessions</p>
-                  <p className="text-xs text-muted-foreground">Manage devices logged in to your account</p>
+                  <p className="text-sm font-medium">{t('profile.activeSessions', { defaultValue: 'Active sessions' })}</p>
+                  <p className="text-xs text-muted-foreground">{t('profile.manageDevices', { defaultValue: 'Manage devices logged in to your account' })}</p>
                 </div>
-                <Badge variant="secondary">1 active</Badge>
+                <Badge variant="secondary">{t('profile.activeCount', { defaultValue: '1 active' })}</Badge>
               </div>
             </CardContent>
           </Card>

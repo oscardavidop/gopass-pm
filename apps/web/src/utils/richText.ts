@@ -40,6 +40,10 @@ export function sanitizeRichText(input: string | null | undefined): string {
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(input, 'text/html');
+  const body = doc.body;
+  if (!body) {
+    return String(input);
+  }
 
   const walk = (node: Node) => {
     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -78,9 +82,9 @@ export function sanitizeRichText(input: string | null | undefined): string {
     Array.from(node.childNodes).forEach((child) => walk(child));
   };
 
-  walk(doc.body);
+  walk(body);
 
-  return doc.body.innerHTML.trim();
+  return body.innerHTML.trim();
 }
 
 export function stripRichText(input: string | null | undefined): string {
@@ -91,7 +95,11 @@ export function stripRichText(input: string | null | undefined): string {
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(input, 'text/html');
-  return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const body = doc.body;
+  if (!body) {
+    return String(input).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  return (body.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
 export function isRichTextEmpty(input: string | null | undefined): boolean {

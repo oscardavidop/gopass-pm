@@ -19,6 +19,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import {
@@ -42,6 +43,7 @@ import {
 import type { AiGeneratedTask } from '@/types/ai.types';
 import type { Priority, TaskStatus, Task } from '@/types/task.types';
 import { cn } from '@/utils/cn';
+import { translateByKey } from '@/i18n/translate';
 
 const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
   { value: 'TODO', label: 'To do' },
@@ -89,6 +91,7 @@ export function AiTaskCreateDrawer({
   const [attachmentsMock, setAttachmentsMock] = useState('');
   const [loadingIndex, setLoadingIndex] = useState(0);
 
+  const { t } = useTranslation();
   const generateTaskAi = useGenerateTaskAi();
   const improveDescriptionAi = useImproveDescriptionAi();
   const suggestPriorityAi = useSuggestPriorityAi();
@@ -173,7 +176,7 @@ export function AiTaskCreateDrawer({
   const handleGenerate = async () => {
     const seed = idea.trim();
     if (seed.length < 3) {
-      toast.error('Describe a bit more what needs to be done');
+      toast.error(translateByKey('ai.describeMore', undefined, 'Describe a bit more what needs to be done'));
       return;
     }
 
@@ -190,7 +193,7 @@ export function AiTaskCreateDrawer({
         status: generated.status ?? defaultStatus,
       });
       setStage('preview');
-      toast.success('AI task preview ready');
+      toast.success(translateByKey('ai.previewReady', undefined, 'AI task preview ready'));
     } catch {
       setStage('idea');
     }
@@ -277,7 +280,7 @@ export function AiTaskCreateDrawer({
       assigneeId: assigneeId || undefined,
     });
 
-    toast.success('AI task created');
+    toast.success(translateByKey('ai.taskCreated', undefined, 'AI task created'));
     resetState();
     onCreated?.(created);
     onClose();
@@ -292,10 +295,10 @@ export function AiTaskCreateDrawer({
         <DrawerHeader className="sticky top-0 z-10 bg-card/90 backdrop-blur-xl border-b border-border/80">
           <DrawerTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-primary" />
-            AI Task Creation
+            {t('ai.taskCreation', { defaultValue: 'AI Task Creation' })}
           </DrawerTitle>
           <DrawerDescription>
-            AI-native flow: idea, generate, review, confirm.
+            {t('ai.taskCreationDesc', { defaultValue: 'AI-native flow: idea, generate, review, confirm.' })}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -310,14 +313,14 @@ export function AiTaskCreateDrawer({
                 className="space-y-4"
               >
                 <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/8 via-transparent to-cyan-500/10 p-4">
-                  <p className="text-sm font-medium">Start with a simple idea</p>
+                  <p className="text-sm font-medium">{t('ai.startSimpleIdea', { defaultValue: 'Start with a simple idea' })}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Describe what needs to be done and AI will generate title, description, subtasks, priority, labels and effort.
+                    {t('ai.startSimpleIdeaDesc', { defaultValue: 'Describe what needs to be done and AI will generate title, description, subtasks, priority, labels and effort.' })}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-border/80 bg-background/70 p-4">
-                  <label className="mb-2 block text-sm font-medium">Task idea</label>
+                  <label className="mb-2 block text-sm font-medium">{t('ai.taskIdea', { defaultValue: 'Task idea' })}</label>
                   <textarea
                     autoFocus
                     value={idea}
@@ -533,7 +536,7 @@ export function AiTaskCreateDrawer({
                     onClick={() => setAdvancedOpen((prev) => !prev)}
                     className="flex w-full items-center justify-between text-sm font-medium"
                   >
-                    <span>Advanced Mode</span>
+                    <span>{t('ai.advancedMode', { defaultValue: 'Advanced Mode' })}</span>
                     {advancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
 
@@ -541,7 +544,7 @@ export function AiTaskCreateDrawer({
                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                       <div>
                         <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" /> Due date
+                          <Calendar className="h-3.5 w-3.5" /> {t('task.dueDate', { defaultValue: 'Due date' })}
                         </label>
                         <input
                           type="date"

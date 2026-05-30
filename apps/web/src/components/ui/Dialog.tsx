@@ -7,18 +7,22 @@ type DialogProps = React.PropsWithChildren<{
   open: boolean;
   onClose: () => void;
   title?: React.ReactNode;
+  description?: React.ReactNode;
   className?: string;
 }>;
 
-function Dialog({ open, onClose, title, className, children }: DialogProps) {
+function Dialog({ open, onClose, title, description, className, children }: DialogProps) {
+  const descriptionId = React.useId();
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(nextOpen) => {
       if (!nextOpen) onClose();
     }}>
-      <DialogContent className={className}>
+      <DialogContent className={className} aria-describedby={description ? descriptionId : undefined}>
         {title ? (
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
+            {description ? <DialogDescription id={descriptionId}>{description}</DialogDescription> : null}
           </DialogHeader>
         ) : null}
         {children}
@@ -82,4 +86,16 @@ const DialogTitle = React.forwardRef<
 ));
 DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
-export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle };
+const DialogDescription = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Description
+    ref={ref}
+    className={cn('text-sm text-muted-foreground', className)}
+    {...props}
+  />
+));
+DialogDescription.displayName = DialogPrimitive.Description.displayName;
+
+export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription };

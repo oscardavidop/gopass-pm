@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { projectsService } from '@/services/projects.service';
+import { translateByKey } from '@/i18n/translate';
+import { getApiErrorMessage } from '@/services/api-error';
 import type { ProjectFilters, CreateProjectPayload } from '@/types/project.types';
 
 export const projectKeys = {
@@ -30,9 +32,9 @@ export function useCreateProject() {
     mutationFn: (payload: CreateProjectPayload) => projectsService.create(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: projectKeys.all });
-      toast.success('Project created');
+      toast.success(translateByKey('project.created', undefined, 'Project created'));
     },
-    onError: () => toast.error('Failed to create project'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.createFailed', 'Failed to create project')),
   });
 }
 
@@ -44,9 +46,9 @@ export function useUpdateProject() {
     onSuccess: (_r, vars) => {
       qc.invalidateQueries({ queryKey: projectKeys.detail(vars.id) });
       qc.invalidateQueries({ queryKey: projectKeys.all });
-      toast.success('Project updated');
+      toast.success(translateByKey('project.updated', undefined, 'Project updated'));
     },
-    onError: () => toast.error('Failed to update project'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.updateFailed', 'Failed to update project')),
   });
 }
 
@@ -56,8 +58,8 @@ export function useDeleteProject() {
     mutationFn: (id: string) => projectsService.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: projectKeys.all });
-      toast.success('Project deleted');
+      toast.success(translateByKey('project.deleted', undefined, 'Project deleted'));
     },
-    onError: () => toast.error('Failed to delete project'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.deleteFailed', 'Failed to delete project')),
   });
 }

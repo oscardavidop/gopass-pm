@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { usersService, type UpdateProfilePayload } from '@/services/users.service';
 import { useAuthStore } from '@/store/auth.store';
 import type { User } from '@/types/auth.types';
+import { translateByKey } from '@/i18n/translate';
+import { getApiErrorMessage } from '@/services/api-error';
 
 export const userKeys = {
   all: ['users'] as const,
@@ -30,9 +32,9 @@ export function useUpdateProfile() {
       // Keep auth store in sync so Navbar/Avatar refresh immediately
       setUser(updated as User);
       qc.setQueryData(userKeys.me(), updated);
-      toast.success('Profile saved');
+      toast.success(translateByKey('profile.saved', undefined, 'Profile saved'));
     },
-    onError: () => toast.error('Failed to save profile'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'profile.saveFailed', 'Failed to save profile')),
   });
 }
 
@@ -45,9 +47,9 @@ export function useAddMember(projectId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
       qc.invalidateQueries({ queryKey: ['projects', 'list'] });
-      toast.success('Member added');
+      toast.success(translateByKey('project.memberAdded', undefined, 'Member added'));
     },
-    onError: () => toast.error('Failed to add member'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.memberAddFailed', 'Failed to add member')),
   });
 }
 
@@ -59,11 +61,8 @@ export function useRemoveMember(projectId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
       qc.invalidateQueries({ queryKey: ['projects', 'list'] });
-      toast.success('Member removed');
+      toast.success(translateByKey('project.memberRemoved', undefined, 'Member removed'));
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message ?? 'Failed to remove member';
-      toast.error(msg);
-    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.memberRemoveFailed', 'Failed to remove member')),
   });
 }

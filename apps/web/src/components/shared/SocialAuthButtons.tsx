@@ -1,8 +1,10 @@
 import { Github } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { useOAuthLogin } from '@/hooks/useAuth';
 import type { OAuthProvider } from '@/services/auth.service';
+import { translateByKey } from '@/i18n/translate';
 
 function buildOAuthUrl(provider: OAuthProvider, redirectUri: string, state: string) {
   if (provider === 'google') {
@@ -34,6 +36,7 @@ interface SocialAuthButtonsProps {
 
 export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
   const oauth = useOAuthLogin();
+  const { t } = useTranslation();
 
   const startOAuth = (provider: OAuthProvider) => {
     if (provider === 'google' && !import.meta.env.VITE_GOOGLE_CLIENT_ID) {
@@ -45,7 +48,7 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
 
     const state = crypto.randomUUID();
     const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const redirectUri = `${appUrl}/auth/oauth/callback?provider=${provider}`;
+    const redirectUri = `${appUrl}/auth/oauth/callback`;
     const authUrl = buildOAuthUrl(provider, redirectUri, state);
 
     sessionStorage.setItem('tasku_oauth_state', state);
@@ -54,7 +57,7 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
 
     const popup = window.open(authUrl, 'tasku_oauth', 'width=520,height=720');
     if (!popup) {
-      toast.error('Enable popups to continue with social sign in.');
+      toast.error(translateByKey('auth.oauth.popupBlocked', undefined, 'Enable popups to continue with social sign in.'));
       return;
     }
 
@@ -78,7 +81,7 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
       sessionStorage.removeItem('tasku_oauth_redirect_uri');
 
       if (data.error || !data.code) {
-        toast.error(data.errorDescription || data.error || 'Could not sign in with provider');
+        toast.error(data.errorDescription || data.error || translateByKey('auth.oauth.failed', undefined, 'Could not sign in with provider'));
         return;
       }
 
@@ -101,7 +104,7 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
         disabled={!isGoogleEnabled || oauth.isPending}
       >
         <GoogleGlyph />
-        Continue with Google
+        {t('auth.oauth.google', { defaultValue: 'Continue with Google' })}
       </Button>
 
       <Button
@@ -112,7 +115,7 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
         disabled={!isGithubEnabled || oauth.isPending}
       >
         <Github className="h-4 w-4" />
-        Continue with GitHub
+        {t('auth.oauth.github', { defaultValue: 'Continue with GitHub' })}
       </Button>
     </div>
   );

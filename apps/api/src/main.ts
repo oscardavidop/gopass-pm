@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe, VersioningType, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
@@ -44,6 +44,16 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: (errors) => {
+        const fields = errors.map((e) => ({
+          field: e.property,
+          errors: Object.values(e.constraints ?? {}),
+        }));
+        return new BadRequestException({
+          i18nKey: 'validation.failed',
+          i18nParams: { fields },
+        });
+      },
     }),
   );
 

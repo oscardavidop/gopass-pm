@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge, ChevronDown, Bot, FilePenLine } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -30,13 +31,14 @@ const STATUS_VARIANT: Record<string, any> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  TODO: 'To do',
-  IN_PROGRESS: 'In progress',
-  REVIEW: 'Review',
-  DONE: 'Done',
+  TODO: 'status.todo',
+  IN_PROGRESS: 'status.inProgress',
+  REVIEW: 'status.review',
+  DONE: 'status.done',
 };
 
 export function ProjectDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -194,10 +196,10 @@ export function ProjectDetailPage() {
     return (
       <div className="text-center py-20">
         <LayoutGrid className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-        <p className="text-muted-foreground mb-4">Project not found.</p>
+        <p className="text-muted-foreground mb-4">{t('project.notFound', { defaultValue: 'Project not found.' })}</p>
         <Button variant="outline" onClick={() => navigate('/projects')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Projects
+          {t('projects.backToProjects', { defaultValue: 'Back to Projects' })}
         </Button>
       </div>
     );
@@ -225,11 +227,11 @@ export function ProjectDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold">{project.name}</h1>
                 <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="text-xs">
-                  {STATUS_LABEL[project.status] ?? project.status}
+                  {t(STATUS_LABEL[project.status] ?? project.status, { defaultValue: project.status })}
                 </Badge>
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/12 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">
                   <Sparkles className="h-3 w-3" />
-                  Live workspace
+                  {t('project.liveWorkspace', { defaultValue: 'Live workspace' })}
                 </span>
               </div>
               {projectDescriptionPreview && (
@@ -240,19 +242,19 @@ export function ProjectDetailPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
             <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-              <p className="text-muted-foreground">Total tasks</p>
+              <p className="text-muted-foreground">{t('project.totalTasks', { defaultValue: 'Total tasks' })}</p>
               <p className="mt-0.5 text-base font-semibold">{tasks.length}</p>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-              <p className="text-muted-foreground">In progress</p>
+              <p className="text-muted-foreground">{t('status.inProgress')}</p>
               <p className="mt-0.5 text-base font-semibold text-blue-700 dark:text-blue-400">{inProgressCount}</p>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-              <p className="text-muted-foreground">In review</p>
+              <p className="text-muted-foreground">{t('status.review')}</p>
               <p className="mt-0.5 text-base font-semibold text-amber-700 dark:text-amber-400">{reviewCount}</p>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-              <p className="text-muted-foreground">Completed</p>
+              <p className="text-muted-foreground">{t('project.completed', { defaultValue: 'Completed' })}</p>
               <p className="mt-0.5 text-base font-semibold text-emerald-700 dark:text-emerald-400">{doneCount}</p>
             </div>
           </div>
@@ -279,7 +281,7 @@ export function ProjectDetailPage() {
               <div className="hidden sm:flex items-center gap-2">
                 <div className="inline-flex items-center gap-1 rounded-full border border-border/75 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
                   <Gauge className="h-3 w-3" />
-                  Sprint completion
+                  {t('project.sprintCompletion', { defaultValue: 'Sprint completion' })}
                 </div>
                 <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden">
                   <div
@@ -295,7 +297,7 @@ export function ProjectDetailPage() {
               <DropdownMenu.Trigger asChild>
                 <Button size="sm" className="inline-flex items-center gap-1.5">
                   <Plus className="h-4 w-4" />
-                  New Task
+                  {t('task.newTask', { defaultValue: 'New Task' })}
                   <ChevronDown className="h-3.5 w-3.5 opacity-80" />
                 </Button>
               </DropdownMenu.Trigger>
@@ -316,8 +318,8 @@ export function ProjectDetailPage() {
                     <div className="flex items-start gap-2.5">
                       <span className="mt-0.5 rounded-md bg-primary/15 p-1 text-primary"><Bot className="h-3.5 w-3.5" /></span>
                       <div>
-                        <div className="flex items-center gap-1.5 text-sm font-medium">Create with AI <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">Suggested</span></div>
-                        <p className="text-xs text-muted-foreground">Generate complete task draft with AI context.</p>
+                        <div className="flex items-center gap-1.5 text-sm font-medium">{t('task.createWithAi', { defaultValue: 'Create with AI' })} <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{t('common.suggested', { defaultValue: 'Suggested' })}</span></div>
+                        <p className="text-xs text-muted-foreground">{t('task.createWithAiDesc', { defaultValue: 'Generate complete task draft with AI context.' })}</p>
                       </div>
                     </div>
                   </DropdownMenu.Item>
@@ -332,8 +334,8 @@ export function ProjectDetailPage() {
                     <div className="flex items-start gap-2.5">
                       <span className="mt-0.5 rounded-md bg-secondary p-1 text-muted-foreground"><FilePenLine className="h-3.5 w-3.5" /></span>
                       <div>
-                        <div className="text-sm font-medium">Create manually</div>
-                        <p className="text-xs text-muted-foreground">Full control over fields, subtasks and details.</p>
+                        <div className="text-sm font-medium">{t('task.createManually', { defaultValue: 'Create manually' })}</div>
+                        <p className="text-xs text-muted-foreground">{t('task.createManuallyDesc', { defaultValue: 'Full control over fields, subtasks and details.' })}</p>
                       </div>
                     </div>
                   </DropdownMenu.Item>
@@ -360,19 +362,19 @@ export function ProjectDetailPage() {
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <CircleDashed className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
-            {todoCount} todo
+            {t('project.todoCount', { defaultValue: '{{count}} todo', count: todoCount })}
           </span>
           <span className="flex items-center gap-1.5">
             <Clock3 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-            {inProgressCount} in progress
+            {t('project.inProgressCount', { defaultValue: '{{count}} in progress', count: inProgressCount })}
           </span>
           <span className="flex items-center gap-1.5">
             <LayoutGrid className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            {reviewCount} review
+            {t('project.reviewCount', { defaultValue: '{{count}} review', count: reviewCount })}
           </span>
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            {doneCount} done
+            {t('project.doneCount', { defaultValue: '{{count}} done', count: doneCount })}
           </span>
         </div>
       )}
@@ -450,9 +452,9 @@ export function ProjectDetailPage() {
       <ConfirmDialog
         open={!!deleteTaskId}
         onOpenChange={(open) => { if (!open) setDeleteTaskId(null); }}
-        title="Delete task"
-        description="This action cannot be undone."
-        confirmLabel="Delete"
+        title={t('task.deleteTitle', { defaultValue: 'Delete task' })}
+        description={t('task.deleteDescription', { defaultValue: 'This action cannot be undone.' })}
+        confirmLabel={t('common.delete', { defaultValue: 'Delete' })}
         variant="destructive"
         isLoading={deleteTask.isPending}
         onConfirm={handleDeleteTask}

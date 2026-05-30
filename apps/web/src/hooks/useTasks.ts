@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { tasksService } from '@/services/tasks.service';
+import { translateByKey } from '@/i18n/translate';
+import { getApiErrorMessage } from '@/services/api-error';
 import type { CreateTaskPayload, TaskFilters, TaskStatus } from '@/types/task.types';
 
 export const taskKeys = {
@@ -32,9 +34,9 @@ export function useCreateTask(projectId: string) {
     mutationFn: (payload: CreateTaskPayload) => tasksService.create(projectId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks', 'project', projectId] });
-      toast.success('Task created');
+      toast.success(translateByKey('task.created', undefined, 'Task created'));
     },
-    onError: () => toast.error('Failed to create task'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'task.createFailed', 'Failed to create task')),
   });
 }
 
@@ -47,7 +49,7 @@ export function useUpdateTask() {
       qc.invalidateQueries({ queryKey: taskKeys.detail(vars.id) });
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onError: () => toast.error('Failed to update task'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'task.updateFailed', 'Failed to update task')),
   });
 }
 
@@ -60,7 +62,7 @@ export function useUpdateTaskStatus() {
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: () => {
-      toast.error('Failed to update status');
+      toast.error(translateByKey('task.updateStatusFailed', undefined, 'Failed to update status'));
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
   });
@@ -72,7 +74,7 @@ export function useDeleteTask() {
     mutationFn: (taskId: string) => tasksService.remove(taskId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Task deleted');
+      toast.success(translateByKey('task.deleted', undefined, 'Task deleted'));
     },
   });
 }
@@ -82,7 +84,7 @@ export function useAddComment(taskId: string) {
   return useMutation({
     mutationFn: ({ content }: { content: string }) => tasksService.addComment(taskId, content),
     onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) }),
-    onError: () => toast.error('Failed to add comment'),
+    onError: () => toast.error(translateByKey('task.commentAddFailed', undefined, 'Failed to add comment')),
   });
 }
 
@@ -94,7 +96,7 @@ export function useAddSubtask(taskId: string) {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onError: () => toast.error('Failed to add subtask'),
+    onError: () => toast.error(translateByKey('task.subtaskAddFailed', undefined, 'Failed to add subtask')),
   });
 }
 
@@ -107,7 +109,7 @@ export function useUpdateSubtask(taskId: string) {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onError: () => toast.error('Failed to update subtask'),
+    onError: () => toast.error(translateByKey('task.subtaskUpdateFailed', undefined, 'Failed to update subtask')),
   });
 }
 
@@ -119,7 +121,7 @@ export function useDeleteSubtask(taskId: string) {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onError: () => toast.error('Failed to delete subtask'),
+    onError: () => toast.error(translateByKey('task.subtaskDeleteFailed', undefined, 'Failed to delete subtask')),
   });
 }
 
@@ -131,6 +133,6 @@ export function useReorderSubtasks(taskId: string) {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onError: () => toast.error('Failed to reorder subtasks'),
+    onError: () => toast.error(translateByKey('task.subtaskReorderFailed', undefined, 'Failed to reorder subtasks')),
   });
 }

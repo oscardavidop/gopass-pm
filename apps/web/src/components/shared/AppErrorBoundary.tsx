@@ -1,4 +1,5 @@
 import React from 'react';
+import i18n from '@/i18n';
 
 interface State {
   hasError: boolean;
@@ -20,13 +21,13 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, S
       return (
         <div className="min-h-screen flex items-center justify-center bg-background px-4">
           <div className="max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-lg">
-            <h1 className="text-lg font-semibold">Something went wrong</h1>
-            <p className="mt-2 text-sm text-muted-foreground">An unexpected UI error occurred. Please refresh this page.</p>
+            <h1 className="text-lg font-semibold">{i18n.t('common.somethingWentWrong', { defaultValue: 'Something went wrong' })}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{i18n.t('common.unexpectedUiError', { defaultValue: 'An unexpected UI error occurred. Please refresh this page.' })}</p>
             <button
               onClick={() => window.location.reload()}
               className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
-              Reload
+              {i18n.t('common.reload', { defaultValue: 'Reload' })}
             </button>
           </div>
         </div>

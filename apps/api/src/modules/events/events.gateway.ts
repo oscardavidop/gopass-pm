@@ -154,8 +154,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${removedUserId}`).emit('notification', {
       type: 'project_access_revoked',
       projectId,
-      title: 'Removed from project',
-      body: 'You have been removed from this project.',
+      i18nKey: 'notification.projectAccessRevoked',
+      i18nParams: { projectId },
     });
   }
 

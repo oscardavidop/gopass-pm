@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Plus, Search, LayoutGrid, List, FolderOpen, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -15,6 +16,7 @@ import { cn } from '@/utils/cn';
 import { type Project, type ProjectStatus } from '@/types/project.types';
 
 export function ProjectsPage() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
   const [view, setView] = useState<'grid' | 'list'>('grid');
@@ -79,18 +81,18 @@ export function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('projects.title', { defaultValue: 'Projects' })}</h1>
           <div className="text-muted-foreground text-sm mt-0.5">
             {isLoading ? (
               <Skeleton className="h-3.5 w-24 inline-block" />
             ) : (
-              `${data?.meta.total ?? 0} project${(data?.meta.total ?? 0) !== 1 ? 's' : ''}`
+              t('projects.count', { defaultValue: '{{count}} projects', count: data?.meta.total ?? 0 })
             )}
           </div>
         </div>
         <Button onClick={() => { setEditingProject(null); setDrawerOpen(true); }} size="sm">
           <Plus className="h-4 w-4" />
-          New project
+          {t('projects.newProject', { defaultValue: 'New project' })}
         </Button>
       </div>
 
@@ -102,7 +104,7 @@ export function ProjectsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" />
 
           <Input
-            placeholder="Search projects..."
+            placeholder={t('projects.searchPlaceholder', { defaultValue: 'Search projects...' })}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="
@@ -150,11 +152,11 @@ export function ProjectsPage() {
           `
               )}
             >
-              <option value="">All statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="ON_HOLD">On hold</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="ARCHIVED">Archived</option>
+              <option value="">{t('projects.allStatuses', { defaultValue: 'All statuses' })}</option>
+              <option value="ACTIVE">{t('project.status.active', { defaultValue: 'Active' })}</option>
+              <option value="ON_HOLD">{t('project.status.onHold', { defaultValue: 'On hold' })}</option>
+              <option value="COMPLETED">{t('project.status.completed', { defaultValue: 'Completed' })}</option>
+              <option value="ARCHIVED">{t('project.status.archived', { defaultValue: 'Archived' })}</option>
             </select>
 
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -185,7 +187,7 @@ export function ProjectsPage() {
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
-              title="Grid view"
+              title={t('common.gridView', { defaultValue: 'Grid view' })}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
@@ -202,7 +204,7 @@ export function ProjectsPage() {
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
-              title="List view"
+              title={t('common.listView', { defaultValue: 'List view' })}
             >
               <List className="h-4 w-4" />
             </button>
@@ -241,17 +243,17 @@ export function ProjectsPage() {
       ) : projects.length === 0 ? (
         <EmptyState
           icon={<FolderOpen className="h-10 w-10 text-muted-foreground/50" />}
-          title={debouncedSearch ? 'No matching projects' : 'No projects yet'}
+          title={debouncedSearch ? t('projects.noMatching', { defaultValue: 'No matching projects' }) : t('projects.emptyTitle', { defaultValue: 'No projects yet' })}
           description={
             debouncedSearch
-              ? `No projects found for "${debouncedSearch}". Try a different search.`
-              : 'Create your first project to start managing tasks and collaboration.'
+              ? t('projects.noMatchingDesc', { defaultValue: 'No projects found for "{{search}}". Try a different search.', search: debouncedSearch })
+              : t('projects.emptyDesc', { defaultValue: 'Create your first project to start managing tasks and collaboration.' })
           }
           action={
             !debouncedSearch ? (
               <Button onClick={() => setDrawerOpen(true)} size="sm">
                 <Plus className="h-4 w-4" />
-                Create your first project
+                {t('projects.createFirst', { defaultValue: 'Create your first project' })}
               </Button>
             ) : undefined
           }
@@ -291,9 +293,9 @@ export function ProjectsPage() {
       <ConfirmDialog
         open={!!deletingProject}
         onOpenChange={(open) => !open && setDeletingProject(null)}
-        title="Delete project"
-        description={`"${deletingProject?.name}" and all its tasks will be permanently deleted. This action cannot be undone.`}
-        confirmLabel="Delete project"
+        title={t('project.deleteTitle', { defaultValue: 'Delete project' })}
+        description={t('project.deleteDescription', { defaultValue: '"{{name}}" and all its tasks will be permanently deleted. This action cannot be undone.', name: deletingProject?.name || '' })}
+        confirmLabel={t('project.deleteAction', { defaultValue: 'Delete project' })}
         isLoading={deleteProject.isPending}
         onConfirm={handleDeleteConfirm}
       />

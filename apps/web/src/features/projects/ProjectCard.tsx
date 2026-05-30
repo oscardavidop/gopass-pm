@@ -17,19 +17,13 @@ import { formatDate } from '@/utils/formatters';
 import { stripRichText } from '@/utils/richText';
 import { cn } from '@/utils/cn';
 import { type Project } from '@/types/project.types';
+import { useTranslation } from 'react-i18next';
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
   ACTIVE: 'success',
   ON_HOLD: 'warning',
   COMPLETED: 'default',
   ARCHIVED: 'secondary',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: 'Active',
-  ON_HOLD: 'On hold',
-  COMPLETED: 'Completed',
-  ARCHIVED: 'Archived',
 };
 
 interface ProjectCardProps {
@@ -41,6 +35,7 @@ interface ProjectCardProps {
 }
 
 function ProjectMenu({ project, onEdit, onDelete }: Pick<ProjectCardProps, 'project' | 'onEdit' | 'onDelete'>) {
+  const { t } = useTranslation();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -63,14 +58,14 @@ function ProjectMenu({ project, onEdit, onDelete }: Pick<ProjectCardProps, 'proj
               className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-accent outline-none rounded-md mx-1 transition-colors"
               onSelect={() => onEdit(project)}
             >
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> Edit project
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> {t('project.edit', { defaultValue: 'Edit project' })}
             </DropdownMenu.Item>
           )}
           <DropdownMenu.Item
             className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-accent outline-none rounded-md mx-1 transition-colors"
             onSelect={() => {}}
           >
-            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" /> Open project
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" /> {t('project.open', { defaultValue: 'Open project' })}
           </DropdownMenu.Item>
           {onDelete && (
             <>
@@ -79,7 +74,7 @@ function ProjectMenu({ project, onEdit, onDelete }: Pick<ProjectCardProps, 'proj
                 className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-destructive/10 text-destructive outline-none rounded-md mx-1 transition-colors"
                 onSelect={() => onDelete(project)}
               >
-                <Trash2 className="h-3.5 w-3.5" /> Delete project
+                <Trash2 className="h-3.5 w-3.5" /> {t('project.deleteAction', { defaultValue: 'Delete project' })}
               </DropdownMenu.Item>
             </>
           )}
@@ -90,10 +85,17 @@ function ProjectMenu({ project, onEdit, onDelete }: Pick<ProjectCardProps, 'proj
 }
 
 export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onDelete }: ProjectCardProps) {
+  const { t } = useTranslation();
   const totalTasks = project._count?.tasks ?? 0;
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const color = project.color ?? '#6366f1';
   const descriptionPreview = stripRichText(project.description ?? '');
+  const statusLabel: Record<string, string> = {
+    ACTIVE: t('project.status.active'),
+    ON_HOLD: t('project.status.onHold'),
+    COMPLETED: t('project.status.completed'),
+    ARCHIVED: t('project.status.archived'),
+  };
 
   if (view === 'list') {
     return (
@@ -118,7 +120,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
             {project.endDate && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{formatDate(project.endDate)}</span>}
           </div>
           <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="hidden sm:inline-flex shrink-0">
-            {STATUS_LABEL[project.status]}
+            {statusLabel[project.status]}
           </Badge>
           {project.owner && (
             <Avatar src={project.owner.avatar} firstName={project.owner.firstName} lastName={project.owner.lastName} size="xs" className="shrink-0" />
@@ -135,8 +137,8 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
         <div className="h-1.5 shrink-0" style={{ background: `linear-gradient(90deg, ${color}, ${color}66)` }} />
         <div className="h-16 px-4 pt-3 bg-gradient-to-br from-primary/5 to-transparent">
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">Workspace Project</span>
-            <span>{project._count?.members ?? 0} collaborators</span>
+            <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">{t('project.workspaceProject', { defaultValue: 'Workspace Project' })}</span>
+            <span>{t('project.collaboratorsCount', { defaultValue: '{{count}} collaborators', count: project._count?.members ?? 0 })}</span>
           </div>
         </div>
         <div className="p-4 flex-1 flex flex-col gap-3">
@@ -151,7 +153,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
                   {descriptionPreview}
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground/70 mt-0.5">No description added yet.</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">{t('project.noDescriptionYet', { defaultValue: 'No description added yet.' })}</p>
               )}
             </Link>
             <ProjectMenu project={project} onEdit={onEdit} onDelete={onDelete} />
@@ -159,7 +161,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
 
           {/* Stats */}
           <div className="flex items-center gap-3 text-xs text-muted-foreground border border-border/60 rounded-lg px-2.5 py-2 bg-background/50">
-            <span className="flex items-center gap-1"><CheckSquare className="h-3.5 w-3.5" />{totalTasks} task{totalTasks !== 1 ? 's' : ''}</span>
+            <span className="flex items-center gap-1"><CheckSquare className="h-3.5 w-3.5" />{t('project.tasksCount', { defaultValue: '{{count}} tasks', count: totalTasks })}</span>
             <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{project._count?.members ?? 0}</span>
             {project.endDate && (
               <span className="flex items-center gap-1 ml-auto"><Calendar className="h-3.5 w-3.5" />{formatDate(project.endDate)}</span>
@@ -169,7 +171,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
           {/* Progress */}
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Progress</span>
+              <span className="text-muted-foreground">{t('project.progress', { defaultValue: 'Progress' })}</span>
               <span className="font-semibold">{progress}%</span>
             </div>
             <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
@@ -185,7 +187,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1">
-            <Badge variant={STATUS_VARIANT[project.status] ?? 'default'}>{STATUS_LABEL[project.status]}</Badge>
+            <Badge variant={STATUS_VARIANT[project.status] ?? 'default'}>{statusLabel[project.status]}</Badge>
             {project.owner && (
               <Avatar src={project.owner.avatar} firstName={project.owner.firstName} lastName={project.owner.lastName} size="sm" />
             )}

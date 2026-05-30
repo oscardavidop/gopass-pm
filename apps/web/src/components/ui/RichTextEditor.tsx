@@ -47,6 +47,14 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
 
+  const safeSanitize = (html: string) => {
+    try {
+      return sanitizeRichText(html);
+    } catch {
+      return html;
+    }
+  };
+
   const plainLength = useMemo(() => stripRichText(value).length, [value]);
 
   useEffect(() => {
@@ -58,11 +66,13 @@ export function RichTextEditor({
   }, [value]);
 
   const emitChange = () => {
-    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    if (!editor) return;
 
-    const next = sanitizeRichText(editorRef.current.innerHTML);
+    const currentHtml = editor.innerHTML ?? '';
+    const next = safeSanitize(currentHtml);
     if (maxLength && stripRichText(next).length > maxLength) {
-      editorRef.current.innerHTML = value || '';
+      editor.innerHTML = value || '';
       return;
     }
     onChange(next);

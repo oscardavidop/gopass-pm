@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { translateByKey } from '@/i18n/translate';
 
 export function OAuthCallbackPage() {
   const [params] = useSearchParams();
@@ -30,9 +31,9 @@ export function OAuthCallbackPage() {
 
     const qs = new URLSearchParams();
     if (error) {
-      qs.set('oauthError', errorDescription || error || 'Social sign in failed');
+      qs.set('oauthError', errorDescription || error || translateByKey('auth.oauth.failed', undefined, 'Social sign in failed'));
     } else {
-      qs.set('oauthError', 'OAuth callback must be opened in popup mode. Please retry from login.');
+      qs.set('oauthError', translateByKey('auth.oauth.callbackFailed', undefined, 'OAuth callback must be opened in popup mode. Please retry from login.'));
     }
 
     navigate(`/login?${qs.toString()}`, { replace: true });
@@ -40,7 +41,7 @@ export function OAuthCallbackPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
-      Finishing secure sign in...
+      {translateByKey('auth.oauth.finishing', undefined, 'Finishing secure sign in...')}
     </div>
   );
 }

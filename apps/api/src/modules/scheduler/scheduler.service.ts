@@ -37,8 +37,8 @@ export class SchedulerService {
       const targetUserId = task.assigneeId ?? task.creatorId;
       this.events.emitToUser(targetUserId, 'notification', {
         type: 'task_overdue',
-        title: 'Task overdue',
-        message: `"${task.title}" is now overdue in ${task.project.name}`,
+        i18nKey: 'notification.taskOverdue',
+        i18nParams: { task: task.title, project: task.project.name },
         taskId: task.id,
         projectId: task.projectId,
         createdAt: new Date().toISOString(),
@@ -72,8 +72,8 @@ export class SchedulerService {
       const targetUserId = task.assigneeId ?? task.creatorId;
       this.events.emitToUser(targetUserId, 'notification', {
         type: 'task_due_reminder',
-        title: 'Task due soon',
-        message: `"${task.title}" is due in 24 hours in ${task.project.name}`,
+        i18nKey: 'notification.taskDueReminder',
+        i18nParams: { task: task.title, project: task.project.name },
         taskId: task.id,
         projectId: task.projectId,
         createdAt: new Date().toISOString(),
@@ -127,8 +127,12 @@ export class SchedulerService {
 
       this.events.emitToUser(user.id, 'notification', {
         type: 'weekly_digest',
-        title: 'Weekly digest',
-        message: `This week: ${tasksCreated} created, ${tasksCompleted} completed, ${tasksOverdue} overdue`,
+        i18nKey: 'notification.weeklyDigest',
+        i18nParams: {
+          created: tasksCreated,
+          completed: tasksCompleted,
+          overdue: tasksOverdue,
+        },
         createdAt: new Date().toISOString(),
       });
     }

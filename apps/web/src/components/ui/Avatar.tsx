@@ -93,12 +93,17 @@ interface AvatarGroupProps {
   className?: string;
 }
 
-export function AvatarGroup({ users, max = 4, size = 'sm', className }: AvatarGroupProps) {
+export function AvatarGroup({
+  users,
+  max = 4,
+  size = 'sm',
+  className,
+}: AvatarGroupProps) {
   const visible = users.slice(0, max);
   const rest = users.length - max;
 
   return (
-    <span className={cn('flex items-center -space-x-1.5', className)}>
+    <span className={cn('flex items-center -space-x-2', className)}>
       {visible.map((u) => (
         <Avatar
           key={u.id}
@@ -106,14 +111,14 @@ export function AvatarGroup({ users, max = 4, size = 'sm', className }: AvatarGr
           firstName={u.firstName}
           lastName={u.lastName}
           size={size}
-          className="ring-2 ring-card"
         />
       ))}
+
       {rest > 0 && (
         <span
           className={cn(
-            'flex items-center justify-center rounded-full ring-2 ring-card',
-            'bg-secondary text-muted-foreground font-semibold',
+            'flex items-center justify-center rounded-full',
+            'bg-muted text-muted-foreground font-medium',
             SIZES[size],
           )}
         >

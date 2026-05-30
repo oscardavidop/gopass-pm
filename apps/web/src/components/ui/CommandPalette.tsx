@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useProjects } from '@/hooks/useProjects';
 import { useProjectTasks } from '@/hooks/useTasks';
 import { cn } from '@/utils/cn';
+import { useTranslation } from 'react-i18next';
 
 interface CommandItem {
   id: string;
@@ -28,6 +29,7 @@ interface CommandItem {
 const RECENT_KEY = 'tasku-command-recent';
 
 export function CommandPalette() {
+  const { t } = useTranslation();
   const open = useUIStore((s) => s.commandPaletteOpen);
   const closeCP = useUIStore((s) => s.closeCommandPalette);
   const toggleTheme = useUIStore((s) => s.toggleTheme);
@@ -96,43 +98,43 @@ export function CommandPalette() {
   /* ── Static commands ── */
   const staticCommands: CommandItem[] = [
     {
-      id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard,
-      colorClass: 'text-indigo-400', group: 'Navigation',
+      id: 'dashboard', label: t('commandPalette.goToDashboard', { defaultValue: 'Go to Dashboard' }), icon: LayoutDashboard,
+      colorClass: 'text-indigo-400', group: t('commandPalette.groupNavigation', { defaultValue: 'Navigation' }),
       shortcut: ['G', 'D'],
       action: () => go('/'),
     },
     {
-      id: 'projects', label: 'Go to Projects', icon: FolderKanban,
-      colorClass: 'text-violet-400', group: 'Navigation',
+      id: 'projects', label: t('commandPalette.goToProjects', { defaultValue: 'Go to Projects' }), icon: FolderKanban,
+      colorClass: 'text-violet-400', group: t('commandPalette.groupNavigation', { defaultValue: 'Navigation' }),
       shortcut: ['G', 'P'],
       action: () => go('/projects'),
     },
     {
-      id: 'calendar', label: 'Go to Calendar', icon: Calendar,
-      colorClass: 'text-blue-400', group: 'Navigation',
+      id: 'calendar', label: t('commandPalette.goToCalendar', { defaultValue: 'Go to Calendar' }), icon: Calendar,
+      colorClass: 'text-blue-400', group: t('commandPalette.groupNavigation', { defaultValue: 'Navigation' }),
       action: () => go('/calendar'),
     },
     {
-      id: 'profile', label: 'Go to Profile', icon: User,
-      colorClass: 'text-emerald-400', group: 'Navigation',
+      id: 'profile', label: t('commandPalette.goToProfile', { defaultValue: 'Go to Profile' }), icon: User,
+      colorClass: 'text-emerald-400', group: t('commandPalette.groupNavigation', { defaultValue: 'Navigation' }),
       shortcut: ['G', 'U'],
       action: () => go('/profile'),
     },
     {
-      id: 'settings', label: 'Go to Settings', icon: Settings,
-      colorClass: 'text-amber-400', group: 'Navigation',
+      id: 'settings', label: t('commandPalette.goToSettings', { defaultValue: 'Go to Settings' }), icon: Settings,
+      colorClass: 'text-amber-400', group: t('commandPalette.groupNavigation', { defaultValue: 'Navigation' }),
       shortcut: ['G', 'S'],
       action: () => go('/settings'),
     },
     {
-      id: 'new-project', label: 'New Project…', icon: Plus,
-      colorClass: 'text-green-400', group: 'Create',
+      id: 'new-project', label: t('commandPalette.newProject', { defaultValue: 'New Project…' }), icon: Plus,
+      colorClass: 'text-green-400', group: t('commandPalette.groupCreate', { defaultValue: 'Create' }),
       shortcut: ['C', 'P'],
       action: () => { go('/projects'); setTimeout(() => window.dispatchEvent(new CustomEvent('gopass:open-project-form')), 100); },
     },
     {
-      id: 'new-task', label: 'New Task…', icon: Plus,
-      colorClass: 'text-sky-400', group: 'Create',
+      id: 'new-task', label: t('commandPalette.newTask', { defaultValue: 'New Task…' }), icon: Plus,
+      colorClass: 'text-sky-400', group: t('commandPalette.groupCreate', { defaultValue: 'Create' }),
       shortcut: ['C', 'T'],
       action: () => {
         if (currentProjectId) {
@@ -144,8 +146,8 @@ export function CommandPalette() {
       },
     },
     {
-      id: 'new-task-ai', label: 'Generate Task with AI…', icon: Zap,
-      colorClass: 'text-violet-400', group: 'Create',
+      id: 'new-task-ai', label: t('commandPalette.generateTaskWithAi', { defaultValue: 'Generate Task with AI…' }), icon: Zap,
+      colorClass: 'text-violet-400', group: t('commandPalette.groupCreate', { defaultValue: 'Create' }),
       shortcut: ['N'],
       action: () => {
         if (currentProjectId) {
@@ -157,14 +159,14 @@ export function CommandPalette() {
       },
     },
     {
-      id: 'toggle-theme', label: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+      id: 'toggle-theme', label: theme === 'dark' ? t('theme.switchToLight', { defaultValue: 'Switch to Light Mode' }) : t('theme.switchToDark', { defaultValue: 'Switch to Dark Mode' }),
       icon: theme === 'dark' ? Sun : Moon,
-      colorClass: 'text-yellow-400', group: 'Appearance',
+      colorClass: 'text-yellow-400', group: t('commandPalette.groupAppearance', { defaultValue: 'Appearance' }),
       action: () => { toggleTheme(); closeCP(); },
     },
     {
-      id: 'logout', label: 'Sign out', icon: LogOut,
-      colorClass: 'text-red-400', group: 'Account',
+      id: 'logout', label: t('auth.signOut', { defaultValue: 'Sign out' }), icon: LogOut,
+      colorClass: 'text-red-400', group: t('commandPalette.groupAccount', { defaultValue: 'Account' }),
       action: () => { logout(); closeCP(); navigate('/login'); },
     },
   ];
@@ -174,11 +176,11 @@ export function CommandPalette() {
     ? projects.slice(0, 8).map((p: any) => ({
       id: `project-${p.id}`,
       label: p.name,
-      sublabel: `${p._count?.tasks ?? 0} tasks`,
+      sublabel: t('project.tasksCount', { defaultValue: '{{count}} tasks', count: p._count?.tasks ?? 0 }),
       icon: Hash,
       colorClass: p.color ? undefined : 'text-indigo-400',
       iconColor: p.color,
-      group: 'Projects',
+      group: t('projects.title', { defaultValue: 'Projects' }),
       action: () => go(`/projects/${p.id}`),
     }))
     : [];
@@ -187,20 +189,20 @@ export function CommandPalette() {
     ? [
       {
         id: `context-open-project-${currentProjectId}`,
-        label: `Open ${currentProject?.name ?? 'project'} board`,
-        sublabel: 'Current context',
+        label: t('commandPalette.openProjectBoard', { defaultValue: 'Open {{name}} board', name: currentProject?.name ?? t('project.title', { defaultValue: 'project' }) }),
+        sublabel: t('commandPalette.currentContext', { defaultValue: 'Current context' }),
         icon: FolderKanban,
         colorClass: 'text-primary',
-        group: 'Context',
+        group: t('commandPalette.groupContext', { defaultValue: 'Context' }),
         action: () => go(`/projects/${currentProjectId}`),
       },
       {
         id: `context-new-task-${currentProjectId}`,
-        label: 'Create task in this project',
-        sublabel: 'Quick action',
+        label: t('commandPalette.createTaskInProject', { defaultValue: 'Create task in this project' }),
+        sublabel: t('commandPalette.quickAction', { defaultValue: 'Quick action' }),
         icon: Plus,
         colorClass: 'text-emerald-400',
-        group: 'Context',
+        group: t('commandPalette.groupContext', { defaultValue: 'Context' }),
         shortcut: ['N', 'T'],
         action: () => {
           closeCP();
@@ -217,7 +219,7 @@ export function CommandPalette() {
       sublabel: task.status?.replace('_', ' '),
       icon: ClipboardList,
       colorClass: 'text-cyan-400',
-      group: 'Tasks in Context',
+      group: t('commandPalette.groupTasksInContext', { defaultValue: 'Tasks in Context' }),
       action: () => {
         navigate(`/projects/${currentProjectId}`);
         closeCP();
@@ -275,7 +277,7 @@ export function CommandPalette() {
                 <Command.Input
                   value={search}
                   onValueChange={setSearch}
-                  placeholder="Search commands, projects, tasks…"
+                  placeholder={t('commandPalette.searchInputPlaceholder', { defaultValue: 'Search commands, projects, tasks…' })}
                   className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                   autoFocus
                 />
@@ -288,12 +290,12 @@ export function CommandPalette() {
               <Command.List className="max-h-[400px] overflow-y-auto p-2">
                 <Command.Empty className="flex flex-col items-center justify-center py-10 text-muted-foreground">
                   <Zap className="h-8 w-8 mb-2 opacity-20" />
-                  <p className="text-sm">No results for "{search}"</p>
+                  <p className="text-sm">{t('commandPalette.noResultsFor', { defaultValue: 'No results for "{{search}}"', search })}</p>
                 </Command.Empty>
 
                 {search.length === 0 && recentCommands.length > 0 && (
                   <Command.Group
-                    heading="Recent"
+                    heading={t('commandPalette.recent', { defaultValue: 'Recent' })}
                     className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:mt-2 [&_[cmdk-group-heading]]:mb-0.5"
                   >
                     {recentCommands.map((cmd) => (
@@ -328,9 +330,9 @@ export function CommandPalette() {
               {/* Footer */}
               <div className="flex items-center justify-between px-4 py-2.5 border-t border-border bg-background/50 text-[10px] text-muted-foreground/60">
                 <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1"><kbd className="border border-border rounded px-1">↑↓</kbd> navigate</span>
-                  <span className="flex items-center gap-1"><kbd className="border border-border rounded px-1">↵</kbd> select</span>
-                  <span className="flex items-center gap-1"><kbd className="border border-border rounded px-1">esc</kbd> close</span>
+                  <span className="flex items-center gap-1"><kbd className="border border-border rounded px-1">↑↓</kbd> {t('commandPalette.navigate', { defaultValue: 'navigate' })}</span>
+                  <span className="flex items-center gap-1"><kbd className="border border-border rounded px-1">↵</kbd> {t('commandPalette.select', { defaultValue: 'select' })}</span>
+                  <span className="flex items-center gap-1"><kbd className="border border-border rounded px-1">esc</kbd> {t('commandPalette.close', { defaultValue: 'close' })}</span>
                 </div>
                 <div className="flex items-center gap-1 opacity-60">
                   <CommandIcon className="h-3 w-3" />

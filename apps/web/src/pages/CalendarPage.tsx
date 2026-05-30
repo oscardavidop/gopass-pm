@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { motion } from 'framer-motion';
 import { Calendar, LayoutGrid, AlertCircle, CalendarDays } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { projectsService } from '@/services/projects.service';
 import { tasksService } from '@/services/tasks.service';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -39,6 +40,7 @@ function CalendarSkeleton() {
 }
 
 export function CalendarPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [view, setView] = useState<'dayGridMonth' | 'dayGridWeek'>('dayGridMonth');
 
@@ -102,22 +104,22 @@ export function CalendarPage() {
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t('calendar.title', { defaultValue: 'Calendar' })}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {isLoading
-              ? 'Loading tasks…'
+              ? t('calendar.loadingTasks', { defaultValue: 'Loading tasks...' })
               : events.length > 0
               ? <>
-                  {events.length} task{events.length !== 1 ? 's' : ''} with due dates
+                  {t('calendar.tasksWithDueDates', { defaultValue: '{{count}} tasks with due dates', count: events.length })}
                   {noDueDateCount > 0 && (
-                    <span className="ml-2 text-muted-foreground/70">· {noDueDateCount} without dates</span>
+                    <span className="ml-2 text-muted-foreground/70">· {t('calendar.withoutDates', { defaultValue: '{{count}} without dates', count: noDueDateCount })}</span>
                   )}
                 </>
               : allTasks.length > 0
-              ? `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} found — none have a due date`
-              : 'No tasks in your projects'}
+              ? t('calendar.noDueDateInTasks', { defaultValue: '{{count}} tasks found - none have a due date', count: allTasks.length })
+              : t('calendar.noTasksInProjects', { defaultValue: 'No tasks in your projects' })}
             {overdueCount > 0 && (
-              <span className="ml-2 text-red-400 font-medium">· {overdueCount} overdue</span>
+              <span className="ml-2 text-red-400 font-medium">· {t('calendar.overdueCount', { defaultValue: '{{count}} overdue', count: overdueCount })}</span>
             )}
           </p>
         </div>
@@ -147,7 +149,7 @@ export function CalendarPage() {
               )}
             >
               <Calendar className="h-3.5 w-3.5" />
-              Month
+              {t('calendar.month', { defaultValue: 'Month' })}
             </button>
             <button
               onClick={() => setView('dayGridWeek')}
@@ -159,7 +161,7 @@ export function CalendarPage() {
               )}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
-              Week
+              {t('calendar.week', { defaultValue: 'Week' })}
             </button>
           </div>
         </div>
@@ -168,7 +170,7 @@ export function CalendarPage() {
       {isError ? (
         <div className="flex items-center gap-2 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          Failed to load calendar data. Please refresh.
+          {t('calendar.loadFailed', { defaultValue: 'Failed to load calendar data. Please refresh.' })}
         </div>
       ) : isLoading ? (
         <div className="rounded-xl border border-border bg-card calendar-container">
@@ -177,13 +179,13 @@ export function CalendarPage() {
       ) : events.length === 0 ? (
         <EmptyState
           icon={<CalendarDays className="h-7 w-7" />}
-          title={allTasks.length > 0 ? 'No tasks have a due date' : 'No tasks yet'}
+          title={allTasks.length > 0 ? t('calendar.noTasksHaveDueDate', { defaultValue: 'No tasks have a due date' }) : t('calendar.noTasksYet', { defaultValue: 'No tasks yet' })}
           description={
             allTasks.length > 0
-              ? `You have ${allTasks.length} task${allTasks.length !== 1 ? 's' : ''}, but none have a due date set. Open any task, set a due date, and it will appear here.`
-              : 'Create tasks and set due dates to see them on the calendar.'
+              ? t('calendar.noTasksHaveDueDateDesc', { defaultValue: 'You have {{count}} tasks, but none have a due date set. Open any task, set a due date, and it will appear here.', count: allTasks.length })
+              : t('calendar.createTasksForCalendar', { defaultValue: 'Create tasks and set due dates to see them on the calendar.' })
           }
-          primaryAction={{ label: 'Go to Projects', onClick: () => navigate('/projects') }}
+          primaryAction={{ label: t('projects.goToProjects', { defaultValue: 'Go to Projects' }), onClick: () => navigate('/projects') }}
         />
       ) : (
         <div className="rounded-xl border border-border bg-card calendar-container overflow-hidden">
@@ -209,7 +211,7 @@ export function CalendarPage() {
             }}
             dayCellClassNames="hover:bg-accent/20 transition-colors"
             dayMaxEvents={3}
-            moreLinkText={(n) => `+${n} more`}
+            moreLinkText={(n) => t('common.moreCount', { defaultValue: '+{{count}} more', count: n })}
           />
         </div>
       )}
