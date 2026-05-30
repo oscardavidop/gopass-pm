@@ -19,7 +19,22 @@ const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: 
   task_overdue:   { icon: AlertTriangle,color: 'text-orange-400',  bg: 'bg-orange-400/10' },
   comment_added:  { icon: MessageSquare,color: 'text-violet-400',  bg: 'bg-violet-400/10' },
   project_updated:{ icon: FolderKanban, color: 'text-amber-400',   bg: 'bg-amber-400/10' },
+  project_deleted:{ icon: Trash2,       color: 'text-red-400',     bg: 'bg-red-400/10' },
   mention:        { icon: MessageSquare,color: 'text-pink-400',    bg: 'bg-pink-400/10' },
+};
+
+const TYPE_I18N_KEY: Record<string, string> = {
+  task_created: 'task.created',
+  task_updated: 'task.updated',
+  task_deleted: 'task.deleted',
+  task_assigned: 'notification.taskAssigned',
+  task_overdue: 'notification.taskOverdue',
+  task_due_reminder: 'notification.taskDueReminder',
+  comment_added: 'notification.commentAdded',
+  project_updated: 'notification.projectUpdated',
+  project_deleted: 'notification.projectDeleted',
+  project_access_revoked: 'notification.projectAccessRevoked',
+  weekly_digest: 'notification.weeklyDigest',
 };
 
 export function NotificationBell() {
@@ -149,8 +164,15 @@ function NotificationItem({
   const { t } = useTranslation();
   const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.task_updated;
   const Icon = cfg.icon;
-  const title = n.i18nKey ? translateByKey(n.i18nKey, n.i18nParams, n.title || n.type) : (n.title || n.type);
-  const body = n.body || (n.taskTitle ? t('notification.taskFallbackBody', { defaultValue: '{{task}}', task: n.taskTitle }) : '');
+  const resolvedTitleKey = n.i18nKey ?? TYPE_I18N_KEY[n.type];
+  const title = translateByKey(
+    resolvedTitleKey,
+    n.i18nParams,
+    n.title || translateByKey(TYPE_I18N_KEY[n.type], n.i18nParams, n.type),
+  );
+  const body = n.body
+    || (n.taskTitle ? t('notification.taskFallbackBody', { defaultValue: '{{task}}', task: n.taskTitle }) : '')
+    || (n.projectName ? t('notification.projectFallbackBody', { defaultValue: '{{projectName}}', projectName: n.projectName }) : '');
 
   return (
     <motion.div

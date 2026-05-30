@@ -11,11 +11,13 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -29,10 +31,14 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post('register')
   @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Register a new user' })
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(dto);
@@ -43,6 +49,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 7, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login with email and password' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(
@@ -57,6 +64,7 @@ export class AuthController {
   @Post('oauth/:provider')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login or register with OAuth provider' })
   async oauth(
     @Param('provider') providerRaw: string,
@@ -73,6 +81,7 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'Request a password reset link' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
@@ -81,6 +90,7 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 4, ttl: 60_000 } })
   @ApiOperation({ summary: 'Reset password with one-time token' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
@@ -88,6 +98,8 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Refresh access token using HTTP-only cookie' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.['refresh_token'];
@@ -131,14 +143,20 @@ export class AuthController {
   }
 
   @Get('email-previews')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'List local email previews (SEND_REAL_EMAIL=false)' })
-  listPreviews(@Query('limit') limit?: string) {
+  listPreviews(@CurrentUser() user: any, @Query('limit') limit?: string) {
+    if (user?.role !== 'ADMIN') throw new ForbiddenException('Insufficient permissions');
     return this.authService.listEmailPreviews(limit ? Number(limit) : undefined);
   }
 
   @Get('email-previews/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get local email preview details' })
-  getPreview(@Param('id') id: string) {
+  getPreview(@CurrentUser() user: any, @Param('id') id: string) {
+    if (user?.role !== 'ADMIN') throw new ForbiddenException('Insufficient permissions');
     return this.authService.getEmailPreview(id);
   }
 
@@ -149,9 +167,10 @@ export class AuthController {
   }
 
   private setRefreshCookie(res: Response, token: string) {
+    const isProd = this.config.get<string>('NODE_ENV') === 'production';
     res.cookie('refresh_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',

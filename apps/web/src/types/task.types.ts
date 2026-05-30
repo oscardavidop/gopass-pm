@@ -31,6 +31,7 @@ export interface Subtask {
   parentTaskId: string;
   title: string;
   completed: boolean;
+  inProgress: boolean;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -92,6 +93,7 @@ export interface CreateTaskPayload {
   subtasks?: Array<{
     title: string;
     completed?: boolean;
+    inProgress?: boolean;
     position?: number;
   }>;
   position?: number;

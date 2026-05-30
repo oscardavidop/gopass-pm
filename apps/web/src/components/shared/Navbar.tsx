@@ -52,7 +52,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
       <div className="relative flex h-16 items-center justify-between gap-3 px-3 md:px-5">
-        <div className="flex min-w-0 items-center gap-3 lg:w-[300px]">
+        <div className="flex min-w-0 items-center gap-3 lg:w-[520px]">
           <button
             onClick={() => openSidebarMobile(true)}
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-card text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
@@ -62,7 +62,7 @@ export function Navbar() {
           </button>
 
           {/* Breadcrumbs */}
-          <nav className="hidden min-w-0 items-center gap-1 text-sm md:flex lg:max-w-[380px]">
+          <nav className="hidden min-w-0 items-center gap-1 text-sm md:flex lg:max-w-[480px]">
             <Link to="/dashboard" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground">
               <Home className="h-3.5 w-3.5" />
             </Link>
@@ -164,7 +164,7 @@ export function Navbar() {
           {/* User menu */}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="ml-1 flex items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-2 py-1.5 shadow-sm transition-colors hover:bg-accent">
+              <button className="ml-1 flex items-center gap-2 px-2 py-1.5 hover:rounded-xl hover:bg-card">
                 <Avatar
                   src={user?.avatar}
                   firstName={user?.firstName}

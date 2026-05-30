@@ -49,7 +49,7 @@ export class TasksController {
     @Body() dto: CreateTaskDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.create(projectId, dto, user.id);
+    return this.tasksService.create(projectId, dto, user.id, user.role);
   }
 
   @Get('projects/:projectId/tasks')
@@ -59,20 +59,20 @@ export class TasksController {
     @Query() filters: FilterTasksDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.findAllByProject(projectId, user.id, filters);
+    return this.tasksService.findAllByProject(projectId, user.id, filters, user.role);
   }
 
   // ── Standalone task routes ───────────────────────────────
   @Get('tasks/:id')
   @ApiOperation({ summary: 'Get task details with comments and activity' })
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.tasksService.findOne(id, user.id);
+    return this.tasksService.findOne(id, user.id, user.role);
   }
 
   @Patch('tasks/:id')
   @ApiOperation({ summary: 'Update task' })
   update(@Param('id') id: string, @Body() dto: UpdateTaskDto, @CurrentUser() user: any) {
-    return this.tasksService.update(id, dto, user.id);
+    return this.tasksService.update(id, dto, user.id, user.role);
   }
 
   @Patch('tasks/:id/status')
@@ -82,20 +82,20 @@ export class TasksController {
     @Body() dto: UpdateTaskStatusDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.updateStatus(id, dto, user.id);
+    return this.tasksService.updateStatus(id, dto, user.id, user.role);
   }
 
   @Delete('tasks/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete task' })
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.tasksService.remove(id, user.id);
+    return this.tasksService.remove(id, user.id, user.role);
   }
 
   @Get('tasks/:id/activity')
   @ApiOperation({ summary: 'Get task audit log' })
   getActivity(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.tasksService.getActivity(id, user.id);
+    return this.tasksService.getActivity(id, user.id, user.role);
   }
 
   // ── Comments ─────────────────────────────────────────────
@@ -106,7 +106,7 @@ export class TasksController {
     @Body() dto: CreateCommentDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.addComment(taskId, dto.content, user.id);
+    return this.tasksService.addComment(taskId, dto.content, user.id, user.role);
   }
 
   @Delete('tasks/:taskId/comments/:commentId')
@@ -127,7 +127,7 @@ export class TasksController {
     @Body() dto: CreateSubtaskDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.addSubtask(taskId, dto.title, user.id);
+    return this.tasksService.addSubtask(taskId, dto, user.id, user.role);
   }
 
   @Patch('tasks/:taskId/subtasks/:subtaskId')
@@ -138,7 +138,7 @@ export class TasksController {
     @Body() dto: UpdateSubtaskDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.updateSubtask(taskId, subtaskId, dto, user.id);
+    return this.tasksService.updateSubtask(taskId, subtaskId, dto, user.id, user.role);
   }
 
   @Delete('tasks/:taskId/subtasks/:subtaskId')
@@ -149,7 +149,7 @@ export class TasksController {
     @Param('subtaskId') subtaskId: string,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.removeSubtask(taskId, subtaskId, user.id);
+    return this.tasksService.removeSubtask(taskId, subtaskId, user.id, user.role);
   }
 
   @Patch('tasks/:taskId/subtasks/reorder')
@@ -159,6 +159,6 @@ export class TasksController {
     @Body() dto: ReorderSubtasksDto,
     @CurrentUser() user: any,
   ) {
-    return this.tasksService.reorderSubtasks(taskId, dto.orderedIds, user.id);
+    return this.tasksService.reorderSubtasks(taskId, dto.orderedIds, user.id, user.role);
   }
 }

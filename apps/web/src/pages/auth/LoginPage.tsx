@@ -96,9 +96,9 @@ export function LoginPage() {
 
         <div className="mt-4 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground space-y-1">
           <p className="font-medium text-foreground">Demo accounts</p>
-          <p>admin@gopass.dev / Admin123!</p>
-          <p>manager@gopass.dev / Manager123!</p>
-          <p>user@gopass.dev / User123!</p>
+          <p>admin@tasku.pro / Admin123!</p>
+          <p>manager@tasku.pro / Manager123!</p>
+          <p>user@tasku.pro / User123!</p>
         </div>
       </CardContent>
     </Card>

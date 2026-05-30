@@ -140,15 +140,22 @@ Additional guidance:
 ## Security Hardening
 
 - Helmet enabled
+- Strict security headers (HSTS in production, frame deny, no-sniff, referrer policy)
 - CORS allowlist from env
-- Global throttling and auth endpoint throttling
+- Global throttling and endpoint-specific throttling for auth, AI and invitations
 - Bcrypt password hashing
 - Refresh token rotation + revocation
 - One-time password reset tokens with expiry
 - Generic forgot-password response to prevent user enumeration
+- WebSocket auth + project membership authorization for room/presence events
+- Environment validation on startup (app fails fast when critical vars are invalid)
 
 ## Health Endpoints
 
+- GET /api/v1/health
+- GET /api/v1/health/db
+- GET /api/v1/health/realtime
+- GET /api/v1/health/email
 - GET /api/v1/health/live
 - GET /api/v1/health/ready
 
@@ -183,6 +190,7 @@ Required production variables include:
 
 - SEND_REAL_EMAIL
 - ZAVU_API_KEY
+- JWT_SECRET
 - APP_URL
 - FRONTEND_URL
 - BACKEND_URL
@@ -192,6 +200,19 @@ Required production variables include:
 - GITHUB_CLIENT_SECRET
 - JWT_ACCESS_SECRET
 - JWT_REFRESH_SECRET
+- OAUTH_REDIRECT_ALLOWLIST
+
+Frontend deploy variables:
+
+- VITE_API_URL
+- VITE_APP_URL
+- VITE_SUPPORTED_LOCALES
+
+Cloudflare Pages deploy variables:
+
+- CLOUDFLARE_ACCOUNT_ID
+- CLOUDFLARE_API_TOKEN
+- CLOUDFLARE_PAGES_PROJECT
 
 ### Database
 
@@ -218,6 +239,43 @@ Services:
 - backend
 - postgres
 - redis
+
+## Deploy Frontend
+
+```bash
+cd apps/web
+npm run deploy
+```
+
+This command builds `dist/` and deploys to Cloudflare Pages using Wrangler.
+
+SPA routing is production-safe via `public/_redirects`:
+
+- `/projects/:id`
+- `/tasks/:id`
+- `/settings`
+
+will resolve to `index.html` instead of 404.
+
+## Deploy Backend
+
+```bash
+cd apps/api
+npm run deploy
+```
+
+This command:
+
+1. Validates required environment variables.
+2. Builds and starts Docker services (`postgres`, `redis`, `api`) using `docker-compose.prod.yml`.
+3. Runs Prisma migrations (`prisma migrate deploy`).
+4. Waits for backend health check success.
+
+Root one-command deploy:
+
+```bash
+npm run deploy
+```
 
 ## CI/CD Ready
 

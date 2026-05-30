@@ -45,9 +45,19 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<CreateTaskPayload> }) =>
       tasksService.update(id, data),
-    onSuccess: (_r, vars) => {
+    onSuccess: (updatedTask, vars) => {
+      qc.setQueryData(taskKeys.detail(vars.id), (old: any) =>
+        old ? { ...old, ...updatedTask } : old,
+      );
+      qc.setQueriesData({ queryKey: ['tasks', 'project', updatedTask.projectId] }, (old: any) => {
+        if (!old?.items) return old;
+        return {
+          ...old,
+          items: old.items.map((task: any) => (task.id === updatedTask.id ? { ...task, ...updatedTask } : task)),
+        };
+      });
       qc.invalidateQueries({ queryKey: taskKeys.detail(vars.id) });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'task.updateFailed', 'Failed to update task')),
   });
@@ -91,10 +101,10 @@ export function useAddComment(taskId: string) {
 export function useAddSubtask(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ title }: { title: string }) => tasksService.addSubtask(taskId, title),
+    mutationFn: ({ title, completed, inProgress }: { title: string; completed?: boolean; inProgress?: boolean }) =>
+      tasksService.addSubtask(taskId, { title, completed, inProgress }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: () => toast.error(translateByKey('task.subtaskAddFailed', undefined, 'Failed to add subtask')),
   });
@@ -103,11 +113,10 @@ export function useAddSubtask(taskId: string) {
 export function useUpdateSubtask(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ subtaskId, data }: { subtaskId: string; data: { title?: string; completed?: boolean; position?: number } }) =>
+    mutationFn: ({ subtaskId, data }: { subtaskId: string; data: { title?: string; completed?: boolean; inProgress?: boolean; position?: number } }) =>
       tasksService.updateSubtask(taskId, subtaskId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: () => toast.error(translateByKey('task.subtaskUpdateFailed', undefined, 'Failed to update subtask')),
   });
@@ -119,7 +128,6 @@ export function useDeleteSubtask(taskId: string) {
     mutationFn: ({ subtaskId }: { subtaskId: string }) => tasksService.deleteSubtask(taskId, subtaskId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: () => toast.error(translateByKey('task.subtaskDeleteFailed', undefined, 'Failed to delete subtask')),
   });
@@ -131,7 +139,6 @@ export function useReorderSubtasks(taskId: string) {
     mutationFn: ({ orderedIds }: { orderedIds: string[] }) => tasksService.reorderSubtasks(taskId, orderedIds),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: () => toast.error(translateByKey('task.subtaskReorderFailed', undefined, 'Failed to reorder subtasks')),
   });

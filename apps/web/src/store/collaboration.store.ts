@@ -30,15 +30,29 @@ export const useCollaborationStore = create<CollaborationState>((set) => ({
   },
 
   setTaskPresence: ({ projectId, taskId, viewing, editing }) => {
-    set((state) => ({
-      taskPresenceByProject: {
-        ...state.taskPresenceByProject,
-        [projectId]: {
-          ...(state.taskPresenceByProject[projectId] ?? {}),
-          [taskId]: { viewing, editing },
+    set((state) => {
+      const previous = state.taskPresenceByProject[projectId]?.[taskId];
+      const sameViewing =
+        (previous?.viewing?.length ?? 0) === viewing.length &&
+        (previous?.viewing ?? []).every((user, index) => user.id === viewing[index]?.id);
+      const sameEditing =
+        (previous?.editing?.length ?? 0) === editing.length &&
+        (previous?.editing ?? []).every((entry, index) => (
+          entry.user.id === editing[index]?.user?.id && entry.field === editing[index]?.field
+        ));
+
+      if (sameViewing && sameEditing) return state;
+
+      return {
+        taskPresenceByProject: {
+          ...state.taskPresenceByProject,
+          [projectId]: {
+            ...(state.taskPresenceByProject[projectId] ?? {}),
+            [taskId]: { viewing, editing },
+          },
         },
-      },
-    }));
+      };
+    });
   },
 
   pushTaskHighlight: (highlight, ttlMs = 6000) => {

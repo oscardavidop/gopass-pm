@@ -25,10 +25,10 @@ async function main() {
   const userHash = await bcrypt.hash('User123!', 12);
 
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@gopass.dev' },
+    where: { email: 'admin@tasku.pro' },
     update: {},
     create: {
-      email: 'admin@gopass.dev',
+      email: 'admin@tasku.pro',
       username: 'admin',
       password: passwordHash,
       firstName: 'Admin',
@@ -39,10 +39,10 @@ async function main() {
   });
 
   const manager = await prisma.user.upsert({
-    where: { email: 'manager@gopass.dev' },
+    where: { email: 'manager@tasku.pro' },
     update: {},
     create: {
-      email: 'manager@gopass.dev',
+      email: 'manager@tasku.pro',
       username: 'manager',
       password: managerHash,
       firstName: 'Sarah',
@@ -53,10 +53,10 @@ async function main() {
   });
 
   const user1 = await prisma.user.upsert({
-    where: { email: 'user@gopass.dev' },
+    where: { email: 'user@tasku.pro' },
     update: {},
     create: {
-      email: 'user@gopass.dev',
+      email: 'user@tasku.pro',
       username: 'john_doe',
       password: userHash,
       firstName: 'John',
@@ -67,10 +67,10 @@ async function main() {
   });
 
   const user2 = await prisma.user.upsert({
-    where: { email: 'jane@gopass.dev' },
+    where: { email: 'jane@tasku.pro' },
     update: {},
     create: {
-      email: 'jane@gopass.dev',
+      email: 'jane@tasku.pro',
       username: 'jane_smith',
       password: userHash,
       firstName: 'Jane',
@@ -348,9 +348,9 @@ async function main() {
   console.log('✅ Notifications and activity logs created');
   console.log('\n🎉 Seed completed successfully!\n');
   console.log('Demo accounts:');
-  console.log('  admin@gopass.dev    / Admin123!   (ADMIN)');
-  console.log('  manager@gopass.dev  / Manager123! (MANAGER)');
-  console.log('  user@gopass.dev     / User123!    (USER)');
+  console.log('  admin@tasku.pro    / Admin123!   (ADMIN)');
+  console.log('  manager@tasku.pro  / Manager123! (MANAGER)');
+  console.log('  user@tasku.pro     / User123!    (USER)');
 }
 
 main()

@@ -13,12 +13,12 @@ const DrawerClose = DialogPrimitive.Close;
 const DrawerPortal = DialogPrimitive.Portal;
 
 const SIZES = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-  full: 'max-w-full',
+  sm: 'sm:w-[420px]',
+  md: 'sm:w-[560px]',
+  lg: 'sm:w-[1060px]',
+  xl: 'sm:w-[920px]',
+  '2xl': 'sm:w-[1100px]',
+  full: 'w-screen',
 };
 
 interface DrawerContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
@@ -53,9 +53,9 @@ const DrawerContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-y-0 right-0 z-50 flex flex-col bg-card shadow-xl',
+        'fixed inset-y-0 right-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-card shadow-xl',
         'border-l border-border',
-        'w-full',
+        'w-screen sm:w-full',
         SIZES[size],
         // Open animation
         'data-[state=open]:animate-slide-in-right',
@@ -117,7 +117,7 @@ function DrawerDescription({ className, ...props }: React.ComponentPropsWithoutR
 function DrawerBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('flex-1 overflow-y-auto px-6 py-5', className)}
+      className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5', className)}
       {...props}
     />
   );

@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 import { AuthService } from './auth.service';
 //@ts-ignore - no need to mock entire PrismaService, just the parts used by AuthService
 //
@@ -12,7 +14,12 @@ describe('AuthService', () => {
   const jwt = {} as any;
     // @ts-ignore
 
-  const config = { get: jest.fn(() => 'http://localhost:3000') } as any;
+  const config = {
+    get: jest.fn((key: string) => {
+      if (key === 'OAUTH_REDIRECT_ALLOWLIST') return 'http://localhost:3000/auth/oauth/callback';
+      return 'http://localhost:3000';
+    }),
+  } as any;
     // @ts-ignore
 
   const email = { send: jest.fn() } as any;
@@ -35,5 +42,14 @@ describe('AuthService', () => {
     expect(result.message).toContain('If your email exists');
     // @ts-ignore
     expect(email.send).not.toHaveBeenCalled();
+  });
+
+  it('rejects oauth login when redirect uri is outside allowlist', async () => {
+    await expect(
+      service.oauthLogin('GOOGLE', {
+        code: 'any-code',
+        redirectUri: 'https://evil.example.com/callback',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

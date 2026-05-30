@@ -4,18 +4,50 @@ import {
   IsEnum,
   IsDateString,
   IsHexColor,
+  IsArray,
+  IsEmail,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProjectStatus } from '@prisma/client';
+import { ProjectStatus, ProjectVisibility, ProjectWorkflowType } from '@prisma/client';
+
+class CreateProjectMemberDto {
+  @ApiProperty({ example: 'usr_123' })
+  @IsString()
+  userId!: string;
+
+  @ApiPropertyOptional({ example: 'MEMBER' })
+  @IsString()
+  @IsOptional()
+  role?: string;
+}
+
+class CreateProjectInvitationDto {
+  @ApiProperty({ example: 'maria@example.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiPropertyOptional({ example: 'MEMBER' })
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @ApiPropertyOptional({ example: 'Welcome to the project' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  message?: string;
+}
 
 export class CreateProjectDto {
   @ApiProperty({ example: 'GoPass Platform' })
   @IsString()
   @MinLength(2)
   @MaxLength(100)
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ example: 'Core SaaS platform development' })
   @IsString()
@@ -27,6 +59,28 @@ export class CreateProjectDto {
   @IsHexColor()
   @IsOptional()
   color?: string;
+
+  @ApiPropertyOptional({ example: 'rocket' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(32)
+  icon?: string;
+
+  @ApiPropertyOptional({ enum: ProjectVisibility })
+  @IsEnum(ProjectVisibility)
+  @IsOptional()
+  visibility?: ProjectVisibility;
+
+  @ApiPropertyOptional({ enum: ProjectWorkflowType })
+  @IsEnum(ProjectWorkflowType)
+  @IsOptional()
+  workflowType?: ProjectWorkflowType;
+
+  @ApiPropertyOptional({ type: [String], example: ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE'] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  workflowStates?: string[];
 
   @ApiPropertyOptional({ enum: ProjectStatus })
   @IsEnum(ProjectStatus)
@@ -42,4 +96,18 @@ export class CreateProjectDto {
   @IsDateString()
   @IsOptional()
   endDate?: string;
+
+  @ApiPropertyOptional({ type: [CreateProjectMemberDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProjectMemberDto)
+  @IsOptional()
+  members?: CreateProjectMemberDto[];
+
+  @ApiPropertyOptional({ type: [CreateProjectInvitationDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProjectInvitationDto)
+  @IsOptional()
+  invitations?: CreateProjectInvitationDto[];
 }

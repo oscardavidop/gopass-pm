@@ -1,4 +1,5 @@
 import { TasksService } from './tasks.service';
+import { Role } from '@prisma/client';
 
 describe('Tasks workflow', () => {
   const prisma = {} as any;
@@ -17,6 +18,6 @@ describe('Tasks workflow', () => {
 
     await service.updateStatus('task-1', { status: 'DONE' as any }, 'user-1');
 
-    expect(updateSpy).toHaveBeenCalledWith('task-1', { status: 'DONE' }, 'user-1');
+    expect(updateSpy).toHaveBeenCalledWith('task-1', { status: 'DONE' }, 'user-1', Role.USER);
   });
 });

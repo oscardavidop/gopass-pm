@@ -12,11 +12,14 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -77,5 +80,43 @@ export class ProjectsController {
     @CurrentUser() user: any,
   ) {
     return this.projectsService.removeMember(id, memberId, user.id, user.role);
+  }
+
+  @Post(':id/leave')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Leave project as current member' })
+  leaveProject(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.projectsService.leave(id, user.id, user.role);
+  }
+
+  @Patch(':id/members/:userId/role')
+  @ApiOperation({ summary: 'Update member role in project' })
+  updateMemberRole(
+    @Param('id') id: string,
+    @Param('userId') memberId: string,
+    @Body() dto: UpdateMemberRoleDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.projectsService.updateMemberRole(id, memberId, dto.role, user.id, user.role);
+  }
+
+  @Get(':id/invitations')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'List project invitations' })
+  listInvitations(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.projectsService.listInvitations(id, user.id, user.role);
+  }
+
+  @Post(':id/invitations')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Invite member by email' })
+  inviteMember(
+    @Param('id') id: string,
+    @Body() dto: InviteMemberDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.projectsService.inviteMember(id, dto, user.id, user.role);
   }
 }

@@ -38,13 +38,13 @@ export const tasksService = {
   deleteComment: (taskId: string, commentId: string) =>
     api.delete(`/tasks/${taskId}/comments/${commentId}`),
 
-  addSubtask: (taskId: string, title: string) =>
-    api.post<{ data: Subtask }>(`/tasks/${taskId}/subtasks`, { title }).then((r) => r.data.data),
+  addSubtask: (taskId: string, payload: { title: string; completed?: boolean; inProgress?: boolean }) =>
+    api.post<{ data: Subtask }>(`/tasks/${taskId}/subtasks`, payload).then((r) => r.data.data),
 
   updateSubtask: (
     taskId: string,
     subtaskId: string,
-    payload: Partial<Pick<Subtask, 'title' | 'completed' | 'position'>>,
+    payload: Partial<Pick<Subtask, 'title' | 'completed' | 'inProgress' | 'position'>>,
   ) => api.patch<{ data: Subtask }>(`/tasks/${taskId}/subtasks/${subtaskId}`, payload).then((r) => r.data.data),
 
   deleteSubtask: (taskId: string, subtaskId: string) =>

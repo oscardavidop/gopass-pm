@@ -216,8 +216,8 @@ export function ManualTaskCreateDrawer({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-border/80 bg-card/75 p-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 border rounded-xl border-border/80 bg-card/75 p-3">
+            <div className="bg-card/75 p-3">
               <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <Flag className="h-3.5 w-3.5" /> Priority
               </label>
@@ -229,7 +229,7 @@ export function ManualTaskCreateDrawer({
               />
             </div>
 
-            <div className="rounded-xl border border-border/80 bg-card/75 p-3">
+            <div className="bg-card/75 p-3">
               <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <ListTodo className="h-3.5 w-3.5" /> Status
               </label>
@@ -241,14 +241,14 @@ export function ManualTaskCreateDrawer({
               />
             </div>
 
-            <div className="rounded-xl border border-border/80 bg-card/75 p-3">
+            <div className="bg-card/75 p-3">
               <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" /> {t('task.dueDate', { defaultValue: 'Due date' })}
               </label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" />
             </div>
 
-            <div className="rounded-xl border border-border/80 bg-card/75 p-3">
+            <div className="bg-card/75 p-3">
               <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <UserRound className="h-3.5 w-3.5" /> Assignee
               </label>

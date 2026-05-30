@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -30,6 +31,21 @@ export class UsersController {
   @ApiOperation({ summary: 'Update own profile' })
   updateMe(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Get('me/notification-preferences')
+  @ApiOperation({ summary: 'Get own notification preferences' })
+  getMyNotificationPreferences(@CurrentUser('id') userId: string) {
+    return this.usersService.getNotificationPreferences(userId);
+  }
+
+  @Patch('me/notification-preferences')
+  @ApiOperation({ summary: 'Update own notification preferences' })
+  updateMyNotificationPreferences(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.usersService.updateNotificationPreferences(userId, dto);
   }
 
   @Get(':id')

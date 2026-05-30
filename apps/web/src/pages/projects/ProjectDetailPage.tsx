@@ -88,6 +88,15 @@ export function ProjectDetailPage() {
   }, [id, navigate]);
 
   useEffect(() => {
+    const handleProjectDeleted = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId: string }>).detail;
+      if (detail?.projectId === id) navigate('/projects', { replace: true });
+    };
+    window.addEventListener('project:deleted', handleProjectDeleted);
+    return () => window.removeEventListener('project:deleted', handleProjectDeleted);
+  }, [id, navigate]);
+
+  useEffect(() => {
     const handleOpenTaskForm = () => {
       setDefaultStatus('TODO');
       setEditingTask(null);
@@ -302,16 +311,7 @@ export function ProjectDetailPage() {
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-t border-border/60 pt-3.5">
           <div className="flex flex-wrap items-center gap-3">
             {/* Presence (online users) */}
-            <PresenceAvatars
-              projectId={id ?? ''}
-              members={project?.members?.map((member) => ({
-                id: member.user.id,
-                firstName: member.user.firstName,
-                lastName: member.user.lastName,
-                avatar: member.user.avatar,
-                collaborationColor: (member.user as any).collaborationColor,
-              })) ?? []}
-            />
+            <PresenceAvatars projectId={id ?? ''} />
 
             {/* Members — modal trigger */}
             {project && (
@@ -320,6 +320,7 @@ export function ProjectDetailPage() {
                 members={project.members}
                 currentUserId={currentUser?.id ?? ''}
                 currentRole={currentProjectRole}
+                pendingInvitations={(project.invitations ?? []).filter((invitation) => invitation.status === 'PENDING') as any}
               />
             )}
           </div>

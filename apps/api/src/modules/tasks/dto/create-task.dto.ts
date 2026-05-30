@@ -9,6 +9,7 @@ import {
   MinLength,
   IsInt,
   Min,
+  IsBoolean,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -24,7 +25,13 @@ export class CreateSubtaskDto {
 
   @ApiPropertyOptional({ default: false })
   @IsOptional()
+  @IsBoolean()
   completed?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  inProgress?: boolean;
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
@@ -49,12 +56,12 @@ export class CreateTaskDto {
   @ApiPropertyOptional({ enum: Priority, default: 'MEDIUM' })
   @IsEnum(Priority)
   @IsOptional()
-  priority?: Priority = Priority.MEDIUM;
+  priority?: Priority;
 
   @ApiPropertyOptional({ enum: TaskStatus, default: 'TODO' })
   @IsEnum(TaskStatus)
   @IsOptional()
-  status?: TaskStatus = TaskStatus.TODO;
+  status?: TaskStatus;
 
   @ApiPropertyOptional({ example: '2024-12-31' })
   @IsDateString()
@@ -70,18 +77,18 @@ export class CreateTaskDto {
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  tags?: string[] = [];
+  tags?: string[];
 
   @ApiPropertyOptional({ default: 0 })
   @IsInt()
   @Min(0)
   @IsOptional()
-  position?: number = 0;
+  position?: number;
 
   @ApiPropertyOptional({ type: [CreateSubtaskDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSubtaskDto)
-  subtasks?: CreateSubtaskDto[] = [];
+  subtasks?: CreateSubtaskDto[];
 }

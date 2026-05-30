@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { User } from '@/types/auth.types';
+import type { NotificationPreferences } from '@/store/preferences.store';
 
 export interface UpdateProfilePayload {
   firstName?: string;
@@ -20,4 +21,14 @@ export const usersService = {
   /** Update current user's profile */
   updateMe: (payload: UpdateProfilePayload): Promise<User> =>
     api.patch<{ data: User }>('/users/me', payload).then((r) => r.data.data),
+
+  getNotificationPreferences: (): Promise<NotificationPreferences> =>
+    api
+      .get<{ data: NotificationPreferences }>('/users/me/notification-preferences')
+      .then((r) => r.data.data),
+
+  updateNotificationPreferences: (payload: Partial<NotificationPreferences>): Promise<NotificationPreferences> =>
+    api
+      .patch<{ data: NotificationPreferences }>('/users/me/notification-preferences', payload)
+      .then((r) => r.data.data),
 };

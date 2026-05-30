@@ -34,11 +34,16 @@ export class SchedulerService {
       },
       include: {
         project: { select: { id: true, name: true } },
+        assignee: { select: { id: true, notificationPrefs: true } },
+        creator: { select: { id: true, notificationPrefs: true } },
       },
     });
 
     for (const task of overdueTasks) {
       const targetUserId = task.assigneeId ?? task.creatorId;
+      const targetUser = task.assignee ?? task.creator;
+      const prefs = this.parseNotificationPrefs((targetUser as any)?.notificationPrefs);
+      if (!prefs.taskDue || !prefs.realtimeNotifications) continue;
       this.events.emitToUser(targetUserId, 'notification', {
         type: 'task_overdue',
         i18nKey: 'notification.taskOverdue',
@@ -59,8 +64,10 @@ export class SchedulerService {
     const now = new Date();
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const in23h = new Date(now.getTime() + 23 * 60 * 60 * 1000);
+    const in1h = new Date(now.getTime() + 60 * 60 * 1000);
+    const in0h = now;
 
-    const upcomingTasks = await this.prisma.task.findMany({
+    const upcomingTasks24h = await this.prisma.task.findMany({
       where: {
         deletedAt: null,
         status: { notIn: [TaskStatus.DONE] },
@@ -74,29 +81,53 @@ export class SchedulerService {
       },
     });
 
-    for (const task of upcomingTasks) {
+    const upcomingTasks1h = await this.prisma.task.findMany({
+      where: {
+        deletedAt: null,
+        status: { notIn: [TaskStatus.DONE] },
+        dueDate: { gte: in0h, lte: in1h },
+      },
+      include: {
+        project: { select: { id: true, name: true } },
+        assignee: { select: { id: true, email: true, firstName: true, notificationPrefs: true } },
+        creator: { select: { id: true, email: true, firstName: true, notificationPrefs: true } },
+      },
+    });
+
+    const dueReminders = [
+      ...upcomingTasks24h.map((task) => ({ task, window: '24h' as const })),
+      ...upcomingTasks1h.map((task) => ({ task, window: '1h' as const })),
+    ];
+
+    for (const entry of dueReminders) {
+      const task = entry.task;
       const targetUserId = task.assigneeId ?? task.creatorId;
       const targetUser = task.assignee ?? task.creator;
+      const prefs = this.parseNotificationPrefs((targetUser as any)?.notificationPrefs);
+      const shouldSendDue = entry.window === '24h' ? prefs.taskDue : prefs.taskDue && prefs.taskDue1h;
+      if (!shouldSendDue) continue;
 
       await this.prisma.notification.create({
         data: {
           userId: targetUserId,
           type: 'task_due_reminder',
           title: 'Task due reminder',
-          body: `${task.title} in ${task.project.name}`,
+          body: `${task.title} in ${task.project.name} (${entry.window})`,
         },
       });
 
-      this.events.emitToUser(targetUserId, 'notification', {
-        type: 'task_due_reminder',
-        i18nKey: 'notification.taskDueReminder',
-        i18nParams: { task: task.title, project: task.project.name },
-        taskId: task.id,
-        projectId: task.projectId,
-        createdAt: new Date().toISOString(),
-      });
+      if (prefs.realtimeNotifications) {
+        this.events.emitToUser(targetUserId, 'notification', {
+          type: 'task_due_reminder',
+          i18nKey: 'notification.taskDueReminder',
+          i18nParams: { task: task.title, project: task.project.name, window: entry.window },
+          taskId: task.id,
+          projectId: task.projectId,
+          createdAt: new Date().toISOString(),
+        });
+      }
 
-      if (targetUser?.email && task.dueDate) {
+      if (prefs.emailNotifications && targetUser?.email && task.dueDate) {
         const taskUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/projects/${task.projectId}?taskId=${task.id}`;
         try {
           await this.email.sendTaskReminderEmail({
@@ -114,7 +145,7 @@ export class SchedulerService {
         }
       }
 
-      this.logger.log(`Due reminder sent: task ${task.id} → user ${targetUserId}`);
+      this.logger.log(`Due reminder sent (${entry.window}): task ${task.id} → user ${targetUserId}`);
     }
   }
 
@@ -126,13 +157,16 @@ export class SchedulerService {
   async sendWeeklyDigest() {
     const users = await this.prisma.user.findMany({
       where: { isActive: true, deletedAt: null },
-      select: { id: true, email: true, firstName: true },
+      select: { id: true, email: true, firstName: true, notificationPrefs: true },
     });
 
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     for (const user of users) {
+      const prefs = this.parseNotificationPrefs((user as any).notificationPrefs);
+      if (!prefs.weekly) continue;
+
       const [tasksCompleted, tasksOverdue, tasksCreated] = await Promise.all([
         this.prisma.task.count({
           where: {
@@ -170,18 +204,20 @@ export class SchedulerService {
         },
       });
 
-      this.events.emitToUser(user.id, 'notification', {
-        type: 'weekly_digest',
-        i18nKey: 'notification.weeklyDigest',
-        i18nParams: {
-          created: tasksCreated,
-          completed: tasksCompleted,
-          overdue: tasksOverdue,
-        },
-        createdAt: new Date().toISOString(),
-      });
+      if (prefs.realtimeNotifications) {
+        this.events.emitToUser(user.id, 'notification', {
+          type: 'weekly_digest',
+          i18nKey: 'notification.weeklyDigest',
+          i18nParams: {
+            created: tasksCreated,
+            completed: tasksCompleted,
+            overdue: tasksOverdue,
+          },
+          createdAt: new Date().toISOString(),
+        });
+      }
 
-      if (user.email) {
+      if (prefs.emailNotifications && user.email) {
         const dashboardUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/dashboard`;
         try {
           await this.email.sendWeeklyDigestEmail({
@@ -202,5 +238,18 @@ export class SchedulerService {
     }
 
     this.logger.log(`Weekly digest sent to ${users.length} users`);
+  }
+
+  private parseNotificationPrefs(raw: unknown) {
+    const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    return {
+      taskAssigned: src.taskAssigned !== false,
+      taskDue: src.taskDue !== false,
+      taskDue1h: src.taskDue1h === true,
+      projectUpdates: src.projectUpdates !== false,
+      weekly: src.weekly !== false,
+      emailNotifications: src.emailNotifications !== false,
+      realtimeNotifications: src.realtimeNotifications !== false,
+    };
   }
 }

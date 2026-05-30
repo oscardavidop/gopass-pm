@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   X, Pencil, Trash2, Calendar, Flag, Tag, MessageSquare,
-  CheckSquare, Square, Plus, Clock, ChevronRight, Loader2, Save, Sparkles,
+  CheckSquare, Plus, Clock, ChevronRight, Loader2, Save, Sparkles, Circle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -107,8 +107,18 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   const taskPresence = useCollaborationStore((state) => (task ? state.taskPresenceByProject[task.projectId]?.[task.id] : undefined));
   const viewers = taskPresence?.viewing ?? [];
   const editors = taskPresence?.editing ?? [];
+  const presenceUsers = Array.from(new Map(
+    [...viewers, ...editors.map((entry) => entry.user)].map((user) => [user.id, user]),
+  ).values());
   const titleEditor = editors.find((entry) => entry.field === 'title');
   const descriptionEditor = editors.find((entry) => entry.field === 'description');
+  const dueDateEditor = editors.find((entry) => entry.field === 'dueDate');
+  const firstPresenceEditor = editors[0]?.user;
+  const headerPresenceText = editors.length > 0
+    ? t('task.liveEditingBy', { defaultValue: '{{name}} is editing', name: editors[0].user.firstName })
+    : viewers.length > 0
+      ? t('task.liveViewingBy', { defaultValue: '{{name}} is viewing this task', name: viewers[0].firstName })
+      : '';
 
   useEffect(() => {
     if (!socket || !task || !taskId) return;
@@ -119,26 +129,27 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
   }, [socket, task, taskId]);
 
   const statusOptions: PremiumSelectOption<TaskStatus>[] = [
-    { value: 'TODO', label: 'To do' },
-    { value: 'IN_PROGRESS', label: 'In progress' },
-    { value: 'REVIEW', label: 'Review' },
-    { value: 'DONE', label: 'Done' },
+    { value: 'TODO', label: t('task.status.todo', { defaultValue: 'To do' }) },
+    { value: 'IN_PROGRESS', label: t('task.status.inProgress', { defaultValue: 'In progress' }) },
+    { value: 'REVIEW', label: t('task.status.review', { defaultValue: 'Review' }) },
+    { value: 'DONE', label: t('task.status.done', { defaultValue: 'Done' }) },
   ];
 
   const priorityOptions: PremiumSelectOption<Priority>[] = [
-    { value: 'LOW', label: 'Low' },
-    { value: 'MEDIUM', label: 'Medium' },
-    { value: 'HIGH', label: 'High' },
-    { value: 'CRITICAL', label: 'Critical', badge: '!' },
+    { value: 'LOW', label: t('task.priority.low', { defaultValue: 'Low' }) },
+    { value: 'MEDIUM', label: t('task.priority.medium', { defaultValue: 'Medium' }) },
+    { value: 'HIGH', label: t('task.priority.high', { defaultValue: 'High' }) },
+    { value: 'CRITICAL', label: t('task.priority.critical', { defaultValue: 'Critical' }), badge: '!' },
   ];
 
   useEffect(() => {
     if (!task) return;
-    setTitleDraft(task.title ?? '');
-    setDescDraft(task.description ?? '');
+    if (!draftDirty) {
+      setTitleDraft(task.title ?? '');
+      setDescDraft(task.description ?? '');
+    }
     setDueDateDraft(task.dueDate ? task.dueDate.slice(0, 10) : '');
-    setDraftDirty(false);
-  }, [task?.id]);
+  }, [task?.id, task?.updatedAt, task?.dueDate, draftDirty]);
 
   const persistDraft = useCallback(async () => {
     if (!task || !draftDirty) return;
@@ -266,13 +277,34 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
           >
             {/* ── header ── */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0 bg-card/90 backdrop-blur-md">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <ChevronRight className="h-3.5 w-3.5" />
-                <span>Task detail</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
-                  <Sparkles className="h-3 w-3" />
-                  Live
-                </span>
+              <div className="min-w-0 space-y-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>{t('task.detailTitle', { defaultValue: 'Task detail' })}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
+                    <Sparkles className="h-3 w-3" />
+                    {t('task.liveBadge', { defaultValue: 'Live' })}
+                  </span>
+                </div>
+                {(presenceUsers.length > 0 || editors.length > 0) && (
+                  <div className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <AvatarGroup
+                      users={presenceUsers.map((user) => ({
+                        id: user.id,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        avatar: user.avatar,
+                      }))}
+                      size="xs"
+                      max={4}
+                    />
+                    {headerPresenceText && (
+                      <span style={{ color: firstPresenceEditor?.collaborationColor ?? undefined }}>
+                        {headerPresenceText}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 {task && onEdit && (
@@ -326,11 +358,15 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                           setDraftDirty(true);
                         }}
                         className="w-full bg-transparent text-lg font-semibold leading-snug outline-none border border-transparent rounded-lg px-1.5 py-1 hover:border-border/60 focus:border-primary/40"
-                        placeholder="Task title"
+                        style={titleEditor?.user?.collaborationColor ? {
+                          borderColor: `${titleEditor.user.collaborationColor}66`,
+                          backgroundColor: `${titleEditor.user.collaborationColor}14`,
+                        } : undefined}
+                        placeholder={t('task.titlePlaceholder', { defaultValue: 'Task title' })}
                       />
                       {titleEditor && (
-                        <span className="text-[11px] text-muted-foreground">
-                          Editing by {titleEditor.user.firstName}
+                        <span className="text-[11px]" style={{ color: titleEditor.user.collaborationColor ?? undefined }}>
+                          {t('task.editingBy', { defaultValue: 'Editing by {{name}}', name: titleEditor.user.firstName })}
                         </span>
                       )}
                       <button
@@ -341,14 +377,14 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
                             : 'border-border text-muted-foreground hover:bg-accent',
                         )}
-                        title="Toggle autosave"
+                        title={t('task.toggleAutosave', { defaultValue: 'Toggle autosave' })}
                       >
-                        Autosave {autosave ? 'on' : 'off'}
+                        {t('task.autosave', { defaultValue: 'Autosave' })} {autosave ? t('common.on', { defaultValue: 'on' }) : t('common.off', { defaultValue: 'off' })}
                       </button>
                     </div>
                     {descriptionEditor && (
-                      <span className="text-[11px] text-muted-foreground">
-                        Editing by {descriptionEditor.user.firstName}
+                      <span className="text-[11px]" style={{ color: descriptionEditor.user.collaborationColor ?? undefined }}>
+                        {t('task.editingBy', { defaultValue: 'Editing by {{name}}', name: descriptionEditor.user.firstName })}
                       </span>
                     )}
                     <div
@@ -360,9 +396,14 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         if (!socket || !task) return;
                         socket.emit('task:editing', { projectId: task.projectId, taskId: task.id, active: false, field: 'description' });
                       }}
+                      className={cn('rounded-lg transition-colors', descriptionEditor && 'border')}
+                      style={descriptionEditor?.user?.collaborationColor ? {
+                        borderColor: `${descriptionEditor.user.collaborationColor}66`,
+                        backgroundColor: `${descriptionEditor.user.collaborationColor}12`,
+                      } : undefined}
                     >
                       <RichTextEditor
-                        label="Description"
+                        label={t('task.description', { defaultValue: 'Description' })}
                         value={descDraft}
                         onChange={(nextValue) => {
                           setDescDraft(nextValue);
@@ -370,53 +411,48 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         }}
                         maxLength={5000}
                         minHeightClassName="min-h-[140px]"
-                        placeholder="Add context, acceptance criteria or implementation notes..."
+                        placeholder={t('task.descriptionPlaceholder', { defaultValue: 'Add context, acceptance criteria or implementation notes...' })}
                       />
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleImproveDescription} isLoading={improveDescriptionAi.isPending}>
-                        Improve description
+                        {t('ai.improveDescription', { defaultValue: 'Improve description' })}
                       </Button>
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleGenerateSubtasks} isLoading={generateSubtasksAi.isPending}>
-                        Generate subtasks
+                        {t('ai.generateSubtasks', { defaultValue: 'Generate subtasks' })}
                       </Button>
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleSuggestPriority} isLoading={suggestPriorityAi.isPending}>
-                        Suggest priority
+                        {t('ai.suggestPriority', { defaultValue: 'Suggest priority' })}
                       </Button>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{autosave ? 'Changes are saved automatically' : 'Manual save mode'}</span>
-                      {(viewers.length > 0 || editors.length > 0) && (
-                        <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-                          <AvatarGroup
-                            users={[...viewers, ...editors.map((entry) => entry.user)].map((user) => ({
-                              id: user.id,
-                              firstName: user.firstName,
-                              lastName: user.lastName,
-                              avatar: user.avatar,
-                            }))}
-                            size="xs"
-                            max={4}
-                          />
-                          {editors.length > 0 ? `${editors[0].user.firstName} is editing...` : `${viewers[0].firstName} is viewing this task`}
-                        </span>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2"
-                        onClick={() => persistDraft()}
-                        disabled={updateTask.isPending || !draftDirty || titleDraft.trim().length < 2}
-                      >
-                        {updateTask.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                        Save
-                      </Button>
+                      <span className="text-muted-foreground">{autosave ? t('task.autosaveHint', { defaultValue: 'Changes are saved automatically' }) : t('task.manualSaveHint', { defaultValue: 'Manual save mode' })}</span>
+
+                      {
+                        autosave  ? (
+                          <Badge variant="success" className="rounded-full px-2 py-1">
+                            <CheckSquare className="h-3.5 w-3.5" />
+                            {t('common.saved', { defaultValue: 'Saved' })}
+                          </Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2"
+                            onClick={() => persistDraft()}
+                            disabled={updateTask.isPending || !draftDirty || titleDraft.trim().length < 2}
+                          >
+                            {updateTask.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                            {t('common.save', { defaultValue: 'Save' })}
+                          </Button>
+                        )
+                      }
                     </div>
                   </div>
 
                   {/* Meta grid */}
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-background/60 border border-border text-sm">
-                    <MetaRow label="Status">
+                    <MetaRow label={t('task.statusLabel', { defaultValue: 'Status' })}>
                       <div className="relative flex items-center">
                         {updateTask.isPending && (
                           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground absolute -left-4" />
@@ -427,13 +463,13 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                           onValueChange={(value) => updateTask.mutate({ id: task.id, data: { status: value as TaskStatus } })}
                           options={statusOptions}
                           size="sm"
-                          ariaLabel="Status"
+                          ariaLabel={t('task.statusLabel', { defaultValue: 'Status' })}
                           triggerClassName="h-7 min-w-[132px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-xl"
                         />
                       </div>
                     </MetaRow>
 
-                    <MetaRow label="Priority">
+                    <MetaRow label={t('task.priorityLabel', { defaultValue: 'Priority' })}>
                       <div className="relative flex items-center">
                         <PremiumSelect
                           value={task.priority}
@@ -441,14 +477,14 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                           onValueChange={(value) => updateTask.mutate({ id: task.id, data: { priority: value as Priority } })}
                           options={priorityOptions}
                           size="sm"
-                          ariaLabel="Priority"
+                          ariaLabel={t('task.priorityLabel', { defaultValue: 'Priority' })}
                           triggerClassName="h-7 min-w-[126px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-xl"
                         />
                       </div>
                     </MetaRow>
 
                     {(task as any).assignee && (
-                      <MetaRow label="Assignee">
+                      <MetaRow label={t('task.assigneeLabel', { defaultValue: 'Assignee' })}>
                         <div className="flex items-center gap-1.5">
                           <Avatar
                             firstName={(task as any).assignee.firstName}
@@ -460,7 +496,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                       </MetaRow>
                     )}
 
-                    <MetaRow label="Due date">
+                    <MetaRow label={t('task.dueDateLabel', { defaultValue: 'Due date' })}>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="h-3.5 w-3.5" />
                         <input
@@ -478,11 +514,20 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                             saveDueDate(e.target.value);
                           }}
                           className="h-7 rounded-md border border-input bg-background/70 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                          style={dueDateEditor?.user?.collaborationColor ? {
+                            borderColor: `${dueDateEditor.user.collaborationColor}66`,
+                            backgroundColor: `${dueDateEditor.user.collaborationColor}14`,
+                          } : undefined}
                         />
                       </div>
+                      {dueDateEditor && (
+                        <p className="mt-1 text-[11px]" style={{ color: dueDateEditor.user.collaborationColor ?? undefined }}>
+                          {t('task.editingBy', { defaultValue: 'Editing by {{name}}', name: dueDateEditor.user.firstName })}
+                        </p>
+                      )}
                     </MetaRow>
 
-                    <MetaRow label="Created">
+                    <MetaRow label={t('task.createdLabel', { defaultValue: 'Created' })}>
                       <div className="flex items-center gap-1 text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" />
                         <span>{timeAgo((task as any).createdAt)}</span>
@@ -493,7 +538,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                   {/* Tags */}
                   {(task as any).tags?.length > 0 && (
                     <div>
-                      <SectionLabel icon={<Tag className="h-3.5 w-3.5" />}>Tags</SectionLabel>
+                      <SectionLabel icon={<Tag className="h-3.5 w-3.5" />}>{t('task.tags', { defaultValue: 'Tags' })}</SectionLabel>
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {(task as any).tags.map((tag: string) => (
                           <span key={tag} className="text-xs bg-secondary/60 text-secondary-foreground px-2.5 py-0.5 rounded-full">
@@ -519,10 +564,10 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                           )}
                         >
                           {tab === 'comments'
-                            ? `Comments (${(task as any).comments?.length ?? 0})`
+                            ? t('task.commentsTab', { defaultValue: 'Comments ({{count}})', count: (task as any).comments?.length ?? 0 })
                             : tab === 'activity'
-                            ? `Activity (${(task as any).activityLogs?.length ?? 0})`
-                            : 'Subtasks'}
+                            ? t('task.activityTab', { defaultValue: 'Activity ({{count}})', count: (task as any).activityLogs?.length ?? 0 })
+                            : t('task.subtasksTab', { defaultValue: 'Subtasks' })}
                         </button>
                       ))}
                     </div>
@@ -534,8 +579,14 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                         onCreate={async (title) => {
                           await addSubtask.mutateAsync({ title });
                         }}
-                        onToggle={async (subtaskId, completed) => {
-                          await updateSubtask.mutateAsync({ subtaskId, data: { completed } });
+                          onToggle={async (subtaskId, state) => {
+                            await updateSubtask.mutateAsync({
+                              subtaskId,
+                              data: {
+                                completed: state === 'DONE',
+                                inProgress: state === 'IN_PROGRESS',
+                              },
+                            });
                         }}
                         onRename={async (subtaskId, title) => {
                           await updateSubtask.mutateAsync({ subtaskId, data: { title } });
@@ -599,7 +650,7 @@ function SubtasksPanel({
 }: {
   task: Task;
   onCreate: (title: string) => Promise<void>;
-  onToggle: (subtaskId: string, completed: boolean) => Promise<void>;
+  onToggle: (subtaskId: string, state: 'TODO' | 'IN_PROGRESS' | 'DONE') => Promise<void>;
   onRename: (subtaskId: string, title: string) => Promise<void>;
   onDelete: (subtaskId: string) => Promise<void>;
   onReorder: (orderedIds: string[]) => Promise<void>;
@@ -609,9 +660,23 @@ function SubtasksPanel({
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const { t } = useTranslation();
 
   const items = task.subtasks ?? [];
   const done = items.filter((item) => item.completed).length;
+
+  const getState = (item: (typeof items)[number]) => {
+    if (item.completed) return 'DONE' as const;
+    if (item.inProgress) return 'IN_PROGRESS' as const;
+    return 'TODO' as const;
+  };
+
+  const getNextState = (item: (typeof items)[number]) => {
+    const state = getState(item);
+    if (state === 'TODO') return 'IN_PROGRESS' as const;
+    if (state === 'IN_PROGRESS') return 'DONE' as const;
+    return 'TODO' as const;
+  };
 
   const addItem = async () => {
     const title = input.trim();
@@ -636,7 +701,7 @@ function SubtasksPanel({
       {items.length > 0 && (
         <>
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{done}/{items.length} completed</span>
+            <span>{t('task.subtasksCompleted', { defaultValue: '{{done}}/{{total}} completed', done, total: items.length })}</span>
             <span>{Math.round((done / items.length) * 100)}%</span>
           </div>
           <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-secondary">
@@ -658,13 +723,20 @@ function SubtasksPanel({
           >
             <button
               disabled={isBusy}
-              onClick={() => onToggle(item.id, !item.completed)}
+              onClick={() => onToggle(item.id, getNextState(item))}
               className="shrink-0"
+              title={getState(item) === 'TODO'
+                ? t('task.subtaskMarkInProgress', { defaultValue: 'Mark as in progress' })
+                : getState(item) === 'IN_PROGRESS'
+                  ? t('task.subtaskMarkDone', { defaultValue: 'Mark as done' })
+                  : t('task.subtaskResetTodo', { defaultValue: 'Reset to to do' })}
             >
-              {item.completed ? (
+              {getState(item) === 'DONE' ? (
                 <CheckSquare className="h-4 w-4 text-emerald-400" />
+              ) : getState(item) === 'IN_PROGRESS' ? (
+                <Clock className="h-4 w-4 text-blue-400" />
               ) : (
-                <Square className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+                <Circle className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
               )}
             </button>
 
@@ -700,18 +772,33 @@ function SubtasksPanel({
                   setEditingId(item.id);
                   setEditingTitle(item.title);
                 }}
-                className={cn('flex-1 text-left text-sm', item.completed && 'line-through text-muted-foreground')}
+                className={cn('flex-1 text-left text-sm', getState(item) === 'DONE' && 'line-through text-muted-foreground')}
               >
                 {item.title}
               </button>
             )}
+
+            <span
+              className={cn(
+                'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                getState(item) === 'DONE' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+                getState(item) === 'IN_PROGRESS' && 'border-blue-500/30 bg-blue-500/10 text-blue-400',
+                getState(item) === 'TODO' && 'border-border/70 bg-background/70 text-muted-foreground',
+              )}
+            >
+              {getState(item) === 'DONE'
+                ? t('task.status.done', { defaultValue: 'Done' })
+                : getState(item) === 'IN_PROGRESS'
+                  ? t('task.status.inProgress', { defaultValue: 'In progress' })
+                  : t('task.status.todo', { defaultValue: 'To do' })}
+            </span>
 
             <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 disabled={isBusy || index === 0}
                 onClick={() => moveItem(index, 'up')}
                 className="rounded p-1 text-xs text-muted-foreground hover:bg-accent"
-                title="Move up"
+                title={t('task.moveUp', { defaultValue: 'Move up' })}
               >
                 ↑
               </button>
@@ -719,7 +806,7 @@ function SubtasksPanel({
                 disabled={isBusy || index === items.length - 1}
                 onClick={() => moveItem(index, 'down')}
                 className="rounded p-1 text-xs text-muted-foreground hover:bg-accent"
-                title="Move down"
+                title={t('task.moveDown', { defaultValue: 'Move down' })}
               >
                 ↓
               </button>
@@ -727,7 +814,7 @@ function SubtasksPanel({
                 disabled={isBusy}
                 onClick={() => onDelete(item.id)}
                 className="rounded p-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                title="Delete"
+                title={t('common.delete', { defaultValue: 'Delete' })}
               >
                 ×
               </button>
@@ -753,11 +840,11 @@ function SubtasksPanel({
                   if (e.key === 'Enter') addItem();
                   if (e.key === 'Escape') { setAdding(false); setInput(''); }
                 }}
-                placeholder="Subtask title…"
+                placeholder={t('task.subtaskTitlePlaceholder', { defaultValue: 'Subtask title...' })}
                 className="flex-1 rounded-md border border-input bg-background/60 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <Button size="sm" onClick={addItem} disabled={!input.trim() || isBusy}>Add</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setInput(''); }}>Cancel</Button>
+              <Button size="sm" onClick={addItem} disabled={!input.trim() || isBusy}>{t('common.add', { defaultValue: 'Add' })}</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setInput(''); }}>{t('common.cancel', { defaultValue: 'Cancel' })}</Button>
             </div>
           </motion.div>
         ) : (
@@ -766,7 +853,7 @@ function SubtasksPanel({
             className="mt-1 flex items-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-primary"
           >
             <Plus className="h-3.5 w-3.5" />
-            Add subtask
+            {t('task.addSubtask', { defaultValue: 'Add subtask' })}
           </button>
         )}
       </AnimatePresence>
@@ -774,7 +861,7 @@ function SubtasksPanel({
       {items.length === 0 && !adding && (
         <div className="py-6 text-center text-sm text-muted-foreground">
           <CheckSquare className="mx-auto mb-2 h-8 w-8 opacity-30" />
-          No subtasks yet
+          {t('task.noSubtasksYet', { defaultValue: 'No subtasks yet' })}
         </div>
       )}
     </div>
@@ -794,6 +881,14 @@ const PRIORITY_LABELS: Record<string, string> = {
   CRITICAL: 'Critical',
 };
 
+function getStatusLabel(status: string) {
+  return translateByKey(`task.status.${status.toLowerCase()}`, undefined, STATUS_LABELS[status] ?? status);
+}
+
+function getPriorityLabel(priority: string) {
+  return translateByKey(`task.priority.${priority.toLowerCase()}`, undefined, PRIORITY_LABELS[priority] ?? priority);
+}
+
 function describeActivityLog(log: any): React.ReactNode {
   const old = log.oldValue ?? {};
   const next = log.newValue ?? {};
@@ -802,16 +897,16 @@ function describeActivityLog(log: any): React.ReactNode {
     const parts: string[] = [];
     if (old.status) {
       parts.push(
-        `changed status from "${STATUS_LABELS[old.status] ?? old.status}" to "${STATUS_LABELS[next.status] ?? next.status}"`,
+        translateByKey('task.activity.changedStatus', { from: getStatusLabel(old.status), to: getStatusLabel(next.status) }, 'changed status from "{{from}}" to "{{to}}"'),
       );
     }
     if (old.priority) {
       parts.push(
-        `changed priority from "${PRIORITY_LABELS[old.priority] ?? old.priority}" to "${PRIORITY_LABELS[next.priority] ?? next.priority}"`,
+        translateByKey('task.activity.changedPriority', { from: getPriorityLabel(old.priority), to: getPriorityLabel(next.priority) }, 'changed priority from "{{from}}" to "{{to}}"'),
       );
     }
     if (old.assigneeId !== undefined) {
-      parts.push('changed the assignee');
+      parts.push(translateByKey('task.activity.changedAssignee', undefined, 'changed the assignee'));
     }
     if (parts.length > 0) {
       return (
@@ -825,22 +920,23 @@ function describeActivityLog(log: any): React.ReactNode {
         </span>
       );
     }
-    return <span className="text-muted-foreground">updated this task</span>;
+    return <span className="text-muted-foreground">{translateByKey('task.activity.updatedTask', undefined, 'updated this task')}</span>;
   }
 
-  if (log.action === 'CREATED') return <span className="text-muted-foreground">created this task</span>;
-  if (log.action === 'DELETED') return <span className="text-muted-foreground">deleted this task</span>;
-  if (log.action === 'COMMENT_ADDED') return <span className="text-muted-foreground">added a comment</span>;
+  if (log.action === 'CREATED') return <span className="text-muted-foreground">{translateByKey('task.activity.createdTask', undefined, 'created this task')}</span>;
+  if (log.action === 'DELETED') return <span className="text-muted-foreground">{translateByKey('task.activity.deletedTask', undefined, 'deleted this task')}</span>;
+  if (log.action === 'COMMENT_ADDED') return <span className="text-muted-foreground">{translateByKey('task.activity.addedComment', undefined, 'added a comment')}</span>;
 
   return <span className="text-muted-foreground lowercase">{log.action.replace(/_/g, ' ')}</span>;
 }
 
 function ActivityPanel({ logs }: { logs: any[] }) {
+  const { t } = useTranslation();
   if (!logs.length) {
     return (
       <div className="text-center py-8 text-muted-foreground text-sm">
         <Clock className="h-8 w-8 mx-auto mb-2 opacity-30" />
-        No activity recorded
+        {t('task.noActivityRecorded', { defaultValue: 'No activity recorded' })}
       </div>
     );
   }
@@ -876,6 +972,7 @@ interface CommentsPanelProps {
 }
 
 function CommentsPanel({ comments, commentText, onCommentChange, onCommentSubmit, isSubmitting }: CommentsPanelProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       {/* Thread */}
@@ -883,7 +980,7 @@ function CommentsPanel({ comments, commentText, onCommentChange, onCommentSubmit
         {comments.length === 0 && (
           <div className="text-center py-6 text-muted-foreground text-sm">
             <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            No comments yet. Start the conversation!
+            {t('task.noCommentsYet', { defaultValue: 'No comments yet. Start the conversation!' })}
           </div>
         )}
         {comments.map((comment: any) => (
@@ -916,7 +1013,7 @@ function CommentsPanel({ comments, commentText, onCommentChange, onCommentSubmit
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onCommentSubmit();
           }}
-          placeholder="Write a comment… (Ctrl+Enter to send)"
+          placeholder={t('task.commentPlaceholder', { defaultValue: 'Write a comment... (Ctrl+Enter to send)' })}
           rows={2}
           className="flex-1 text-sm bg-background/60 border border-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder:text-muted-foreground"
         />
@@ -926,7 +1023,7 @@ function CommentsPanel({ comments, commentText, onCommentChange, onCommentSubmit
           disabled={!commentText.trim() || isSubmitting}
           className="self-end"
         >
-          {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Post'}
+          {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('task.postComment', { defaultValue: 'Post' })}
         </Button>
       </div>
     </div>

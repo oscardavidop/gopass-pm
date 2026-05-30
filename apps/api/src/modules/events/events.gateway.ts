@@ -41,14 +41,25 @@ interface TaskPresenceEntry {
 }
 
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: {
+    origin: (origin, callback) => {
+      const allowed = (process.env.CORS_ORIGINS || '').split(',').map((v) => v.trim()).filter(Boolean);
+      if (!origin || allowed.length === 0 || allowed.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('CORS blocked'));
+    },
+    credentials: true,
+  },
   namespace: '/events',
 })
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(EventsGateway.name);
+  private readonly eventRateMap = new Map<string, number[]>();
 
   /** projectId → Map<socketId, PresenceUser> */
   private presenceRooms = new Map<string, Map<string, PresenceUser>>();
@@ -115,6 +126,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           user: leaving,
           timestamp: new Date().toISOString(),
         });
+        if (members.size === 0) this.presenceRooms.delete(projectId);
       }
     });
 
@@ -123,23 +135,34 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (entries.has(client.id)) {
           entries.delete(client.id);
           this._broadcastTaskPresence(projectId, taskId);
+          if (entries.size === 0) taskMap.delete(taskId);
         }
       });
+      if (taskMap.size === 0) this.taskPresenceRooms.delete(projectId);
+    });
+
+    this.eventRateMap.forEach((_, key) => {
+      if (key.startsWith(`${client.id}:`)) this.eventRateMap.delete(key);
     });
   }
 
   @SubscribeMessage('join:project')
-  handleJoinProject(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+  async handleJoinProject(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+    if (!this.allowEvent(client.id, 'join:project', 40, 60_000)) return;
+    if (!(await this.isProjectMember(client, projectId))) return;
     client.join(`project:${projectId}`);
   }
 
   @SubscribeMessage('leave:project')
-  handleLeaveProject(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+  async handleLeaveProject(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+    if (!(await this.isProjectMember(client, projectId))) return;
     client.leave(`project:${projectId}`);
   }
 
   @SubscribeMessage('presence:join')
-  handlePresenceJoin(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+  async handlePresenceJoin(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+    if (!this.allowEvent(client.id, 'presence:join', 30, 60_000)) return;
+    if (!(await this.isProjectMember(client, projectId))) return;
     client.join(`project:${projectId}`);
     if (!this.presenceRooms.has(projectId)) this.presenceRooms.set(projectId, new Map());
     const user = client.data.user;
@@ -164,7 +187,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('presence:heartbeat')
-  handlePresenceHeartbeat(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+  async handlePresenceHeartbeat(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+    if (!(await this.isProjectMember(client, projectId))) return;
     const room = this.presenceRooms.get(projectId);
     const presence = room?.get(client.id);
     if (presence) {
@@ -176,7 +200,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('presence:leave')
-  handlePresenceLeave(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+  async handlePresenceLeave(@ConnectedSocket() client: Socket, @MessageBody() projectId: string) {
+    if (!(await this.isProjectMember(client, projectId))) return;
     client.leave(`project:${projectId}`);
     const leaving = this.presenceRooms.get(projectId)?.get(client.id);
     this.presenceRooms.get(projectId)?.delete(client.id);
@@ -189,29 +214,66 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('task:viewing')
-  handleTaskViewing(
+  async handleTaskViewing(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { projectId: string; taskId: string; active?: boolean },
   ) {
+    if (!(await this.hasTaskAccess(client, payload.projectId, payload.taskId))) return;
     const { projectId, taskId, active = true } = payload;
     this._setTaskPresence(client, projectId, taskId, active ? 'viewing' : null);
   }
 
   @SubscribeMessage('task:editing')
-  handleTaskEditing(
+  async handleTaskEditing(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { projectId: string; taskId: string; active: boolean; field?: string },
   ) {
+    if (!this.allowEvent(client.id, 'task:editing', 120, 60_000)) return;
+    if (!(await this.hasTaskAccess(client, payload.projectId, payload.taskId))) return;
     const { projectId, taskId, active, field } = payload;
     this._setTaskPresence(client, projectId, taskId, active ? 'editing' : null, field);
   }
 
   @SubscribeMessage('task:presence:leave')
-  handleTaskPresenceLeave(
+  async handleTaskPresenceLeave(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { projectId: string; taskId: string },
   ) {
+    if (!(await this.hasTaskAccess(client, payload.projectId, payload.taskId))) return;
     this._setTaskPresence(client, payload.projectId, payload.taskId, null);
+  }
+
+  private allowEvent(socketId: string, eventName: string, limit: number, ttlMs: number) {
+    const now = Date.now();
+    const key = `${socketId}:${eventName}`;
+    const bucket = (this.eventRateMap.get(key) ?? []).filter((ts) => ts > now - ttlMs);
+    if (bucket.length >= limit) return false;
+    bucket.push(now);
+    this.eventRateMap.set(key, bucket);
+    return true;
+  }
+
+  private async isProjectMember(client: Socket, projectId: string) {
+    const userId = client.data.userId as string | undefined;
+    if (!userId || !projectId) return false;
+
+    const member = await this.prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+      select: { id: true },
+    });
+
+    return !!member;
+  }
+
+  private async hasTaskAccess(client: Socket, projectId: string, taskId: string) {
+    if (!(await this.isProjectMember(client, projectId))) return false;
+
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, projectId, deletedAt: null },
+      select: { id: true },
+    });
+
+    return !!task;
   }
 
   private _broadcastPresence(projectId: string) {
@@ -238,15 +300,27 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const projectMap = this.taskPresenceRooms.get(projectId)!;
     if (!projectMap.has(taskId)) projectMap.set(taskId, new Map());
     const taskMap = projectMap.get(taskId)!;
+    const previous = taskMap.get(client.id);
 
     if (mode === null) {
+      if (!previous) return;
       taskMap.delete(client.id);
-      this._broadcastTaskPresence(projectId, taskId);
+      this._broadcastTaskPresence(projectId, taskId, client.id);
       return;
     }
 
     const user = client.data.user as TaskPresenceUser | undefined;
     if (!user) return;
+
+    // Skip no-op updates to avoid noisy duplicate events/re-renders on clients.
+    if (
+      previous &&
+      previous.mode === mode &&
+      (previous.field ?? null) === (field ?? null) &&
+      previous.user.id === user.id
+    ) {
+      return;
+    }
 
     taskMap.set(client.id, {
       user,
@@ -256,10 +330,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       updatedAt: Date.now(),
     });
 
-    this._broadcastTaskPresence(projectId, taskId);
+    this._broadcastTaskPresence(projectId, taskId, client.id);
   }
 
-  private _broadcastTaskPresence(projectId: string, taskId: string) {
+  private _broadcastTaskPresence(projectId: string, taskId: string, excludeSocketId?: string) {
     const entries = Array.from(this.taskPresenceRooms.get(projectId)?.get(taskId)?.values() ?? []);
     const viewing = entries
       .filter((entry) => entry.mode === 'viewing')
@@ -268,7 +342,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .filter((entry) => entry.mode === 'editing')
       .map((entry) => ({ user: entry.user, field: entry.field }));
 
-    this.server.to(`project:${projectId}`).emit('task.presence', {
+    const room = this.server.to(`project:${projectId}`);
+    const target = excludeSocketId ? room.except(excludeSocketId) : room;
+
+    target.emit('task.presence', {
       projectId,
       taskId,
       viewing,
@@ -276,14 +353,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       timestamp: new Date().toISOString(),
     });
 
-    this.server.to(`project:${projectId}`).emit('task.viewing', {
+    target.emit('task.viewing', {
       projectId,
       taskId,
       users: viewing,
       timestamp: new Date().toISOString(),
     });
 
-    this.server.to(`project:${projectId}`).emit('task.editing', {
+    target.emit('task.editing', {
       projectId,
       taskId,
       users: editing,
@@ -343,6 +420,15 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       projectId,
       project,
       actor,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  emitProjectDeleted(projectId: string, data?: { projectId: string; projectName?: string; actor?: any }) {
+    this.server.to(`project:${projectId}`).emit('project.deleted', {
+      projectId,
+      projectName: data?.projectName,
+      actor: data?.actor,
       timestamp: new Date().toISOString(),
     });
   }

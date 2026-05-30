@@ -6,8 +6,11 @@ import { detectBrowserLocale, normalizeLocale } from '@/i18n/locale';
 export interface NotificationPreferences {
   taskAssigned: boolean;
   taskDue: boolean;
+  taskDue1h: boolean;
   projectUpdates: boolean;
   weekly: boolean;
+  emailNotifications: boolean;
+  realtimeNotifications: boolean;
 }
 
 interface PreferencesState {
@@ -25,8 +28,11 @@ export const usePreferencesStore = create<PreferencesState>()(
       notifications: {
         taskAssigned:   true,
         taskDue:        true,
-        projectUpdates: false,
+        taskDue1h:      false,
+        projectUpdates: true,
         weekly:         true,
+        emailNotifications: true,
+        realtimeNotifications: true,
       },
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
       language: normalizeLocale(detectBrowserLocale()),

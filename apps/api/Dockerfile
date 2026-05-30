@@ -8,6 +8,7 @@ RUN npm ci
 COPY . .
 RUN npx prisma generate
 RUN npm run build
+RUN npm prune --omit=dev
 
 # --- Production image ---
 FROM node:20-alpine AS runner
@@ -15,6 +16,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist

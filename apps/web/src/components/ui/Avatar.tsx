@@ -3,12 +3,12 @@ import * as AvatarPrimitive from '@radix-ui/react-avatar';
 import { cn } from '@/utils/cn';
 
 const SIZES = {
-  xs: 'h-5 w-5 text-[9px]',
-  sm: 'h-7 w-7 text-[11px]',
-  md: 'h-8 w-8 text-xs',
-  lg: 'h-10 w-10 text-sm',
-  xl: 'h-12 w-12 text-base',
-  '2xl': 'h-16 w-16 text-lg',
+  xs: 'h-6 w-6 text-[10px]',
+  sm: 'h-8 w-8 text-xs',
+  md: 'h-10 w-10 text-sm',
+  lg: 'h-12 w-12 text-base',
+  xl: 'h-14 w-14 text-lg',
+  '2xl': 'h-16 w-16 text-xl',
 };
 
 type AvatarSize = keyof typeof SIZES;
@@ -19,32 +19,35 @@ interface AvatarProps {
   lastName?: string;
   size?: AvatarSize;
   className?: string;
-  /** Show green online indicator dot */
   online?: boolean;
-  /** Custom fallback color — defaults to indigo palette based on initials */
   color?: string | null;
 }
 
+// Lógica de iniciales mejorada para evitar undefined
 function getInitials(firstName?: string, lastName?: string): string {
-  const f = (firstName?.[0] ?? '').toUpperCase();
-  const l = (lastName?.[0] ?? '').toUpperCase();
-  return f + l || '?';
+  if (!firstName && !lastName) return '?';
+  const f = firstName ? firstName.trim()[0].toUpperCase() : '';
+  const l = lastName ? lastName.trim()[0].toUpperCase() : '';
+  return `${f}${l}`;
 }
 
+// Paleta estilo SaaS / Dark Tech
 const PALETTE = [
-  'bg-indigo-500/20 text-indigo-400',
-  'bg-violet-500/20 text-violet-400',
-  'bg-blue-500/20 text-blue-400',
-  'bg-emerald-500/20 text-emerald-400',
-  'bg-pink-500/20 text-pink-400',
-  'bg-amber-500/20 text-amber-400',
-  'bg-cyan-500/20 text-cyan-400',
-  'bg-rose-500/20 text-rose-400',
+  'bg-blue-600 text-white',
+  'bg-indigo-600 text-white',
+  'bg-violet-600 text-white',
+  'bg-purple-600 text-white',
+  'bg-fuchsia-600 text-white',
+  'bg-emerald-600 text-white',
+  'bg-cyan-600 text-white',
+  'bg-rose-600 text-white',
 ];
 
 function seedColor(str: string): string {
   let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
@@ -62,34 +65,64 @@ export function Avatar({
 
   return (
     <span className={cn('relative inline-flex shrink-0', className)}>
-      <AvatarPrimitive.Root className={cn('rounded-full overflow-hidden', SIZES[size])}>
+      <AvatarPrimitive.Root
+        className={cn(
+          'relative flex shrink-0 overflow-hidden rounded-full',
+          /* El ring-background es vital para el efecto de superposición tipo GitHub */
+          'ring-2 ring-background', 
+          SIZES[size]
+        )}
+      >
         {src && (
           <AvatarPrimitive.Image
             src={src}
-            alt={`${firstName} ${lastName}`}
-            className="h-full w-full object-cover"
+            alt={`${firstName ?? ''} ${lastName ?? ''}`.trim()}
+            className="aspect-square h-full w-full object-cover"
           />
         )}
+
         <AvatarPrimitive.Fallback
           className={cn(
-            'flex h-full w-full items-center justify-center rounded-full font-semibold',
-            colorClass,
+            'flex h-full w-full items-center justify-center font-medium',
+            colorClass
           )}
-          style={color ? { backgroundColor: `${color}22`, color } : undefined}
+          style={
+            color
+              ? {
+                  backgroundColor: color,
+                  color: '#ffffff',
+                }
+              : undefined
+          }
         >
           {initials}
         </AvatarPrimitive.Fallback>
       </AvatarPrimitive.Root>
+
       {online && (
-        <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-400" />
+        <span
+          className={cn(
+            'absolute bottom-0 right-0 z-10 block rounded-full bg-emerald-500 ring-2 ring-background',
+            /* Escalar el punto verde dependiendo del tamaño del avatar */
+            size === 'xs' ? 'h-1.5 w-1.5' :
+            size === 'sm' ? 'h-2 w-2' :
+            size === 'md' ? 'h-2.5 w-2.5' :
+            size === 'lg' ? 'h-3 w-3' :
+            size === 'xl' ? 'h-3.5 w-3.5' : 'h-4 w-4'
+          )}
+        />
       )}
     </span>
   );
 }
 
-/** Stack of avatars (AvatarGroup) */
 interface AvatarGroupProps {
-  users: Array<{ id: string; firstName: string; lastName: string; avatar?: string | null }>;
+  users: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatar?: string | null;
+  }>;
   max?: number;
   size?: AvatarSize;
   className?: string;
@@ -97,36 +130,46 @@ interface AvatarGroupProps {
 
 export function AvatarGroup({
   users,
-  max = 4,
+  max = 5,
   size = 'sm',
   className,
 }: AvatarGroupProps) {
   const visible = users.slice(0, max);
-  const rest = users.length - max;
+  const remaining = users.length - max;
 
   return (
-    <span className={cn('flex items-center -space-x-2', className)}>
-      {visible.map((u) => (
-        <Avatar
-          key={u.id}
-          src={u.avatar}
-          firstName={u.firstName}
-          lastName={u.lastName}
-          size={size}
-        />
+    <div className={cn('flex items-center', className)}>
+      {visible.map((user, index) => (
+        <div
+          key={user.id}
+          className="-ml-3 first:ml-0 hover:z-20 transition-transform hover:scale-105"
+          style={{
+            zIndex: visible.length - index,
+          }}
+        >
+          <Avatar
+            src={user.avatar}
+            firstName={user.firstName}
+            lastName={user.lastName}
+            size={size}
+            /* Pasamos un className vacío para evitar que el span sobreescriba el ring */
+            className="transition-all"
+          />
+        </div>
       ))}
 
-      {rest > 0 && (
-        <span
+      {remaining > 0 && (
+        <div
           className={cn(
-            'flex items-center justify-center rounded-full',
-            'bg-muted text-muted-foreground font-medium',
-            SIZES[size],
+            'relative -ml-3 flex items-center justify-center rounded-full',
+            'ring-2 ring-background bg-slate-800 text-slate-300 dark:bg-slate-800 dark:text-slate-300',
+            'font-medium shadow-sm z-0',
+            SIZES[size]
           )}
         >
-          +{rest}
-        </span>
+          +{remaining}
+        </div>
       )}
-    </span>
+    </div>
   );
 }

@@ -1,5 +1,12 @@
 import { api } from './api';
-import type { Project, CreateProjectPayload, ProjectFilters, PaginatedResponse } from '@/types/project.types';
+import type {
+  Project,
+  CreateProjectPayload,
+  ProjectFilters,
+  PaginatedResponse,
+  ProjectInvitation,
+  ProjectRole,
+} from '@/types/project.types';
 
 export const projectsService = {
   list: (filters?: ProjectFilters) =>
@@ -18,9 +25,24 @@ export const projectsService = {
 
   remove: (id: string) => api.delete(`/projects/${id}`),
 
+  leave: (projectId: string) =>
+    api.post(`/projects/${projectId}/leave`),
+
   addMember: (projectId: string, userId: string) =>
     api.post(`/projects/${projectId}/members/${userId}`),
 
+  updateMemberRole: (projectId: string, userId: string, role: ProjectRole) =>
+    api.patch(`/projects/${projectId}/members/${userId}/role`, { role }),
+
   removeMember: (projectId: string, userId: string) =>
     api.delete(`/projects/${projectId}/members/${userId}`),
+
+  listInvitations: (projectId: string) =>
+    api.get<{ data: ProjectInvitation[] }>(`/projects/${projectId}/invitations`).then((r) => r.data.data),
+
+  inviteMember: (projectId: string, payload: { email: string; role?: ProjectRole; message?: string }) =>
+    api.post<{ data: { mode: 'existing_user' | 'pending_invite'; invitation: ProjectInvitation } }>(
+      `/projects/${projectId}/invitations`,
+      payload,
+    ).then((r) => r.data.data),
 };

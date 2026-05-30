@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreateSubtaskDto {
   @ApiProperty({ example: 'Implement webhook handler' })
@@ -10,7 +10,13 @@ export class CreateSubtaskDto {
 
   @ApiPropertyOptional({ default: false })
   @IsOptional()
+  @IsBoolean()
   completed?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  inProgress?: boolean;
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()

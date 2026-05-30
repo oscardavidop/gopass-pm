@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useUsers, useAddMember, useRemoveMember } from '@/hooks/useUsers';
+import { useUsers, useAddMember, useRemoveMember, useUpdateMemberRole, useInviteMember, useLeaveProject } from '@/hooks/useUsers';
 import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -30,6 +30,7 @@ interface MemberManagerProps {
   members: ProjectMember[];
   currentUserId: string;
   currentRole: string;
+  pendingInvitations?: Array<{ id: string; email: string; status: string; role: string }>;
 }
 
 export function MemberManagerTrigger({
@@ -37,7 +38,7 @@ export function MemberManagerTrigger({
   onClick,
 }: {
   members: ProjectMember[];
-  onClick?: () => void;
+  onClick: () => void;
 }) {
   const { t } = useTranslation();
   const users = members
@@ -46,8 +47,8 @@ export function MemberManagerTrigger({
 
   return (
     <button
-      onClick={() => onClick?.()}
-      className="group flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-3 py-2 backdrop-blur-sm transition-all duration-200 hover:bg-accent/70"
+      onClick={onClick}
+      className="group flex items-center gap-3 rounded-2xl border-border/70 bg-card/80 px-3 py-2 backdrop-blur-sm transition-all duration-200 hover:bg-accent/70"
       title={t('member.manageTeamMembers', { defaultValue: 'Manage team members' })}
     >
       {/* Avatars */}
@@ -87,12 +88,13 @@ export function MemberManagerTrigger({
 }
 
 /** Modal content */
-export function MemberManager({ projectId, members, currentUserId, currentRole }: MemberManagerProps) {
+export function MemberManager({ projectId, members, currentUserId, currentRole, pendingInvitations = [] }: MemberManagerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
   const debouncedSearch = useDebounce(search, 300);
 
   const { data: allUsers = [], isLoading: usersLoading } = useUsers(
@@ -101,6 +103,9 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
 
   const addMember = useAddMember(projectId);
   const removeMember = useRemoveMember(projectId);
+  const updateRole = useUpdateMemberRole(projectId);
+  const inviteMember = useInviteMember(projectId);
+  const leaveProject = useLeaveProject(projectId);
 
   const memberIds = new Set(members.map((m) => m.userId));
   const canManage = currentRole === 'OWNER' || currentRole === 'ADMIN';
@@ -133,6 +138,12 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
     },
     [removeMember],
   );
+
+  const handleLeave = useCallback(() => {
+    leaveProject.mutate(undefined, {
+      onSuccess: () => setOpen(false),
+    });
+  }, [leaveProject]);
 
   return (
     <>
@@ -179,7 +190,19 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
                   </div>
                   <div className={cn('flex items-center gap-1 text-xs font-medium', ROLE_COLOR[m.role])}>
                     <RoleIcon className="h-3 w-3" />
-                    {roleLabel[m.role]}
+                    {canManage && !isOwner ? (
+                      <select
+                        value={m.role}
+                        onChange={(e) => updateRole.mutate({ userId: m.userId, role: e.target.value as any })}
+                        className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px]"
+                      >
+                        <option value="ADMIN">{roleLabel.ADMIN}</option>
+                        <option value="MEMBER">{roleLabel.MEMBER}</option>
+                        <option value="VIEWER">{t('member.roleViewer', { defaultValue: 'Viewer' })}</option>
+                      </select>
+                    ) : (
+                      roleLabel[m.role] ?? m.role
+                    )}
                   </div>
                   {canManage && !isOwner && !isSelf && (
                     <button
@@ -189,6 +212,20 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
                       title={t('member.removeMember', { defaultValue: 'Remove member' })}
                     >
                       {isRemoving ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <X className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                  {!isOwner && isSelf && (
+                    <button
+                      onClick={handleLeave}
+                      disabled={leaveProject.isPending}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-destructive disabled:cursor-not-allowed"
+                      title={t('member.leaveProject', { defaultValue: 'Leave project' })}
+                    >
+                      {leaveProject.isPending ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <X className="h-3.5 w-3.5" />
@@ -276,6 +313,40 @@ export function MemberManager({ projectId, members, currentUserId, currentRole }
                   );
                 })}
               </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="email"
+                  placeholder={t('member.inviteByEmail', { defaultValue: 'Invite by email' })}
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!inviteEmail.includes('@') || inviteMember.isPending}
+                  onClick={() => inviteMember.mutate({ email: inviteEmail }, { onSuccess: () => setInviteEmail('') })}
+                >
+                  {t('member.invite', { defaultValue: 'Invite' })}
+                </Button>
+              </div>
+
+              {pendingInvitations.length > 0 && (
+                <div className="rounded-lg border border-border/70 bg-background/70 p-2">
+                  <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+                    {t('member.pendingInvitations', { defaultValue: 'Pending invitations' })}
+                  </p>
+                  <div className="space-y-1">
+                    {pendingInvitations.slice(0, 5).map((invitation) => (
+                      <div key={invitation.id} className="flex items-center justify-between text-xs">
+                        <span className="truncate">{invitation.email}</span>
+                        <span className="rounded-full border border-border px-2 py-0.5">{invitation.role}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

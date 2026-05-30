@@ -199,8 +199,8 @@ function SidebarContent({
         <button
           onClick={() => handleGo('/profile')}
           className={cn(
-            'mb-2 flex w-full items-center rounded-xl border border-border/60 bg-background/70 p-2 text-left transition-colors hover:bg-accent/70',
-            collapsed ? 'justify-center' : 'gap-2.5',
+            'mb-2 flex w-full items-center rounded-xl  p-2 text-left transition-colors hover:bg-accent/70',
+            collapsed ? 'justify-center bg-none rounded-0' : 'gap-2.5 border-border/60 bg-background/70 ',
           )}
         >
           <Avatar

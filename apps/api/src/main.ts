@@ -1,10 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType, BadRequestException } from '@nestjs/common';
+import { ValidationPipe, VersioningType, BadRequestException, NestInterceptor } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import * as cookieParser from 'cookie-parser';
+import cookieParser = require('cookie-parser');
 import helmet from 'helmet';
-
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
 import { TransformInterceptor } from './shared/interceptors/transform.interceptor';
@@ -18,9 +17,29 @@ async function bootstrap() {
   const port = config.get<number>('API_PORT', 3001);
   const prefix = config.get<string>('API_PREFIX', 'api/v1');
   const corsOrigins = config.get<string>('CORS_ORIGINS', 'http://localhost:3000');
+  const isProd = config.get<string>('NODE_ENV') === 'production';
 
   // Security
-  app.use(helmet());
+  (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      hsts: isProd
+        ? {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        }
+        : false,
+      frameguard: { action: 'deny' },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      noSniff: true,
+    }),
+  );
+  app.use((_, res, next) => {
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+  });
   app.use(cookieParser());
 
   app.enableCors({
@@ -59,7 +78,7 @@ async function bootstrap() {
 
   // Global filters & interceptors
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalInterceptors(new TransformInterceptor() as unknown as NestInterceptor);
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()

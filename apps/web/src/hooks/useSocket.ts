@@ -215,13 +215,42 @@ export function useSocket(projectId?: string) {
       }
     };
 
+    const onProjectDeletedRealtime = (payload: any) => {
+      if (!payload?.projectId) return;
+      queryClientRef.current.invalidateQueries({ queryKey: ['projects'] });
+      queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+      addNotifRef.current({
+        type: 'project_deleted',
+        i18nKey: 'notification.projectDeleted',
+        i18nParams: { projectName: payload.projectName },
+        projectId: payload.projectId,
+        projectName: payload.projectName,
+      });
+      window.dispatchEvent(new CustomEvent('project:deleted', { detail: { projectId: payload.projectId } }));
+    };
+
     const onTaskPresence = (payload: any) => {
       if (!payload?.projectId || !payload?.taskId) return;
+
+      const currentUserId = currentUserRef.current?.id;
+      const viewingByUser = new Map<string, any>();
+      for (const user of payload.viewing ?? []) {
+        if (!user?.id || user.id === currentUserId) continue;
+        if (!viewingByUser.has(user.id)) viewingByUser.set(user.id, user);
+      }
+
+      const editingByUser = new Map<string, any>();
+      for (const entry of payload.editing ?? []) {
+        const user = entry?.user;
+        if (!user?.id || user.id === currentUserId) continue;
+        if (!editingByUser.has(user.id)) editingByUser.set(user.id, { user, field: entry?.field });
+      }
+
       setTaskPresenceRef.current({
         projectId: payload.projectId,
         taskId: payload.taskId,
-        viewing: payload.viewing ?? [],
-        editing: payload.editing ?? [],
+        viewing: Array.from(viewingByUser.values()),
+        editing: Array.from(editingByUser.values()),
       });
     };
 
@@ -232,9 +261,11 @@ export function useSocket(projectId?: string) {
       setProjectPresenceRef.current(projectId, users);
     };
 
-    const onActivityCreated = () => {
+    const onActivityCreated = (payload: any) => {
       queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
-      queryClientRef.current.invalidateQueries({ queryKey: ['tasks'] });
+      if (payload?.activity?.taskId) {
+        queryClientRef.current.invalidateQueries({ queryKey: ['tasks', 'detail', payload.activity.taskId] });
+      }
     };
 
     const onTaskDeleted = ({ id, projectId }: { id: string; projectId: string }) => {
@@ -251,6 +282,7 @@ export function useSocket(projectId?: string) {
     s.on('task.moved', onTaskMovedRealtime);
     s.on('task.deleted', onTaskDeletedRealtime);
     s.on('project.updated', onProjectUpdatedRealtime);
+    s.on('project.deleted', onProjectDeletedRealtime);
     s.on('task.presence', onTaskPresence);
     s.on('presence:update', onPresenceUpdate);
     s.on('activity.created', onActivityCreated);
@@ -281,6 +313,15 @@ export function useSocket(projectId?: string) {
 
     /* ── Server-pushed notifications (cron jobs, assignments, etc.) ── */
     const onNotification = (data: any) => {
+      const fallbackI18nByType: Record<string, string> = {
+        task_assigned: 'notification.taskAssigned',
+        task_overdue: 'notification.taskOverdue',
+        task_due_reminder: 'notification.taskDueReminder',
+        project_updated: 'notification.projectUpdated',
+        project_deleted: 'notification.projectDeleted',
+        project_access_revoked: 'notification.projectAccessRevoked',
+      };
+
       if (data.type === 'project_access_revoked') {
         // Also handled by onMemberRemoved but backend sends this too as a fallback
         window.dispatchEvent(
@@ -289,15 +330,20 @@ export function useSocket(projectId?: string) {
         queryClientRef.current.invalidateQueries({ queryKey: ['projects'] });
         return;
       }
+      if (data.type === 'project_deleted') {
+        queryClientRef.current.invalidateQueries({ queryKey: ['projects'] });
+        window.dispatchEvent(new CustomEvent('project:deleted', { detail: { projectId: data.projectId } }));
+      }
       addNotifRef.current({
         type: data.type,
         title: data.title,
         body: data.body ?? data.message ?? '',
-        i18nKey: data.i18nKey,
+        i18nKey: data.i18nKey ?? fallbackI18nByType[data.type],
         i18nParams: data.i18nParams,
         projectId: data.projectId,
         taskId: data.taskId,
         taskTitle: data.taskTitle,
+        projectName: data.projectName ?? data.i18nParams?.projectName,
         actorName: data.actorName,
       });
     };
@@ -312,6 +358,7 @@ export function useSocket(projectId?: string) {
       s.off('task.moved', onTaskMovedRealtime);
       s.off('task.deleted', onTaskDeletedRealtime);
       s.off('project.updated', onProjectUpdatedRealtime);
+      s.off('project.deleted', onProjectDeletedRealtime);
       s.off('task.presence', onTaskPresence);
       s.off('presence:update', onPresenceUpdate);
       s.off('activity.created', onActivityCreated);

@@ -1,9 +1,16 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 import { TasksService } from './tasks.service';
 
 describe('TasksService', () => {
   const prisma = {
+    project: {
+      findFirst: jest.fn(),
+    },
+    projectMember: {
+      findUnique: jest.fn(),
+    },
     subtask: {
       findMany: jest.fn(),
       update: jest.fn(),
@@ -26,8 +33,19 @@ describe('TasksService', () => {
   });
 
   it('throws bad request for invalid subtask reorder payload', async () => {
+    prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.projectMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
     prisma.subtask.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
 
     await expect(service.reorderSubtasks('task-1', ['a'], 'user-1')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects write access when project role is VIEWER', async () => {
+    prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.projectMember.findUnique.mockResolvedValue({ role: 'VIEWER' });
+
+    await expect(
+      (service as any).assertProjectAccess('project-1', 'viewer-1', { requireWrite: true, userRole: Role.USER }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

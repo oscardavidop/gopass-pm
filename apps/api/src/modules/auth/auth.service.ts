@@ -106,6 +106,10 @@ export class AuthService {
       userId: user.id,
       userName: user.firstName,
       appUrl,
+      supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+      year: new Date().getFullYear().toString(),
+      companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),
+      companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
     });
 
     return { user, ...tokens };
@@ -175,6 +179,8 @@ export class AuthService {
     if (normalized !== 'GOOGLE' && normalized !== 'GITHUB') {
       throw new BadRequestException('OAuth provider not enabled yet');
     }
+
+    this.assertAllowedOAuthRedirect(dto.redirectUri);
 
     const profile = normalized === 'GOOGLE'
       ? await this.fetchGoogleProfile(dto.code, dto.redirectUri)
@@ -295,6 +301,7 @@ export class AuthService {
       companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),
       supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
       companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+      year: new Date().getFullYear().toString(),
     });
 
     return { message: 'If your email exists, you will receive reset instructions shortly.' };
@@ -496,5 +503,42 @@ export class AuthService {
       hash |= 0;
     }
     return COLLABORATION_PALETTE[Math.abs(hash) % COLLABORATION_PALETTE.length];
+  }
+
+  private assertAllowedOAuthRedirect(redirectUri: string) {
+    let redirect: URL;
+    try {
+      redirect = new URL(redirectUri);
+    } catch {
+      throw new BadRequestException('Invalid OAuth redirectUri');
+    }
+
+    const allowlistRaw = this.config.get<string>('OAUTH_REDIRECT_ALLOWLIST', '');
+    const normalizedAllowlist = allowlistRaw
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => {
+        try {
+          const parsed = new URL(value);
+          return `${parsed.origin}${parsed.pathname}`;
+        } catch {
+          return value;
+        }
+      });
+
+    if (normalizedAllowlist.length === 0) {
+      const frontend = this.config.get<string>('FRONTEND_URL');
+      if (frontend) {
+        const parsed = new URL(frontend);
+        normalizedAllowlist.push(`${parsed.origin}/auth/oauth/callback`);
+      }
+    }
+
+    const normalizedRedirect = `${redirect.origin}${redirect.pathname}`;
+
+    if (!normalizedAllowlist.includes(normalizedRedirect)) {
+      throw new BadRequestException('OAuth redirectUri is not allowed');
+    }
   }
 }

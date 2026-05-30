@@ -1,6 +1,5 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, map } from 'rxjs';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -11,13 +10,19 @@ export interface ApiResponse<T> {
   meta?: Record<string, unknown>;
 }
 
+function isApiResponse<T>(value: unknown): value is ApiResponse<T> {
+  if (!value || typeof value !== 'object') return false;
+  if (!('success' in value) || !('data' in value)) return false;
+  return typeof (value as { success: unknown }).success === 'boolean';
+}
+
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<ApiResponse<T>> {
+  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<ApiResponse<T>> {
     return next.handle().pipe(
       map((data) => {
         // If the handler already returns our envelope, pass through
-        if (data && typeof data === 'object' && 'success' in data) {
+        if (isApiResponse<T>(data)) {
           return data;
         }
 
@@ -38,7 +43,7 @@ export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T
           data,
           i18nKey: 'common.success',
         };
-      }),
+      } ),
     );
-  }
+  } 
 }

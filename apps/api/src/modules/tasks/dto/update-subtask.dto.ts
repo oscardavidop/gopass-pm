@@ -14,6 +14,11 @@ export class UpdateSubtaskDto {
   @IsBoolean()
   completed?: boolean;
 
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  inProgress?: boolean;
+
   @ApiPropertyOptional({ example: 2 })
   @IsOptional()
   @IsInt()

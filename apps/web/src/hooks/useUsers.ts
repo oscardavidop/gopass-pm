@@ -66,3 +66,46 @@ export function useRemoveMember(projectId: string) {
     onError: (err) => toast.error(getApiErrorMessage(err, 'project.memberRemoveFailed', 'Failed to remove member')),
   });
 }
+
+export function useLeaveProject(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      import('@/services/projects.service').then((m) => m.projectsService.leave(projectId)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
+      qc.invalidateQueries({ queryKey: ['projects', 'list'] });
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(translateByKey('project.left', undefined, 'You left the project'));
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.leaveFailed', 'Failed to leave project')),
+  });
+}
+
+export function useUpdateMemberRole(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' }) =>
+      import('@/services/projects.service').then((m) => m.projectsService.updateMemberRole(projectId, userId, role)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
+      qc.invalidateQueries({ queryKey: ['projects', 'list'] });
+      toast.success(translateByKey('project.roleUpdated', undefined, 'Role updated'));
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.roleUpdateFailed', 'Failed to update role')),
+  });
+}
+
+export function useInviteMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { email: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'; message?: string }) =>
+      import('@/services/projects.service').then((m) => m.projectsService.inviteMember(projectId, payload)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
+      qc.invalidateQueries({ queryKey: ['projects', 'list'] });
+      toast.success(translateByKey('project.invitationSent', undefined, 'Invitation sent'));
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.invitationFailed', 'Failed to send invitation')),
+  });
+}

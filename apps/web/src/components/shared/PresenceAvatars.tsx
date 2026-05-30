@@ -35,7 +35,7 @@ export function PresenceAvatars({ projectId, members = [] }: PresenceAvatarsProp
   if (uniqueUsers.length === 0 && members.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/50 px-2.5 py-1.5">
+    <div className="flex items-center gap-2.5 rounded-xl border-border/60 bg-background/50 px-2.5 py-1.5">
       <div className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-2 py-1 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />

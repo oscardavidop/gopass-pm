@@ -3,18 +3,99 @@ export type EmailTemplateType =
   | 'welcome'
   | 'project_invitation'
   | 'task_assigned'
+  | 'task_reassigned'
   | 'task_due_reminder'
   | 'weekly_digest';
 
 export type EmailProviderName = 'zavu' | 'preview';
 
-export type NamedTemplateVariables = Record<string, unknown>;
-export type IndexedTemplateVariables = Record<string, string>;
+export type TemplateScalar = string | number | boolean | Date | null | undefined;
+export type SemanticTemplateVariables = Record<string, TemplateScalar>;
+
+export interface ResetPasswordVariables {
+  userName: string;
+  resetUrl: string;
+  expirationTime: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
+}
+
+export interface WelcomeVariables {
+  userName: string;
+  appUrl: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
+}
+
+export interface ProjectInvitationVariables {
+  userName: string;
+  invitedBy: string;
+  projectName: string;
+  projectUrl: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
+}
+
+export interface TaskAssignedVariables {
+  userName: string;
+  assignedBy: string;
+  projectName: string;
+  taskTitle: string;
+  taskUrl: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
+}
+
+export interface TaskReassignedVariables {
+  userName: string;
+  assignedBy: string;
+  projectName: string;
+  taskTitle: string;
+  taskUrl: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
+}
+
+export interface TaskDueReminderVariables {
+  userName: string;
+  projectName: string;
+  taskTitle: string;
+  dueDate: string;
+  taskUrl: string;
+}
+
+export interface WeeklyDigestVariables {
+  userName: string;
+  periodLabel: string;
+  tasksCreated: number;
+  tasksCompleted: number;
+  tasksOverdue: number;
+  dashboardUrl: string;
+}
+
+export interface TemplateVariablesByType {
+  reset_password: ResetPasswordVariables;
+  welcome: WelcomeVariables;
+  project_invitation: ProjectInvitationVariables;
+  task_assigned: TaskAssignedVariables;
+  task_reassigned: TaskReassignedVariables;
+  task_due_reminder: TaskDueReminderVariables;
+  weekly_digest: WeeklyDigestVariables;
+}
 
 export interface EmailTemplateRegistryEntry {
   type: EmailTemplateType;
   envKey: string;
-  variableMap: Record<string, `${number}`>;
 }
 
 export interface ResolvedTemplate {
@@ -24,10 +105,10 @@ export interface ResolvedTemplate {
   entry: EmailTemplateRegistryEntry;
 }
 
-export interface SendTemplateRequest {
-  template: EmailTemplateType;
+export interface SendTemplateRequest<T extends EmailTemplateType = EmailTemplateType> {
+  template: T;
   to: string;
-  variables: NamedTemplateVariables;
+  variables: TemplateVariablesByType[T];
   userId?: string;
   locale?: string | null;
 }
@@ -35,7 +116,7 @@ export interface SendTemplateRequest {
 export interface EmailProviderSendInput {
   to: string;
   templateId: string;
-  templateVariables: IndexedTemplateVariables;
+  templateVariables: Record<string, string>;
 }
 
 export interface EmailProviderSendResult {
@@ -57,6 +138,7 @@ export interface SendResetPasswordEmailInput {
   companyName: string;
   supportEmail: string;
   companyAddress: string;
+  year: string;
 }
 
 export interface SendWelcomeEmailInput {
@@ -65,6 +147,10 @@ export interface SendWelcomeEmailInput {
   locale?: string | null;
   userName?: string | null;
   appUrl: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
 }
 
 export interface SendProjectInvitationEmailInput {
@@ -75,6 +161,10 @@ export interface SendProjectInvitationEmailInput {
   invitedBy?: string | null;
   projectName: string;
   projectUrl: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
 }
 
 export interface SendTaskAssignedEmailInput {
@@ -86,9 +176,28 @@ export interface SendTaskAssignedEmailInput {
   projectName: string;
   taskTitle: string;
   taskUrl: string;
+  companyName: string;
+  companyAddress: string;
+  supportEmail: string;
+  year: string;
 }
 
-export interface SendTaskReminderEmailInput {
+export interface SendTaskReassignedEmailInput {
+  to: string;
+  userId?: string;
+  locale?: string | null;
+  userName?: string | null;
+  assignedBy?: string | null;
+  projectName: string;
+  taskTitle: string;
+  taskUrl: string;
+  companyName: string;
+  companyAddress: string;
+  supportEmail: string;
+  year: string;
+}
+
+export interface SendTaskDueReminderEmailInput {
   to: string;
   userId?: string;
   locale?: string | null;
@@ -98,6 +207,8 @@ export interface SendTaskReminderEmailInput {
   dueDate: string;
   taskUrl: string;
 }
+
+export type SendTaskReminderEmailInput = SendTaskDueReminderEmailInput;
 
 export interface SendWeeklyDigestEmailInput {
   to: string;

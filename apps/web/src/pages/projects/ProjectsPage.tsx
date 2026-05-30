@@ -9,11 +9,12 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ProjectCard } from '@/features/projects/ProjectCard';
-import { ProjectDrawer } from '@/features/projects/ProjectDrawer';
+import { ProjectDrawer, type ProjectDrawerSubmitPayload } from '@/features/projects/ProjectDrawer';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
 import { useDebounce } from '@/hooks/useDebounce';
 import { cn } from '@/utils/cn';
 import { type Project, type ProjectStatus } from '@/types/project.types';
+import { projectsService } from '@/services/projects.service';
 
 export function ProjectsPage() {
   const { t } = useTranslation();
@@ -34,17 +35,54 @@ export function ProjectsPage() {
   const projects = data?.items ?? [];
 
   const handleCreate = useCallback(
-    async (formData: any) => {
-      await createProject.mutateAsync(formData);
+    async (payload: ProjectDrawerSubmitPayload) => {
+      await createProject.mutateAsync({
+        ...payload.project,
+        members: payload.members,
+        invitations: payload.invitations,
+      } as any);
       setDrawerOpen(false);
     },
     [createProject],
   );
 
   const handleEdit = useCallback(
-    async (formData: any) => {
+    async (payload: ProjectDrawerSubmitPayload) => {
       if (!editingProject) return;
-      await updateProject.mutateAsync({ id: editingProject.id, data: formData });
+      await updateProject.mutateAsync({ id: editingProject.id, data: payload.project });
+
+      const ops: Array<Promise<unknown>> = [];
+      const currentMemberMap = new Map(editingProject.members.map((member) => [member.userId, member]));
+      const nextMemberMap = new Map(payload.members.map((member) => [member.userId, member]));
+
+      for (const [userId, member] of nextMemberMap) {
+        const current = currentMemberMap.get(userId);
+        if (!current) {
+          ops.push(
+            projectsService
+              .addMember(editingProject.id, userId)
+              .then(() => projectsService.updateMemberRole(editingProject.id, userId, member.role))
+              .catch(() => undefined),
+          );
+          continue;
+        }
+
+        if (current.role !== member.role) {
+          ops.push(projectsService.updateMemberRole(editingProject.id, userId, member.role).catch(() => undefined));
+        }
+      }
+
+      for (const current of editingProject.members) {
+        if (!nextMemberMap.has(current.userId)) {
+          ops.push(projectsService.removeMember(editingProject.id, current.userId).catch(() => undefined));
+        }
+      }
+
+      for (const invitation of payload.invitations) {
+        ops.push(projectsService.inviteMember(editingProject.id, invitation).catch(() => undefined));
+      }
+      if (ops.length > 0) await Promise.all(ops);
+
       setEditingProject(null);
       setDrawerOpen(false);
     },

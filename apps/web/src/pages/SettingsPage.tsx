@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { Moon, Sun, Bell, Globe, Palette, Check, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/hooks/useTheme';
 import { usePreferencesStore } from '@/store/preferences.store';
+import { usersService } from '@/services/users.service';
 import { cn } from '@/utils/cn';
 import { getLocaleLabel, getSupportedLocales } from '@/i18n/locale';
 
@@ -60,6 +62,40 @@ export function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const prefs = usePreferencesStore();
   const { t } = useTranslation();
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    usersService.getNotificationPreferences()
+      .then((serverPrefs) => {
+        if (cancelled) return;
+        (Object.keys(serverPrefs) as Array<keyof typeof serverPrefs>).forEach((key) => {
+          prefs.setNotification(key as any, !!serverPrefs[key]);
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setPrefsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [prefs]);
+
+  const updateNotificationPref = async (
+    key: keyof typeof prefs.notifications,
+    value: boolean,
+  ) => {
+    prefs.setNotification(key, value);
+    setSavingKey(key);
+    try {
+      await usersService.updateNotificationPreferences({ [key]: value });
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
   const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
@@ -125,8 +161,11 @@ export function SettingsPage() {
                 [
                   { key: 'taskAssigned'   as const, label: t('notification.taskAssigned'),   desc: t('notification.taskAssignedDesc') },
                   { key: 'taskDue'        as const, label: t('notification.taskDue'), desc: t('notification.taskDueDesc') },
+                  { key: 'taskDue1h'      as const, label: t('notification.taskDue1h', { defaultValue: '1h due reminder (optional)' }), desc: t('notification.taskDue1hDesc', { defaultValue: 'Additional reminder one hour before due date' }) },
                   { key: 'projectUpdates' as const, label: t('notification.projectUpdates'),        desc: t('notification.projectUpdatesDesc') },
                   { key: 'weekly'         as const, label: t('notification.weekly'),          desc: t('notification.weeklyDesc') },
+                  { key: 'emailNotifications' as const, label: t('notification.emailNotifications', { defaultValue: 'Email notifications' }), desc: t('notification.emailNotificationsDesc', { defaultValue: 'Receive notifications by email' }) },
+                  { key: 'realtimeNotifications' as const, label: t('notification.realtimeNotifications', { defaultValue: 'Realtime notifications' }), desc: t('notification.realtimeNotificationsDesc', { defaultValue: 'Show instant realtime toasts/events' }) },
                 ]
               ).map(({ key, label, desc }) => (
                 <div key={key} className="flex items-center justify-between py-1">
@@ -134,12 +173,21 @@ export function SettingsPage() {
                     <p className="text-sm font-medium">{label}</p>
                     <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
-                  <Toggle
-                    checked={prefs.notifications[key]}
-                    onChange={(v) => prefs.setNotification(key, v)}
-                  />
+                  <div className="flex items-center gap-2">
+                    {savingKey === key && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                    <Toggle
+                      checked={prefs.notifications[key]}
+                      onChange={(v) => void updateNotificationPref(key, v)}
+                    />
+                  </div>
                 </div>
               ))}
+              {!prefsLoaded && (
+                <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {t('common.loading', { defaultValue: 'Loading...' })}
+                </p>
+              )}
             </CardContent>
           </Card>
         </motion.div>

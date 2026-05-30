@@ -8,13 +8,12 @@ import {
 } from './email.registry';
 import {
   EmailProvider,
-  IndexedTemplateVariables,
-  NamedTemplateVariables,
   ResolvedTemplate,
   SendProjectInvitationEmailInput,
   SendResetPasswordEmailInput,
   SendTaskAssignedEmailInput,
-  SendTaskReminderEmailInput,
+  SendTaskDueReminderEmailInput,
+  SendTaskReassignedEmailInput,
   SendTemplateRequest,
   SendWeeklyDigestEmailInput,
   SendWelcomeEmailInput,
@@ -32,15 +31,14 @@ export class EmailService {
 
   async sendTemplate(input: SendTemplateRequest) {
     const resolved = this.resolveTemplate(input.template, input.locale);
-    const mappedVariables = this.mapTemplateVariables(resolved, input.variables);
+    const semanticVariables = this.normalizeTemplateVariables(input.variables);
 
     const basePayload = {
       template: resolved.type,
       templateId: resolved.templateId,
       locale: resolved.locale,
       recipient: input.to,
-      variables: mappedVariables,
-      variableMap: resolved.entry.variableMap,
+      variables: semanticVariables,
     };
 
     const sendRealEmail = this.shouldSendRealEmail();
@@ -53,7 +51,7 @@ export class EmailService {
           recipient: input.to,
           status: 'PREVIEW',
           provider: 'preview',
-          variables: this.toJsonValue(mappedVariables),
+          variables: this.toJsonValue(semanticVariables),
           payload: this.toJsonValue(basePayload),
         },
       });
@@ -70,7 +68,7 @@ export class EmailService {
       const providerResult = await this.provider.sendTemplate({
         to: input.to,
         templateId: resolved.templateId,
-        templateVariables: mappedVariables,
+        templateVariables: semanticVariables,
       });
 
       const log = await this.prisma.emailLog.create({
@@ -83,7 +81,7 @@ export class EmailService {
           provider: providerResult.provider,
           providerMessageId: providerResult.providerMessageId,
           sentAt: new Date(),
-          variables: this.toJsonValue(mappedVariables),
+          variables: this.toJsonValue(semanticVariables),
           payload: this.toJsonValue(basePayload),
         },
       });
@@ -103,7 +101,7 @@ export class EmailService {
           recipient: input.to,
           status: 'FAILED',
           provider: 'zavu',
-          variables: this.toJsonValue(mappedVariables),
+          variables: this.toJsonValue(semanticVariables),
           payload: this.toJsonValue(basePayload),
           error: message,
         },
@@ -160,8 +158,8 @@ export class EmailService {
         expirationTime: input.expirationTime,
         companyName: input.companyName,
         supportEmail: input.supportEmail,
-        year: new Date().getFullYear().toString(),
-        companyAddress: input.companyAddress 
+        year: input.year,
+        companyAddress: input.companyAddress,
       },
     });
   }
@@ -175,6 +173,10 @@ export class EmailService {
       variables: {
         userName: input.userName || 'there',
         appUrl: input.appUrl,
+        supportEmail: input.supportEmail,
+        year: input.year,
+        companyName: input.companyName,
+        companyAddress: input.companyAddress,
       },
     });
   }
@@ -190,6 +192,10 @@ export class EmailService {
         invitedBy: input.invitedBy || 'A team member',
         projectName: input.projectName,
         projectUrl: input.projectUrl,
+        supportEmail: input.supportEmail,
+        year: input.year,
+        companyName: input.companyName,
+        companyAddress: input.companyAddress,
       },
     });
   }
@@ -206,11 +212,35 @@ export class EmailService {
         projectName: input.projectName,
         taskTitle: input.taskTitle,
         taskUrl: input.taskUrl,
+        companyName: input.companyName,
+        companyAddress: input.companyAddress,
+        supportEmail: input.supportEmail,
+        year: input.year,
       },
     });
   }
 
-  async sendTaskReminderEmail(input: SendTaskReminderEmailInput) {
+  async sendTaskReassignedEmail(input: SendTaskReassignedEmailInput) {
+    return this.sendTemplate({
+      template: 'task_reassigned',
+      to: input.to,
+      userId: input.userId,
+      locale: input.locale,
+      variables: {
+        userName: input.userName || 'there',
+        assignedBy: input.assignedBy || 'A teammate',
+        projectName: input.projectName,
+        taskTitle: input.taskTitle,
+        taskUrl: input.taskUrl,
+        companyName: input.companyName,
+        companyAddress: input.companyAddress,
+        supportEmail: input.supportEmail,
+        year: input.year,
+      },
+    });
+  }
+
+  async sendTaskDueReminderEmail(input: SendTaskDueReminderEmailInput) {
     return this.sendTemplate({
       template: 'task_due_reminder',
       to: input.to,
@@ -224,6 +254,10 @@ export class EmailService {
         taskUrl: input.taskUrl,
       },
     });
+  }
+
+  async sendTaskReminderEmail(input: SendTaskDueReminderEmailInput) {
+    return this.sendTaskDueReminderEmail(input);
   }
 
   async sendWeeklyDigestEmail(input: SendWeeklyDigestEmailInput) {
@@ -265,18 +299,12 @@ export class EmailService {
     };
   }
 
-  private mapTemplateVariables(
-    resolved: ResolvedTemplate,
-    variables: NamedTemplateVariables,
-  ): IndexedTemplateVariables {
-    const mapped: IndexedTemplateVariables = {};
-
-    for (const [name, index] of Object.entries(resolved.entry.variableMap)) {
-      const rawValue = variables[name];
-      mapped[index] = this.stringify(rawValue);
+  private normalizeTemplateVariables<T extends object>(variables: T): Record<string, string> {
+    const normalized: Record<string, string> = {};
+    for (const [name, value] of Object.entries(variables as Record<string, unknown>)) {
+      normalized[name] = this.stringify(value);
     }
-
-    return mapped;
+    return normalized;
   }
 
   private normalizeLocale(locale?: string | null) {

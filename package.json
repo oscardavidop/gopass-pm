@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "deploy:web": "npm run deploy -w apps/web",
+    "deploy:api": "npm run deploy -w apps/api",
+    "deploy": "npm run deploy:web && npm run deploy:api",
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
     "docker:prod": "docker compose up --build",
     "docker:down": "docker compose down -v",
@@ -17,6 +20,9 @@
     "lint": "npm run lint -w apps/api && npm run lint -w apps/web",
     "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
     "test": "npm run test -w apps/api"
+  },
+  "engines": {
+    "node": ">=25 <26"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -11,9 +11,11 @@ import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { EmailService } from '../mail/email.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
+import { hasProjectPermission } from '../auth/authorization/project-rbac';
 
 @Injectable()
 export class TasksService {
@@ -25,10 +27,10 @@ export class TasksService {
     private readonly events: EventsGateway,
     private readonly config: ConfigService,
     private readonly email: EmailService,
-  ) {}
+  ) { }
 
-  async create(projectId: string, dto: CreateTaskDto, userId: string) {
-    await this.assertProjectAccess(projectId, userId);
+  async create(projectId: string, dto: CreateTaskDto, userId: string, userRole: Role = Role.USER) {
+    await this.assertProjectAccess(projectId, userId, { requireWrite: true, userRole });
 
     const dueDate = this.normalizeDueDate(dto.dueDate);
     const { subtasks = [], ...taskPayload } = dto;
@@ -50,6 +52,7 @@ export class TasksService {
               parentTaskId: created.id,
               title: subtask.title.trim(),
               completed: subtask.completed ?? false,
+              inProgress: subtask.completed ? false : (subtask.inProgress ?? false),
               position: subtask.position ?? index,
             }))
             .filter((subtask) => subtask.title.length >= 2),
@@ -80,11 +83,74 @@ export class TasksService {
       },
     });
     this.events.emitActivityCreated(projectId, activity);
+
+    if (task.assigneeId && task.assignee) {
+      const [project, actorUser] = await Promise.all([
+        this.prisma.project.findUnique({
+          where: { id: task.projectId },
+          select: { id: true, name: true },
+        }),
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { firstName: true, lastName: true },
+        }),
+      ]);
+
+      const projectName = project?.name || 'Project';
+      const actorName = [actorUser?.firstName, actorUser?.lastName].filter(Boolean).join(' ').trim() || 'A teammate';
+      const taskUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/projects/${task.projectId}?taskId=${task.id}`;
+      const prefs = this.parseNotificationPrefs((task.assignee as any).notificationPrefs);
+      const assigneeAny = task.assignee as any;
+
+      if (prefs.taskAssigned) {
+        await this.prisma.notification.create({
+          data: {
+            userId: task.assignee.id,
+            type: 'task_assigned',
+            title: 'Task assigned',
+            body: `${task.title} in ${projectName}`,
+          },
+        });
+      }
+
+      if (prefs.taskAssigned && prefs.realtimeNotifications) {
+        this.events.emitToUser(task.assignee.id, 'notification', {
+          type: 'task_assigned',
+          i18nKey: 'notification.taskAssigned',
+          i18nParams: { task: task.title, project: projectName },
+          taskId: task.id,
+          projectId: task.projectId,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      if (prefs.taskAssigned && prefs.emailNotifications && assigneeAny?.email) {
+        try {
+          await this.email.sendTaskAssignedEmail({
+            to: assigneeAny.email,
+            userId: task.assignee.id,
+            userName: task.assignee.firstName,
+            assignedBy: actorName,
+            projectName,
+            taskTitle: task.title,
+            taskUrl,
+            companyName: this.config.get<string>('COMPANY_NAME', 'Our Company'),
+            companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+            supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+            year: new Date().getFullYear().toString(),
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Failed to send task_assigned email for task ${task.id}: ${msg}`);
+        }
+      }
+    }
+
     return task;
   }
 
-  async findAllByProject(projectId: string, userId: string, filters: FilterTasksDto) {
-    await this.assertProjectAccess(projectId, userId);
+  async findAllByProject(projectId: string, userId: string, filters: FilterTasksDto, userRole: Role = Role.USER) {
+    await this.assertProjectAccess(projectId, userId, { userRole });
 
     const { search, status, priority, assigneeId, page = 1, limit = 50, sortBy = 'position', order = 'asc' } = filters;
     const skip = (page - 1) * limit;
@@ -120,7 +186,7 @@ export class TasksService {
     };
   }
 
-  async findOne(id: string, userId: string) {
+  async findOne(id: string, userId: string, userRole: Role = Role.USER) {
     const task = await this.prisma.task.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -143,16 +209,26 @@ export class TasksService {
     });
 
     if (!task) throw new NotFoundException('Task not found');
-    await this.assertProjectAccess(task.projectId, userId);
+    await this.assertProjectAccess(task.projectId, userId, { userRole });
 
     return task;
   }
 
-  async update(id: string, dto: UpdateTaskDto, userId: string) {
-    const task = await this.findOne(id, userId);
+  async update(id: string, dto: UpdateTaskDto, userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(id, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
     const oldValues: Record<string, any> = {};
     const changes: string[] = [];
     const dueDate = this.normalizeDueDate(dto.dueDate);
+
+    if (dto.title !== undefined && dto.title !== task.title) {
+      oldValues.title = task.title;
+      changes.push('title');
+    }
+    if (dto.description !== undefined && dto.description !== task.description) {
+      oldValues.description = task.description;
+      changes.push('description');
+    }
 
     if (dto.status && dto.status !== task.status) {
       oldValues.status = task.status;
@@ -209,42 +285,112 @@ export class TasksService {
       const projectName = project?.name || 'Project';
       const actorName = [actor?.firstName, actor?.lastName].filter(Boolean).join(' ').trim() || 'A teammate';
       const taskUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/projects/${updated.projectId}?taskId=${updated.id}`;
+      const isReassignment = !!task.assigneeId && task.assigneeId !== updated.assigneeId;
+      const targetType = isReassignment ? 'task_reassigned' : 'task_assigned';
+      const targetI18n = isReassignment ? 'notification.taskReassigned' : 'notification.taskAssigned';
+      const notificationTitle = isReassignment ? 'Task reassigned' : 'Task assigned';
 
       if (updated.assignee) {
-        await this.prisma.notification.create({
-          data: {
-            userId: updated.assignee.id,
-            type: 'task_assigned',
-            title: 'Task assigned',
-            body: `${updated.title} in ${projectName}`,
-          },
-        });
+        const prefs = this.parseNotificationPrefs((updated.assignee as any).notificationPrefs);
+        if (prefs.taskAssigned) {
+          await this.prisma.notification.create({
+            data: {
+              userId: updated.assignee.id,
+              type: targetType,
+              title: notificationTitle,
+              body: `${updated.title} in ${projectName}`,
+            },
+          });
+        }
 
-        this.events.emitToUser(updated.assignee.id, 'notification', {
-          type: 'task_assigned',
-          i18nKey: 'notification.taskAssigned',
-          i18nParams: { task: updated.title, project: projectName },
-          taskId: updated.id,
-          projectId: updated.projectId,
-          createdAt: new Date().toISOString(),
-        });
+        if (prefs.taskAssigned && prefs.realtimeNotifications) {
+          this.events.emitToUser(updated.assignee.id, 'notification', {
+            type: targetType,
+            i18nKey: targetI18n,
+            i18nParams: { task: updated.title, project: projectName },
+            taskId: updated.id,
+            projectId: updated.projectId,
+            createdAt: new Date().toISOString(),
+          });
+        }
 
         const assigneeAny = updated.assignee as any;
-        if (assigneeAny?.email) {
+        if (prefs.taskAssigned && prefs.emailNotifications && assigneeAny?.email) {
           try {
-            await this.email.sendTaskAssignedEmail({
-              to: assigneeAny.email,
-              userId: updated.assignee.id,
-              userName: updated.assignee.firstName,
-              assignedBy: actorName,
-              projectName,
-              taskTitle: updated.title,
-              taskUrl,
-            });
+            if (isReassignment) {
+              await this.email.sendTaskReassignedEmail({
+                to: assigneeAny.email,
+                userId: updated.assignee.id,
+                userName: updated.assignee.firstName,
+                assignedBy: actorName,
+                projectName,
+                taskTitle: updated.title,
+                taskUrl,
+                companyName: this.config.get<string>('COMPANY_NAME', 'Our Company'),
+                companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+                supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+                year: new Date().getFullYear().toString(),
+              });
+            } else {
+              this.logger.debug(`Sending task_assigned email to ${assigneeAny.email} for task ${updated.id}`);
+              await this.email.sendTaskAssignedEmail({
+                to: assigneeAny.email,
+                userId: updated.assignee.id,
+                userName: updated.assignee.firstName,
+                assignedBy: actorName,
+                projectName,
+                taskTitle: updated.title,
+                taskUrl,
+                companyName: this.config.get<string>('COMPANY_NAME', 'Our Company'),
+                companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+                supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+                year: new Date().getFullYear().toString(),
+              });
+            }
           } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);
-            this.logger.warn(`Failed to send task_assigned email for task ${updated.id}: ${msg}`);
+            this.logger.warn(`Failed to send ${targetType} email for task ${updated.id}: ${msg}`);
           }
+        } else {
+          this.logger.debug(`Not sending ${targetType} email for task ${updated.id} due to user preferences or missing email`);
+        }
+
+        if (isReassignment) {
+          const reassignedActivity = await this.prisma.activityLog.create({
+            data: {
+              action: 'REASSIGNED',
+              entity: 'Task',
+              entityId: updated.id,
+              oldValue: { assigneeId: task.assigneeId },
+              newValue: { assigneeId: updated.assigneeId },
+              userId,
+              projectId: updated.projectId,
+              taskId: updated.id,
+            },
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+            },
+          });
+          this.events.emitActivityCreated(updated.projectId, reassignedActivity);
+        }
+
+        if (isReassignment && task.assigneeId && task.assigneeId !== updated.assigneeId) {
+          this.events.emitToUser(task.assigneeId, 'notification', {
+            type: 'task_unassigned',
+            i18nKey: 'notification.taskUnassigned',
+            i18nParams: { task: updated.title, project: projectName },
+            taskId: updated.id,
+            projectId: updated.projectId,
+            createdAt: new Date().toISOString(),
+          });
+          await this.prisma.notification.create({
+            data: {
+              userId: task.assigneeId,
+              type: 'task_unassigned',
+              title: 'Task reassigned',
+              body: `${updated.title} was reassigned in ${projectName}`,
+            },
+          });
         }
       }
     }
@@ -272,12 +418,13 @@ export class TasksService {
     return updated;
   }
 
-  async updateStatus(id: string, dto: UpdateTaskStatusDto, userId: string) {
-    return this.update(id, { status: dto.status }, userId);
+  async updateStatus(id: string, dto: UpdateTaskStatusDto, userId: string, userRole: Role = Role.USER) {
+    return this.update(id, { status: dto.status }, userId, userRole);
   }
 
-  async remove(id: string, userId: string) {
-    const task = await this.findOne(id, userId);
+  async remove(id: string, userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(id, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
 
     const member = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId: task.projectId, userId } },
@@ -316,8 +463,8 @@ export class TasksService {
     return deleted;
   }
 
-  async getActivity(taskId: string, userId: string) {
-    await this.findOne(taskId, userId);
+  async getActivity(taskId: string, userId: string, userRole: Role = Role.USER) {
+    await this.findOne(taskId, userId, userRole);
 
     return this.prisma.activityLog.findMany({
       where: { taskId },
@@ -329,15 +476,44 @@ export class TasksService {
   }
 
   // Comments
-  async addComment(taskId: string, content: string, userId: string) {
-    await this.findOne(taskId, userId);
+  async addComment(taskId: string, content: string, userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(taskId, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
 
-    return this.prisma.comment.create({
+    const comment = await this.prisma.comment.create({
       data: { content, taskId, authorId: userId },
       include: {
         author: { select: { id: true, firstName: true, lastName: true, avatar: true } },
       },
     });
+
+    const activity = await this.prisma.activityLog.create({
+      data: {
+        action: 'COMMENT_ADDED',
+        entity: 'Comment',
+        entityId: comment.id,
+        newValue: { content: comment.content },
+        userId,
+        projectId: task.projectId,
+        taskId,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(task.projectId, activity);
+
+    const updatedTask = await this.prisma.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: this.taskIncludes(),
+    });
+    const actor = await this.getActorSnapshot(userId);
+    this.events.emitTaskUpdated(task.projectId, updatedTask, {
+      actor,
+      changedFields: ['comments'],
+    });
+
+    return comment;
   }
 
   async deleteComment(commentId: string, userId: string, userRole: Role) {
@@ -354,14 +530,19 @@ export class TasksService {
     });
   }
 
-  async addSubtask(taskId: string, title: string, userId: string) {
-    const task = await this.findOne(taskId, userId);
+  async addSubtask(taskId: string, payload: CreateSubtaskDto, userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(taskId, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
     const existingCount = await this.prisma.subtask.count({ where: { parentTaskId: taskId } });
+    const completed = payload.completed ?? false;
+    const inProgress = completed ? false : (payload.inProgress ?? false);
 
     const subtask = await this.prisma.subtask.create({
       data: {
         parentTaskId: taskId,
-        title: title.trim(),
+        title: payload.title.trim(),
+        completed,
+        inProgress,
         position: existingCount,
       },
     });
@@ -371,7 +552,12 @@ export class TasksService {
         action: 'SUBTASK_CREATED',
         entity: 'Subtask',
         entityId: subtask.id,
-        newValue: { title: subtask.title, position: subtask.position },
+        newValue: {
+          title: subtask.title,
+          completed: subtask.completed,
+          inProgress: subtask.inProgress,
+          position: subtask.position,
+        },
         userId,
         projectId: task.projectId,
         taskId,
@@ -395,8 +581,9 @@ export class TasksService {
     return subtask;
   }
 
-  async updateSubtask(taskId: string, subtaskId: string, data: { title?: string; completed?: boolean; position?: number }, userId: string) {
-    const task = await this.findOne(taskId, userId);
+  async updateSubtask(taskId: string, subtaskId: string, data: { title?: string; completed?: boolean; inProgress?: boolean; position?: number }, userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(taskId, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
 
     const subtask = await this.prisma.subtask.findFirst({
       where: { id: subtaskId, parentTaskId: taskId },
@@ -404,11 +591,21 @@ export class TasksService {
 
     if (!subtask) throw new NotFoundException('Subtask not found');
 
+    const normalizedCompleted = data.completed;
+    const normalizedInProgress = data.inProgress;
+    const nextCompleted = normalizedCompleted !== undefined
+      ? normalizedCompleted
+      : (normalizedInProgress ? false : undefined);
+    const nextInProgress = normalizedInProgress !== undefined
+      ? normalizedInProgress
+      : (normalizedCompleted ? false : undefined);
+
     const updated = await this.prisma.subtask.update({
       where: { id: subtaskId },
       data: {
         ...(data.title !== undefined && { title: data.title.trim() }),
-        ...(data.completed !== undefined && { completed: data.completed }),
+        ...(nextCompleted !== undefined && { completed: nextCompleted }),
+        ...(nextInProgress !== undefined && { inProgress: nextInProgress }),
         ...(data.position !== undefined && { position: data.position }),
       },
     });
@@ -418,8 +615,18 @@ export class TasksService {
         action: 'SUBTASK_UPDATED',
         entity: 'Subtask',
         entityId: subtaskId,
-        oldValue: { title: subtask.title, completed: subtask.completed, position: subtask.position },
-        newValue: { title: updated.title, completed: updated.completed, position: updated.position },
+        oldValue: {
+          title: subtask.title,
+          completed: subtask.completed,
+          inProgress: (subtask as any).inProgress ?? false,
+          position: subtask.position,
+        },
+        newValue: {
+          title: updated.title,
+          completed: updated.completed,
+          inProgress: (updated as any).inProgress ?? false,
+          position: updated.position,
+        },
         userId,
         projectId: task.projectId,
         taskId,
@@ -443,8 +650,9 @@ export class TasksService {
     return updated;
   }
 
-  async removeSubtask(taskId: string, subtaskId: string, userId: string) {
-    const task = await this.findOne(taskId, userId);
+  async removeSubtask(taskId: string, subtaskId: string, userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(taskId, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
 
     const subtask = await this.prisma.subtask.findFirst({
       where: { id: subtaskId, parentTaskId: taskId },
@@ -498,8 +706,9 @@ export class TasksService {
     return { id: subtaskId };
   }
 
-  async reorderSubtasks(taskId: string, orderedIds: string[], userId: string) {
-    const task = await this.findOne(taskId, userId);
+  async reorderSubtasks(taskId: string, orderedIds: string[], userId: string, userRole: Role = Role.USER) {
+    const task = await this.findOne(taskId, userId, userRole);
+    await this.assertProjectAccess(task.projectId, userId, { requireWrite: true, userRole });
 
     const subtasks = await this.prisma.subtask.findMany({
       where: { parentTaskId: taskId },
@@ -553,23 +762,51 @@ export class TasksService {
     return updatedTask.subtasks;
   }
 
-  private async assertProjectAccess(projectId: string, userId: string) {
+  private async assertProjectAccess(
+    projectId: string,
+    userId: string,
+    options?: { requireWrite?: boolean; userRole?: Role },
+  ) {
+    const requireWrite = options?.requireWrite ?? false;
+    const userRole = options?.userRole ?? Role.USER;
+
     const project = await this.prisma.project.findFirst({
-      where: {
-        id: projectId,
-        deletedAt: null,
-        members: { some: { userId } },
-      },
+      where: { id: projectId, deletedAt: null },
+      select: { id: true },
     });
 
     if (!project) throw new ForbiddenException('No access to this project');
+
+    if (userRole === Role.ADMIN) return project;
+
+    const member = await this.prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+      select: { role: true },
+    });
+
+    if (!member || !hasProjectPermission(member.role, 'project.read', userRole)) {
+      throw new ForbiddenException('No access to this project');
+    }
+
+    if (requireWrite && !hasProjectPermission(member.role, 'task.write', userRole)) {
+      throw new ForbiddenException('Insufficient task permissions');
+    }
+
     return project;
   }
 
   private taskIncludes() {
     return {
       assignee: {
-        select: { id: true, firstName: true, lastName: true, avatar: true, email: true, collaborationColor: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          avatar: true,
+          email: true,
+          collaborationColor: true,
+          notificationPrefs: true,
+        },
       },
       creator: {
         select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true },
@@ -595,6 +832,19 @@ export class TasksService {
     const parsed = new Date(raw);
     if (Number.isNaN(parsed.getTime())) return undefined;
     return parsed;
+  }
+
+  private parseNotificationPrefs(raw: unknown) {
+    const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    return {
+      taskAssigned: src.taskAssigned !== false,
+      taskDue: src.taskDue !== false,
+      taskDue1h: src.taskDue1h === true,
+      projectUpdates: src.projectUpdates !== false,
+      weekly: src.weekly !== false,
+      emailNotifications: src.emailNotifications !== false,
+      realtimeNotifications: src.realtimeNotifications !== false,
+    };
   }
 
   private async getActorSnapshot(userId: string) {

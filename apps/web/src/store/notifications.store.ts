@@ -10,6 +10,7 @@ export type NotificationType =
   | 'task_due_reminder'
   | 'comment_added'
   | 'project_updated'
+  | 'project_deleted'
   | 'project_access_revoked'
   | 'weekly_digest'
   | 'mention';
