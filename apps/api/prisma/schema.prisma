@@ -77,6 +77,7 @@ model User {
   oauthAccounts  OAuthAccount[]
   resetTokens    PasswordResetToken[]
   notifications  Notification[]
+  emailLogs      EmailLog[]
 
   @@index([email])
   @@index([username])
@@ -262,12 +263,12 @@ model PasswordResetToken {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   title     String
   body      String?
   type      String
   readAt    DateTime? @map("read_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -275,6 +276,31 @@ model Notification {
   @@index([userId])
   @@index([readAt])
   @@map("notifications")
+}
+
+model EmailLog {
+  id                String    @id @default(uuid())
+  templateType      String    @map("template_type")
+  templateId        String?   @map("template_id")
+  recipient         String
+  status            String
+  provider          String
+  providerMessageId String?   @map("provider_message_id")
+  variables         Json?
+  payload           Json?
+  sentAt            DateTime? @map("sent_at")
+  error             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([templateType])
+  @@index([recipient])
+  @@index([status])
+  @@index([createdAt])
+  @@map("email_logs")
 }
 
 model EmailPreview {

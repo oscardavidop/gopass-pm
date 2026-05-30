@@ -8,12 +8,14 @@ describe('ProjectsService', () => {
     project: { update: jest.fn() },
   } as any;
   const events = {} as any;
+  const config = {} as any;
+  const email = {} as any;
 
   let service: ProjectsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ProjectsService(prisma, events);
+    service = new ProjectsService(prisma, events, config, email);
   });
 
   it('rejects delete when non-owner user is not admin', async () => {

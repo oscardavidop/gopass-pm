@@ -16,8 +16,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { OAuthLoginDto } from './dto/oauth-login.dto';
-import { AuthEmailService } from './auth-email.service';
-import { buildPasswordResetEmail, buildWelcomeEmail } from './auth-email.templates';
+import { EmailService } from '../mail/email.service';
 
 type OAuthProviderInput = 'GOOGLE' | 'GITHUB' | 'MICROSOFT' | 'DISCORD' | 'LINKEDIN';
 
@@ -41,7 +40,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly email: AuthEmailService,
+    private readonly email: EmailService,
   ) {}
 
   private get oauthAccountModel(): OAuthAccountModel {
@@ -89,12 +88,11 @@ export class AuthService {
     await this.saveRefreshToken(tokens.refreshToken, user.id);
 
     const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
-    const welcome = buildWelcomeEmail({ firstName: user.firstName, appUrl });
-    await this.email.send({
+    await this.email.sendWelcomeEmail({
       to: user.email,
-      subject: welcome.subject,
-      html: welcome.html,
-      kind: 'WELCOME',
+      userId: user.id,
+      userName: user.firstName,
+      appUrl,
     });
 
     return { user, ...tokens };
@@ -272,20 +270,17 @@ export class AuthService {
     });
 
     const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
-    const appUrl = this.config.get<string>('APP_URL', frontendUrl);
     const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
-    const template = buildPasswordResetEmail({
-      firstName: user.firstName,
-      appUrl,
-      resetUrl,
-      expiresMinutes: 30,
-    });
 
-    await this.email.send({
+    await this.email.sendResetPasswordEmail({
       to: user.email,
-      subject: template.subject,
-      html: template.html,
-      kind: 'PASSWORD_RESET',
+      userId: user.id,
+      userName: user.firstName,
+      resetUrl,
+      expirationTime: '30 minutes',
+      companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),
+      supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+      companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
     });
 
     return { message: 'If your email exists, you will receive reset instructions shortly.' };

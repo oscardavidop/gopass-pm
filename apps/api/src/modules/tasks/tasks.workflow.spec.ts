@@ -3,11 +3,13 @@ import { TasksService } from './tasks.service';
 describe('Tasks workflow', () => {
   const prisma = {} as any;
   const events = {} as any;
+  const config = { get: jest.fn(() => 'http://localhost:3000') } as any;
+  const email = { sendTaskAssignedEmail: jest.fn() } as any;
 
   let service: TasksService;
 
   beforeEach(() => {
-    service = new TasksService(prisma, events);
+    service = new TasksService(prisma, events, config, email);
   });
 
   it('delegates updateStatus to update', async () => {

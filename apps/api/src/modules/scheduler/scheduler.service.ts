@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import { EmailService } from '../mail/email.service';
 import { TaskStatus } from '@prisma/client';
 
 @Injectable()
@@ -11,6 +13,8 @@ export class SchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly config: ConfigService,
+    private readonly email: EmailService,
   ) {}
 
   /**
@@ -65,11 +69,24 @@ export class SchedulerService {
       },
       include: {
         project: { select: { id: true, name: true } },
+        assignee: { select: { id: true, email: true, firstName: true } },
+        creator: { select: { id: true, email: true, firstName: true } },
       },
     });
 
     for (const task of upcomingTasks) {
       const targetUserId = task.assigneeId ?? task.creatorId;
+      const targetUser = task.assignee ?? task.creator;
+
+      await this.prisma.notification.create({
+        data: {
+          userId: targetUserId,
+          type: 'task_due_reminder',
+          title: 'Task due reminder',
+          body: `${task.title} in ${task.project.name}`,
+        },
+      });
+
       this.events.emitToUser(targetUserId, 'notification', {
         type: 'task_due_reminder',
         i18nKey: 'notification.taskDueReminder',
@@ -78,6 +95,25 @@ export class SchedulerService {
         projectId: task.projectId,
         createdAt: new Date().toISOString(),
       });
+
+      if (targetUser?.email && task.dueDate) {
+        const taskUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/projects/${task.projectId}?taskId=${task.id}`;
+        try {
+          await this.email.sendTaskReminderEmail({
+            to: targetUser.email,
+            userId: targetUser.id,
+            userName: targetUser.firstName,
+            projectName: task.project.name,
+            taskTitle: task.title,
+            dueDate: task.dueDate.toISOString(),
+            taskUrl,
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Due reminder email failed for task ${task.id}: ${msg}`);
+        }
+      }
+
       this.logger.log(`Due reminder sent: task ${task.id} → user ${targetUserId}`);
     }
   }
@@ -90,7 +126,7 @@ export class SchedulerService {
   async sendWeeklyDigest() {
     const users = await this.prisma.user.findMany({
       where: { isActive: true, deletedAt: null },
-      select: { id: true },
+      select: { id: true, email: true, firstName: true },
     });
 
     const now = new Date();
@@ -125,6 +161,15 @@ export class SchedulerService {
 
       if (tasksCompleted === 0 && tasksOverdue === 0 && tasksCreated === 0) continue;
 
+      await this.prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: 'weekly_digest',
+          title: 'Weekly digest',
+          body: `${tasksCompleted} completed · ${tasksCreated} created · ${tasksOverdue} overdue`,
+        },
+      });
+
       this.events.emitToUser(user.id, 'notification', {
         type: 'weekly_digest',
         i18nKey: 'notification.weeklyDigest',
@@ -135,6 +180,25 @@ export class SchedulerService {
         },
         createdAt: new Date().toISOString(),
       });
+
+      if (user.email) {
+        const dashboardUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/dashboard`;
+        try {
+          await this.email.sendWeeklyDigestEmail({
+            to: user.email,
+            userId: user.id,
+            userName: user.firstName,
+            periodLabel: 'Last 7 days',
+            tasksCreated,
+            tasksCompleted,
+            tasksOverdue,
+            dashboardUrl,
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Weekly digest email failed for user ${user.id}: ${msg}`);
+        }
+      }
     }
 
     this.logger.log(`Weekly digest sent to ${users.length} users`);

@@ -1,20 +1,27 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
 import { EventsGateway } from '../events/events.gateway';
+import { EmailService } from '../mail/email.service';
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly config: ConfigService,
+    private readonly email: EmailService,
   ) {}
 
   async create(dto: CreateProjectDto, userId: string) {
@@ -127,16 +134,21 @@ export class ProjectsService {
       throw new ForbiddenException('Insufficient permissions');
     }
 
+    const existingMember = await this.prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId: memberId } },
+    });
+    if (existingMember) {
+      return existingMember;
+    }
+
     // Fetch the new member's user data so we can broadcast their info
     const newMemberUser = await this.prisma.user.findUnique({
       where: { id: memberId },
       select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
     });
 
-    const result = await this.prisma.projectMember.upsert({
-      where: { projectId_userId: { projectId, userId: memberId } },
-      create: { projectId, userId: memberId },
-      update: {},
+    const result = await this.prisma.projectMember.create({
+      data: { projectId, userId: memberId },
     });
 
     const adder = project.members.find((m) => m.userId === currentUserId);
@@ -151,7 +163,16 @@ export class ProjectsService {
       user: newMemberUser,
     });
 
-    // 2. Notify the newly added member privately
+    // 2. Persist notification + notify the newly added member privately
+    await this.prisma.notification.create({
+      data: {
+        userId: memberId,
+        type: 'project_updated',
+        title: 'Project invitation',
+        body: `You were added to ${project.name}`,
+      },
+    });
+
     this.events.emitToUser(memberId, 'notification', {
       type: 'project_updated',
       i18nKey: 'notification.projectMemberAdded',
@@ -159,6 +180,40 @@ export class ProjectsService {
       projectId,
       actorName,
     });
+
+    await this.prisma.activityLog.create({
+      data: {
+        action: 'INVITED_MEMBER',
+        entity: 'ProjectMember',
+        entityId: result.id,
+        newValue: {
+          memberId,
+          projectId,
+          projectName: project.name,
+        },
+        userId: currentUserId,
+        projectId,
+      },
+    });
+
+    if (newMemberUser?.email) {
+      const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+      const projectUrl = `${frontendUrl}/projects/${projectId}`;
+
+      try {
+        await this.email.sendProjectInvitationEmail({
+          to: newMemberUser.email,
+          userId: memberId,
+          userName: newMemberUser.firstName,
+          invitedBy: actorName,
+          projectName: project.name,
+          projectUrl,
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to send project invitation email: ${msg}`);
+      }
+    }
 
     return result;
   }

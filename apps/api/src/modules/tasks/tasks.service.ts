@@ -1,12 +1,15 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Role, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import { EmailService } from '../mail/email.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
@@ -15,10 +18,13 @@ import { FilterTasksDto } from './dto/filter-tasks.dto';
 @Injectable()
 export class TasksService {
   private static readonly DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+  private readonly logger = new Logger(TasksService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly config: ConfigService,
+    private readonly email: EmailService,
   ) {}
 
   async create(projectId: string, dto: CreateTaskDto, userId: string) {
@@ -164,6 +170,62 @@ export class TasksService {
     });
 
     this.events.emitTaskUpdated(updated.projectId, updated);
+
+    const assigneeChanged = dto.assigneeId !== undefined && dto.assigneeId !== task.assigneeId;
+    if (assigneeChanged && updated.assigneeId) {
+      const [project, actor] = await Promise.all([
+        this.prisma.project.findUnique({
+          where: { id: updated.projectId },
+          select: { id: true, name: true },
+        }),
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { firstName: true, lastName: true },
+        }),
+      ]);
+
+      const projectName = project?.name || 'Project';
+      const actorName = [actor?.firstName, actor?.lastName].filter(Boolean).join(' ').trim() || 'A teammate';
+      const taskUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/projects/${updated.projectId}?taskId=${updated.id}`;
+
+      if (updated.assignee) {
+        await this.prisma.notification.create({
+          data: {
+            userId: updated.assignee.id,
+            type: 'task_assigned',
+            title: 'Task assigned',
+            body: `${updated.title} in ${projectName}`,
+          },
+        });
+
+        this.events.emitToUser(updated.assignee.id, 'notification', {
+          type: 'task_assigned',
+          i18nKey: 'notification.taskAssigned',
+          i18nParams: { task: updated.title, project: projectName },
+          taskId: updated.id,
+          projectId: updated.projectId,
+          createdAt: new Date().toISOString(),
+        });
+
+        const assigneeAny = updated.assignee as any;
+        if (assigneeAny?.email) {
+          try {
+            await this.email.sendTaskAssignedEmail({
+              to: assigneeAny.email,
+              userId: updated.assignee.id,
+              userName: updated.assignee.firstName,
+              assignedBy: actorName,
+              projectName,
+              taskTitle: updated.title,
+              taskUrl,
+            });
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Failed to send task_assigned email for task ${updated.id}: ${msg}`);
+          }
+        }
+      }
+    }
 
     // Audit log
     if (changes.length > 0) {
@@ -429,7 +491,7 @@ export class TasksService {
   private taskIncludes() {
     return {
       assignee: {
-        select: { id: true, firstName: true, lastName: true, avatar: true },
+        select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
       },
       creator: {
         select: { id: true, firstName: true, lastName: true, avatar: true },
