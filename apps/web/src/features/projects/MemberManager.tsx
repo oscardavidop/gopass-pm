@@ -31,64 +31,74 @@ interface MemberManagerProps {
   currentUserId: string;
   currentRole: string;
   pendingInvitations?: Array<{ id: string; email: string; status: string; role: string }>;
+  onlyButton?: boolean;
 }
 
 export function MemberManagerTrigger({
   members,
+  onlyButton = false,
   onClick,
 }: {
-  members: ProjectMember[];
-  onClick: () => void;
+  members?: ProjectMember[];
+  onClick?: () => void;
+  onlyButton?: boolean;
 }) {
   const { t } = useTranslation();
+
   const users = members
-    .map((m) => m.user)
-    .filter((u): u is NonNullable<ProjectMember['user']> => Boolean(u));
+    ?.map((m) => m.user)
+    .filter((u): u is NonNullable<ProjectMember['user']> => Boolean(u)) ?? [];
 
-  return (
-    <button
-      onClick={onClick}
-      className="group flex items-center gap-3 rounded-2xl border-border/70 bg-card/80 px-3 py-2 backdrop-blur-sm transition-all duration-200 hover:bg-accent/70"
-      title={t('member.manageTeamMembers', { defaultValue: 'Manage team members' })}
-    >
-      {/* Avatars */}
-      <div className="transition-transform duration-200 group-hover:-translate-y-0.5">
-        <AvatarGroup
-          users={users.map((u) => ({
-            id: u.id,
-            firstName: u.firstName,
-            lastName: u.lastName,
-            avatar: (u as any).avatar,
-          }))}
-          max={5}
-          size="sm"
-          className="-space-x-2"
-        />
-      </div>
-
-      {/* Text */}
-      <div className="hidden sm:flex flex-col items-start leading-tight">
-        <span className="text-sm font-medium text-foreground">
-          {t('member.team', { defaultValue: 'Team' })}
-        </span>
-
-        <span className="text-[11px] text-muted-foreground">
-          {t('member.membersCount', { defaultValue: '{{count}} members', count: members.length })}
-        </span>
-      </div>
-
-      {/* Icon */}
-      <div
-        className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl bg-background/70 transition-colors group-hover:bg-accent"
-      >
-        <Users className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
-      </div>
+  return onlyButton ? (
+    <button onClick={onClick} className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 sm:mt-0">
+      + {t('member.manageMembers', { defaultValue: 'Manage members' })}
     </button>
-  );
+  ) : (
+    <>
+      <button
+        onClick={onClick}
+        className="group flex items-center gap-3 rounded-2xl border-border/70 bg-card/80 px-3 py-2 backdrop-blur-sm transition-all duration-200 hover:bg-accent/70"
+        title={t('member.manageTeamMembers', { defaultValue: 'Manage team members' })}
+      >
+        {/* Avatars */}
+        <div className="transition-transform duration-200 group-hover:-translate-y-0.5">
+          <AvatarGroup
+            users={users.map((u) => ({
+              id: u.id,
+              firstName: u.firstName,
+              lastName: u.lastName,
+              avatar: (u as any).avatar,
+            }))}
+            max={5}
+            size="sm"
+            className="-space-x-2"
+          />
+        </div>
+
+        {/* Text */}
+        <div className="hidden sm:flex flex-col items-start leading-tight">
+          <span className="text-sm font-medium text-foreground">
+            {t('member.team', { defaultValue: 'Team' })}
+          </span>
+
+          <span className="text-[11px] text-muted-foreground">
+            {t('member.membersCount', { defaultValue: '{{count}} members', count: members?.length ?? 0 })}
+          </span>
+        </div>
+
+        {/* Icon */}
+        <div
+          className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl bg-background/70 transition-colors group-hover:bg-accent"
+        >
+          <Users className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+        </div>
+      </button>
+    </>
+  )
 }
 
 /** Modal content */
-export function MemberManager({ projectId, members, currentUserId, currentRole, pendingInvitations = [] }: MemberManagerProps) {
+export function MemberManager({ projectId, members, currentUserId, currentRole, pendingInvitations = [], onlyButton }: MemberManagerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -147,7 +157,7 @@ export function MemberManager({ projectId, members, currentUserId, currentRole, 
 
   return (
     <>
-      <MemberManagerTrigger members={members} onClick={() => setOpen(true)} />
+      <MemberManagerTrigger members={members} onlyButton={onlyButton} onClick={() => setOpen(true)} />
 
       <Dialog open={open} onClose={() => setOpen(false)} title={t('member.teamMembers', { defaultValue: 'Team members' })} className="max-w-md">
         <div className="space-y-4">
@@ -165,76 +175,76 @@ export function MemberManager({ projectId, members, currentUserId, currentRole, 
               const nameB = `${b.user?.firstName ?? ''} ${b.user?.lastName ?? ''}`.trim();
               return nameA.localeCompare(nameB);
             }).
-            map((m) => {
-              const RoleIcon = ROLE_ICON[m.role] ?? User;
-              const isRemoving = removingId === m.userId;
-              const isSelf = m.userId === currentUserId;
-              const isOwner = m.role === 'OWNER';
-              return (
-                <div
-                  key={m.userId}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent/40 transition-colors group"
-                >
-                  <Avatar
-                    src={(m.user as any)?.avatar}
-                    firstName={m.user?.firstName ?? ''}
-                    lastName={m.user?.lastName ?? ''}
-                    size="sm"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {m.user?.firstName} {m.user?.lastName}
-                      {isSelf && <span className="text-xs text-muted-foreground ml-1">({t('member.you', { defaultValue: 'you' })})</span>}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{(m.user as any)?.email}</p>
-                  </div>
-                  <div className={cn('flex items-center gap-1 text-xs font-medium', ROLE_COLOR[m.role])}>
-                    <RoleIcon className="h-3 w-3" />
-                    {canManage && !isOwner ? (
-                      <select
-                        value={m.role}
-                        onChange={(e) => updateRole.mutate({ userId: m.userId, role: e.target.value as any })}
-                        className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px]"
+              map((m) => {
+                const RoleIcon = ROLE_ICON[m.role] ?? User;
+                const isRemoving = removingId === m.userId;
+                const isSelf = m.userId === currentUserId;
+                const isOwner = m.role === 'OWNER';
+                return (
+                  <div
+                    key={m.userId}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent/40 transition-colors group"
+                  >
+                    <Avatar
+                      src={(m.user as any)?.avatar}
+                      firstName={m.user?.firstName ?? ''}
+                      lastName={m.user?.lastName ?? ''}
+                      size="sm"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {m.user?.firstName} {m.user?.lastName}
+                        {isSelf && <span className="text-xs text-muted-foreground ml-1">({t('member.you', { defaultValue: 'you' })})</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{(m.user as any)?.email}</p>
+                    </div>
+                    <div className={cn('flex items-center gap-1 text-xs font-medium', ROLE_COLOR[m.role])}>
+                      <RoleIcon className="h-3 w-3" />
+                      {canManage && !isOwner ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) => updateRole.mutate({ userId: m.userId, role: e.target.value as any })}
+                          className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="ADMIN">{roleLabel.ADMIN}</option>
+                          <option value="MEMBER">{roleLabel.MEMBER}</option>
+                          <option value="VIEWER">{t('member.roleViewer', { defaultValue: 'Viewer' })}</option>
+                        </select>
+                      ) : (
+                        roleLabel[m.role] ?? m.role
+                      )}
+                    </div>
+                    {canManage && !isOwner && !isSelf && (
+                      <button
+                        onClick={() => handleRemove(m.userId)}
+                        disabled={isRemoving}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-destructive disabled:cursor-not-allowed"
+                        title={t('member.removeMember', { defaultValue: 'Remove member' })}
                       >
-                        <option value="ADMIN">{roleLabel.ADMIN}</option>
-                        <option value="MEMBER">{roleLabel.MEMBER}</option>
-                        <option value="VIEWER">{t('member.roleViewer', { defaultValue: 'Viewer' })}</option>
-                      </select>
-                    ) : (
-                      roleLabel[m.role] ?? m.role
+                        {isRemoving ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
+                    {!isOwner && isSelf && (
+                      <button
+                        onClick={handleLeave}
+                        disabled={leaveProject.isPending}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-destructive disabled:cursor-not-allowed"
+                        title={t('member.leaveProject', { defaultValue: 'Leave project' })}
+                      >
+                        {leaveProject.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                     )}
                   </div>
-                  {canManage && !isOwner && !isSelf && (
-                    <button
-                      onClick={() => handleRemove(m.userId)}
-                      disabled={isRemoving}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-destructive disabled:cursor-not-allowed"
-                      title={t('member.removeMember', { defaultValue: 'Remove member' })}
-                    >
-                      {isRemoving ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <X className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  )}
-                  {!isOwner && isSelf && (
-                    <button
-                      onClick={handleLeave}
-                      disabled={leaveProject.isPending}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-destructive disabled:cursor-not-allowed"
-                      title={t('member.leaveProject', { defaultValue: 'Leave project' })}
-                    >
-                      {leaveProject.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <X className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
 
           {/* Add member section */}

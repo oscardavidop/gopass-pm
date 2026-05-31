@@ -237,7 +237,7 @@ export function TaskListView({
       ) : (
         <div className="space-y-3">
           {grouped.map((group) => (
-            <div key={group.key} className="rounded-xl border border-border bg-card overflow-hidden">
+            <div key={group.key} className="rounded-md border border-border bg-card overflow-hidden">
               {groupBy !== 'none' && (
                 <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
                   <div className="flex items-center justify-between">

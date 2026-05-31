@@ -465,7 +465,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                           options={statusOptions}
                           size="sm"
                           ariaLabel={t('task.statusLabel', { defaultValue: 'Status' })}
-                          triggerClassName="h-7 min-w-[132px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-xl"
+                          triggerClassName="h-7 min-w-[132px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-md"
                         />
                       </div>
                     </MetaRow>
@@ -479,7 +479,7 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                           options={priorityOptions}
                           size="sm"
                           ariaLabel={t('task.priorityLabel', { defaultValue: 'Priority' })}
-                          triggerClassName="h-7 min-w-[126px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-xl"
+                          triggerClassName="h-7 min-w-[126px] border-0 bg-transparent px-1.5 shadow-none hover:bg-accent rounded-md"
                         />
                       </div>
                     </MetaRow>

@@ -125,7 +125,7 @@ export function TaskFilters({
             onValueChange={(v) => onPriorityChange(v)}
             options={priorityOptions}
             ariaLabel={t('task.priority', { defaultValue: 'Priority' })}
-            triggerClassName="h-10 rounded-xl"
+            triggerClassName="h-10 rounded-md"
           />
         </div>
 
@@ -135,12 +135,12 @@ export function TaskFilters({
             onValueChange={(v) => onAssigneeChange(v)}
             options={assigneeOptions}
             ariaLabel={t('task.assignee', { defaultValue: 'Assignee' })}
-            triggerClassName="h-10 rounded-xl"
+            triggerClassName="h-10 rounded-md"
           />
         </div>
 
         <div className="lg:col-span-2">
-          <div className="inline-flex h-10 w-full items-center gap-1 rounded-xl border border-border/50 bg-card px-2">
+          <div className="inline-flex h-10 w-full items-center gap-1 rounded-md border border-border/50 bg-card px-2">
             <ListFilter className="h-3.5 w-3.5 text-muted-foreground" />
             <PremiumSelect
               value={groupBy}

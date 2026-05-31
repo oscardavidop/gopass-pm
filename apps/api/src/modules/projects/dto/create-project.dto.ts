@@ -6,6 +6,8 @@ import {
   IsHexColor,
   IsArray,
   IsEmail,
+  IsBoolean,
+  IsObject,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -40,6 +42,32 @@ class CreateProjectInvitationDto {
   @IsOptional()
   @MaxLength(500)
   message?: string;
+}
+
+class ProjectNotificationSettingsDto {
+  @IsOptional()
+  @IsBoolean()
+  taskCreated?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  taskAssigned?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  taskCompleted?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  memberAdded?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  workflowUpdated?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fileUploaded?: boolean;
 }
 
 export class CreateProjectDto {
@@ -81,6 +109,27 @@ export class CreateProjectDto {
   @IsString({ each: true })
   @IsOptional()
   workflowStates?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  priorityLabels?: string[];
+
+  @ApiPropertyOptional({ enum: ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] })
+  @IsString()
+  @IsOptional()
+  invitePermission?: string;
+
+  @ApiPropertyOptional({ enum: ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] })
+  @IsString()
+  @IsOptional()
+  taskCreatePermission?: string;
+
+  @ApiPropertyOptional({ type: ProjectNotificationSettingsDto })
+  @IsObject()
+  @IsOptional()
+  notificationSettings?: ProjectNotificationSettingsDto;
 
   @ApiPropertyOptional({ enum: ProjectStatus })
   @IsEnum(ProjectStatus)

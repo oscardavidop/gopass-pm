@@ -26,6 +26,14 @@ export function useProject(id: string) {
   });
 }
 
+export function useProjectActivity(id: string, limit = 100) {
+  return useQuery({
+    queryKey: [...projectKeys.detail(id), 'activity', limit],
+    queryFn: () => projectsService.getActivity(id, limit),
+    enabled: !!id,
+  });
+}
+
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
@@ -61,5 +69,18 @@ export function useDeleteProject() {
       toast.success(translateByKey('project.deleted', undefined, 'Project deleted'));
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'project.deleteFailed', 'Failed to delete project')),
+  });
+}
+
+export function useTransferProjectOwnership() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userId }: { id: string; userId: string }) => projectsService.transferOwnership(id, userId),
+    onSuccess: (_r, vars) => {
+      qc.invalidateQueries({ queryKey: projectKeys.detail(vars.id) });
+      qc.invalidateQueries({ queryKey: projectKeys.all });
+      toast.success(translateByKey('project.ownershipTransferred', undefined, 'Project ownership transferred'));
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'project.ownershipTransferFailed', 'Failed to transfer ownership')),
   });
 }

@@ -20,6 +20,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -46,6 +47,16 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Get project details' })
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.projectsService.findOne(id, user.id, user.role);
+  }
+
+  @Get(':id/activity')
+  @ApiOperation({ summary: 'Get project activity feed' })
+  findActivity(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('limit') limit?: string,
+  ) {
+    return this.projectsService.findActivity(id, user.id, user.role, Number(limit || 100));
   }
 
   @Patch(':id')
@@ -98,6 +109,16 @@ export class ProjectsController {
     @CurrentUser() user: any,
   ) {
     return this.projectsService.updateMemberRole(id, memberId, dto.role, user.id, user.role);
+  }
+
+  @Post(':id/transfer-ownership')
+  @ApiOperation({ summary: 'Transfer project ownership to another member' })
+  transferOwnership(
+    @Param('id') id: string,
+    @Body() dto: TransferOwnershipDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.projectsService.transferOwnership(id, dto.userId, user.id, user.role);
   }
 
   @Get(':id/invitations')

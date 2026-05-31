@@ -32,8 +32,6 @@ export class LocalStorageProvider implements StorageProvider {
 
   async getObject(path: string) {
     const absolute = this.toAbsolutePath(path);
-    console.log('Getting local storage object for path:', path, 'absolute path:', absolute);
-
     try {
       const stat = await fs.stat(absolute);
       return {

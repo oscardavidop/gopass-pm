@@ -264,6 +264,9 @@ export function useSocket(projectId?: string) {
 
     const onActivityCreated = (payload: any) => {
       queryClientRef.current.invalidateQueries({ queryKey: ['dashboard', 'activity'] });
+      if (payload?.projectId) {
+        queryClientRef.current.invalidateQueries({ queryKey: ['projects', 'detail', payload.projectId, 'activity'] });
+      }
       if (payload?.activity?.taskId) {
         queryClientRef.current.invalidateQueries({ queryKey: ['tasks', 'detail', payload.activity.taskId] });
       }

@@ -6,7 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role, TaskStatus } from '@prisma/client';
+import { ProjectRole, Role, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { EmailService } from '../mail/email.service';
@@ -31,6 +31,23 @@ export class TasksService {
 
   async create(projectId: string, dto: CreateTaskDto, userId: string, userRole: Role = Role.USER) {
     await this.assertProjectAccess(projectId, userId, { requireWrite: true, userRole });
+
+    if (userRole !== Role.ADMIN) {
+      const [project, member] = await Promise.all([
+        this.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { taskCreatePermission: true },
+        }),
+        this.prisma.projectMember.findUnique({
+          where: { projectId_userId: { projectId, userId } },
+          select: { role: true },
+        }),
+      ]);
+
+      if (!this.hasRoleAtLeast(member?.role, project?.taskCreatePermission)) {
+        throw new ForbiddenException('Insufficient permissions to create tasks in this project');
+      }
+    }
 
     const dueDate = this.normalizeDueDate(dto.dueDate);
     const { subtasks = [], ...taskPayload } = dto;
@@ -845,6 +862,17 @@ export class TasksService {
       emailNotifications: src.emailNotifications !== false,
       realtimeNotifications: src.realtimeNotifications !== false,
     };
+  }
+
+  private hasRoleAtLeast(actorRole: ProjectRole | null | undefined, requiredRole: ProjectRole | null | undefined) {
+    if (!actorRole || !requiredRole) return false;
+    const rank: Record<ProjectRole, number> = {
+      OWNER: 4,
+      ADMIN: 3,
+      MEMBER: 2,
+      VIEWER: 1,
+    };
+    return rank[actorRole] >= rank[requiredRole];
   }
 
   private async getActorSnapshot(userId: string) {

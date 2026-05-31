@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
+import { ProjectIdentityAvatar } from '@/components/shared/ProjectIdentityAvatar';
 import { timeAgo } from '@/utils/formatters';
 import {
   useDashboardStats, useDashboardTimeline, useDashboardActivity,
@@ -250,7 +251,7 @@ export function DashboardPage() {
                 <Link key={p.id} to={`/projects/${p.id}`} className="block group">
                   <div className="flex items-center justify-between text-sm mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color }} />
+                      <ProjectIdentityAvatar name={p.name} color={p.color} iconUrl={p.branding?.iconUrl ?? null} size="xs" />
                       <span className="font-medium truncate group-hover:text-primary transition-colors">{p.name}</span>
                     </div>
                     <span className="text-xs text-muted-foreground shrink-0 ml-2">{p.progress ?? 0}%</span>

@@ -6,6 +6,7 @@ import type {
   PaginatedResponse,
   ProjectInvitation,
   ProjectRole,
+  ProjectActivityLog,
 } from '@/types/project.types';
 
 export const projectsService = {
@@ -16,6 +17,9 @@ export const projectsService = {
 
   get: (id: string) =>
     api.get<{ data: Project }>(`/projects/${id}`).then((r) => r.data.data),
+
+  getActivity: (id: string, limit = 100) =>
+    api.get<{ data: ProjectActivityLog[] }>(`/projects/${id}/activity`, { params: { limit } }).then((r) => r.data.data),
 
   create: (payload: CreateProjectPayload) =>
     api.post<{ data: Project }>('/projects', payload).then((r) => r.data.data),
@@ -33,6 +37,9 @@ export const projectsService = {
 
   updateMemberRole: (projectId: string, userId: string, role: ProjectRole) =>
     api.patch(`/projects/${projectId}/members/${userId}/role`, { role }),
+
+  transferOwnership: (projectId: string, userId: string) =>
+    api.post<{ data: Project }>(`/projects/${projectId}/transfer-ownership`, { userId }).then((r) => r.data.data),
 
   removeMember: (projectId: string, userId: string) =>
     api.delete(`/projects/${projectId}/members/${userId}`),

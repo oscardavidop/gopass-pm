@@ -119,8 +119,8 @@ export function PremiumSelect<T extends string = string>({
   }, [open]);
 
   const triggerBase = size === 'sm'
-    ? 'h-8 px-2.5 text-xs rounded-xl'
-    : 'h-10 px-3 text-sm rounded-2xl';
+    ? 'h-8 px-2.5 text-xs rounded-md'
+    : 'h-10 px-3 text-sm rounded-md';
 
   return (
     <div className={cn('w-full', className)}>
@@ -174,7 +174,7 @@ export function PremiumSelect<T extends string = string>({
             sideOffset={8}
             className={cn(
               'z-50 w-[var(--radix-popover-trigger-width)] min-w-[220px] max-w-[95vw]',
-              'rounded-2xl border border-border/50 bg-popover/95 text-popover-foreground backdrop-blur-xl',
+              'rounded-md border border-border/50 bg-popover/95 text-popover-foreground backdrop-blur-xl',
               'shadow-xl shadow-black/10',
               'data-[state=open]:animate-in data-[state=closed]:animate-out',
               'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
@@ -221,7 +221,7 @@ export function PremiumSelect<T extends string = string>({
                             setOpen(false);
                           }}
                           className={cn(
-                            'flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2.5 text-sm outline-none',
+                            'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2.5 text-sm outline-none',
                             'transition-all duration-200',
                             'data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground',
                             'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',

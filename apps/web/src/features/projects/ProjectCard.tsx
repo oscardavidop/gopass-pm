@@ -13,6 +13,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
+import { ProjectIdentityAvatar } from '@/components/shared/ProjectIdentityAvatar';
 import { formatDate } from '@/utils/formatters';
 import { stripRichText } from '@/utils/richText';
 import { cn } from '@/utils/cn';
@@ -89,6 +90,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
   const totalTasks = project._count?.tasks ?? 0;
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const color = project.color ?? '#6366f1';
+  const iconUrl = project.branding?.iconUrl ?? null;
   const descriptionPreview = stripRichText(project.description ?? '');
   const statusLabel: Record<string, string> = {
     ACTIVE: t('project.status.active'),
@@ -101,7 +103,7 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} layout>
         <div className="group premium-panel flex items-center gap-4 px-4 py-3.5 hover:-translate-y-[1px] transition-all duration-200">
-          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+          <ProjectIdentityAvatar name={project.name} color={color} iconUrl={iconUrl} size="sm" />
           <Link to={`/projects/${project.id}`} className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate hover:text-primary transition-colors">{project.name}</p>
             {descriptionPreview && (
@@ -139,6 +141,9 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">{t('project.workspaceProject', { defaultValue: 'Workspace Project' })}</span>
             <span>{t('project.collaboratorsCount', { defaultValue: '{{count}} collaborators', count: project._count?.members ?? 0 })}</span>
+          </div>
+          <div className="mt-2">
+            <ProjectIdentityAvatar name={project.name} color={color} iconUrl={iconUrl} size="sm" />
           </div>
         </div>
         <div className="p-4 flex-1 flex flex-col gap-3">

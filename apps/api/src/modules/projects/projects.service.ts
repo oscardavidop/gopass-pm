@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { ProjectInvitationStatus, ProjectRole, Role } from '@prisma/client';
+import { createHmac } from 'crypto';
+import { FileEntityType, ProjectInvitationStatus, ProjectRole, Role } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -33,11 +34,16 @@ export class ProjectsService {
       .map((state) => state.trim())
       .filter((state) => state.length > 0)
       .slice(0, 12);
+    const priorityLabels = (dto.priorityLabels ?? ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'])
+      .map((label) => label.trim())
+      .filter((label) => label.length > 0)
+      .slice(0, 12);
 
     const created = await this.prisma.project.create({
       data: {
         ...projectPayload,
         workflowStates,
+        priorityLabels,
         ownerId: userId,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
@@ -47,6 +53,25 @@ export class ProjectsService {
       },
       include: this.projectIncludes(),
     });
+
+    const createdActivity = await this.prisma.activityLog.create({
+      data: {
+        action: 'PROJECT_CREATED',
+        entity: 'Project',
+        entityId: created.id,
+        newValue: {
+          name: created.name,
+          status: created.status,
+          visibility: created.visibility,
+        },
+        userId,
+        projectId: created.id,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(created.id, createdActivity);
 
     const actor = await this.getActorSnapshot(userId);
     const actorName = [actor?.firstName, actor?.lastName].filter(Boolean).join(' ').trim() || 'A team member';
@@ -119,8 +144,10 @@ export class ProjectsService {
       this.prisma.project.count({ where }),
     ]);
 
+    const withBranding = await this.decorateProjectsWithBranding(items);
+
     return {
-      items,
+      items: withBranding,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -138,7 +165,7 @@ export class ProjectsService {
       throw new ForbiddenException('Access denied to this project');
     }
 
-    return project;
+    return this.decorateProjectWithBranding(project);
   }
 
   async update(id: string, dto: UpdateProjectDto, userId: string, userRole: Role) {
@@ -157,6 +184,9 @@ export class ProjectsService {
         ...projectData,
         workflowStates: dto.workflowStates
           ? dto.workflowStates.map((state) => state.trim()).filter((state) => state.length > 0).slice(0, 12)
+          : undefined,
+        priorityLabels: dto.priorityLabels
+          ? dto.priorityLabels.map((label) => label.trim()).filter((label) => label.length > 0).slice(0, 12)
           : undefined,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
@@ -185,7 +215,21 @@ export class ProjectsService {
     });
     this.events.emitActivityCreated(id, activity);
 
-    return updated;
+    return this.decorateProjectWithBranding(updated);
+  }
+
+  async findActivity(id: string, userId: string, userRole: Role, limit = 100) {
+    await this.findOne(id, userId, userRole);
+
+    return this.prisma.activityLog.findMany({
+      where: { projectId: id },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+        task: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit || 50, 1), 300),
+    });
   }
 
   async remove(id: string, userId: string, userRole: Role) {
@@ -348,7 +392,7 @@ export class ProjectsService {
   async listInvitations(projectId: string, currentUserId: string, userRole: Role) {
     const project = await this.findOne(projectId, currentUserId, userRole);
     const member = project.members.find((m) => m.userId === currentUserId);
-    if (!hasProjectPermission(member?.role, 'project.invitation.manage', userRole)) {
+    if (userRole !== Role.ADMIN && !this.hasRoleAtLeast(member?.role, project.invitePermission)) {
       throw new ForbiddenException('Insufficient permissions');
     }
 
@@ -367,7 +411,7 @@ export class ProjectsService {
     const project = await this.findOne(projectId, currentUserId, userRole);
     const member = project.members.find((m) => m.userId === currentUserId);
 
-    if (!hasProjectPermission(member?.role, 'project.invitation.manage', userRole)) {
+    if (userRole !== Role.ADMIN && !this.hasRoleAtLeast(member?.role, project.invitePermission)) {
       throw new ForbiddenException('Insufficient permissions');
     }
 
@@ -525,6 +569,21 @@ export class ProjectsService {
       where: { projectId_userId: { projectId, userId: memberId } },
     });
 
+    const activity = await this.prisma.activityLog.create({
+      data: {
+        action: 'MEMBER_REMOVED',
+        entity: 'ProjectMember',
+        entityId: result.id,
+        oldValue: { memberId, role: targetMember.role },
+        userId: currentUserId,
+        projectId,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(projectId, activity);
+
     // Broadcast removal to all members + force-remove the kicked user from the WS room
     this.events.emitMemberRemoved(projectId, memberId, { projectId, userId: memberId });
 
@@ -545,6 +604,21 @@ export class ProjectsService {
     await this.prisma.projectMember.delete({
       where: { projectId_userId: { projectId, userId: currentUserId } },
     });
+
+    const leaveActivity = await this.prisma.activityLog.create({
+      data: {
+        action: 'MEMBER_LEFT',
+        entity: 'ProjectMember',
+        entityId: currentMember.id,
+        oldValue: { memberId: currentUserId, role: currentMember.role },
+        userId: currentUserId,
+        projectId,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+      },
+    });
+    this.events.emitActivityCreated(projectId, leaveActivity);
 
     this.events.emitMemberRemoved(projectId, currentUserId, { projectId, userId: currentUserId });
 
@@ -576,6 +650,64 @@ export class ProjectsService {
     return { left: true, projectId };
   }
 
+  async transferOwnership(projectId: string, targetUserId: string, currentUserId: string, userRole: Role) {
+    const project = await this.findOne(projectId, currentUserId, userRole);
+    const currentMember = project.members.find((member) => member.userId === currentUserId);
+    const targetMember = project.members.find((member) => member.userId === targetUserId);
+
+    if (!currentMember || currentMember.role !== ProjectRole.OWNER) {
+      throw new ForbiddenException('Only owner can transfer project ownership');
+    }
+    if (!targetMember) {
+      throw new NotFoundException('Target user is not a project member');
+    }
+    if (targetUserId === currentUserId) {
+      throw new ForbiddenException('Target user already owns the project');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: projectId },
+        data: { ownerId: targetUserId },
+      });
+
+      await tx.projectMember.update({
+        where: { projectId_userId: { projectId, userId: currentUserId } },
+        data: { role: ProjectRole.ADMIN },
+      });
+
+      await tx.projectMember.update({
+        where: { projectId_userId: { projectId, userId: targetUserId } },
+        data: { role: ProjectRole.OWNER },
+      });
+
+      const activity = await tx.activityLog.create({
+        data: {
+          action: 'OWNERSHIP_TRANSFERRED',
+          entity: 'Project',
+          entityId: projectId,
+          oldValue: { ownerId: currentUserId },
+          newValue: { ownerId: targetUserId },
+          userId: currentUserId,
+          projectId,
+        },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+        },
+      });
+
+      this.events.emitActivityCreated(projectId, activity);
+      return tx.project.findUnique({ where: { id: projectId }, include: this.projectIncludes() });
+    });
+
+    if (!updated) {
+      throw new NotFoundException('Project not found after ownership transfer');
+    }
+
+    this.events.emitProjectUpdated(projectId, updated, await this.getActorSnapshot(currentUserId));
+    return this.decorateProjectWithBranding(updated);
+  }
+
   private projectIncludes() {
     return {
       owner: {
@@ -600,6 +732,61 @@ export class ProjectsService {
     };
   }
 
+  private async decorateProjectWithBranding<T extends { id: string }>(project: T) {
+    const list = await this.decorateProjectsWithBranding([project]);
+    return list[0] as T & {
+      branding: {
+        iconUrl: string | null;
+        bannerUrl: string | null;
+        coverUrl: string | null;
+      };
+    };
+  }
+
+  private async decorateProjectsWithBranding<T extends { id: string }>(projects: T[]) {
+    if (!projects.length) return projects as Array<T & { branding: { iconUrl: null; bannerUrl: null; coverUrl: null } }>;
+
+    const projectIds = projects.map((project) => project.id);
+    const files = await this.prisma.file.findMany({
+      where: {
+        entityType: FileEntityType.PROJECT,
+        entityId: { in: projectIds },
+        kind: { in: ['icon', 'banner', 'cover'] },
+      },
+      select: { id: true, entityId: true, kind: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const brandingMap = new Map<string, { iconUrl: string | null; bannerUrl: string | null; coverUrl: string | null }>();
+
+    for (const file of files) {
+      if (!brandingMap.has(file.entityId)) {
+        brandingMap.set(file.entityId, { iconUrl: null, bannerUrl: null, coverUrl: null });
+      }
+      const target = brandingMap.get(file.entityId)!;
+      if (file.kind === 'icon' && !target.iconUrl) target.iconUrl = this.buildSignedFileUrl(file.id, 60 * 60 * 24);
+      if (file.kind === 'banner' && !target.bannerUrl) target.bannerUrl = this.buildSignedFileUrl(file.id, 60 * 60 * 24);
+      if (file.kind === 'cover' && !target.coverUrl) target.coverUrl = this.buildSignedFileUrl(file.id, 60 * 60 * 24);
+    }
+
+    return projects.map((project) => ({
+      ...project,
+      branding: brandingMap.get(project.id) ?? { iconUrl: null, bannerUrl: null, coverUrl: null },
+    }));
+  }
+
+  private buildSignedFileUrl(fileId: string, ttlSeconds: number) {
+    const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+    const sig = this.signFileUrl(fileId, exp);
+    const prefix = this.config.get<string>('API_PREFIX', 'api/v1').replace(/^\/+|\/+$/g, '');
+    return `/${prefix}/files/${fileId}?exp=${exp}&sig=${sig}`;
+  }
+
+  private signFileUrl(fileId: string, exp: number) {
+    const secret = this.config.get<string>('UPLOADS_SIGNING_SECRET') || this.config.get<string>('JWT_ACCESS_SECRET', 'change-me');
+    return createHmac('sha256', secret).update(`${fileId}:${exp}`).digest('hex');
+  }
+
   private parseNotificationPrefs(raw: unknown) {
     const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
     return {
@@ -611,6 +798,17 @@ export class ProjectsService {
       emailNotifications: src.emailNotifications !== false,
       realtimeNotifications: src.realtimeNotifications !== false,
     };
+  }
+
+  private hasRoleAtLeast(actorRole: ProjectRole | undefined, requiredRole: ProjectRole | undefined) {
+    if (!actorRole || !requiredRole) return false;
+    const rank: Record<ProjectRole, number> = {
+      OWNER: 4,
+      ADMIN: 3,
+      MEMBER: 2,
+      VIEWER: 1,
+    };
+    return rank[actorRole] >= rank[requiredRole];
   }
 
   private async sendProjectMemberAddedNotification(input: {
