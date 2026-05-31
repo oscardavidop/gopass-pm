@@ -9,6 +9,8 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().min(1, 'CORS_ORIGINS is required'),
   FRONTEND_URL: z.string().url('FRONTEND_URL must be a valid URL'),
   OAUTH_REDIRECT_ALLOWLIST: z.string().optional().default(''),
+  COOKIE_DOMAIN: z.string().optional().default(''),
+  COOKIE_SAME_SITE: z.enum(['strict', 'lax', 'none']).optional().default('lax'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 chars').optional(),
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
@@ -51,6 +53,10 @@ export function validateEnv(config: Record<string, unknown>) {
     const sendRealEmail = String(env.SEND_REAL_EMAIL).toLowerCase() === 'true';
     if (sendRealEmail && !env.ZAVU_SENDER_ID) {
       throw new Error('ZAVU_SENDER_ID is required when SEND_REAL_EMAIL=true');
+    }
+
+    if (env.COOKIE_SAME_SITE === 'none' && env.FRONTEND_URL.startsWith('http://')) {
+      throw new Error('COOKIE_SAME_SITE=none requires HTTPS frontend URL in production');
     }
   }
 

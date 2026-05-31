@@ -155,6 +155,7 @@ Additional guidance:
 - GET /api/v1/health
 - GET /api/v1/health/db
 - GET /api/v1/health/realtime
+- GET /api/v1/health/ws
 - GET /api/v1/health/email
 - GET /api/v1/health/live
 - GET /api/v1/health/ready
@@ -168,7 +169,7 @@ Readiness checks:
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20+ (20 or 22 LTS recommended for production parity)
 - npm 10+
 - Docker + Docker Compose
 
@@ -205,8 +206,16 @@ Required production variables include:
 Frontend deploy variables:
 
 - VITE_API_URL
+- VITE_WS_URL
 - VITE_APP_URL
 - VITE_SUPPORTED_LOCALES
+
+Backend deploy variables for separated frontend/backend domains:
+
+- CORS_ORIGINS
+- FRONTEND_URL
+- COOKIE_SAME_SITE
+- COOKIE_DOMAIN
 
 Cloudflare Pages deploy variables:
 
@@ -249,6 +258,12 @@ npm run deploy
 
 This command builds `dist/` and deploys to Cloudflare Pages using Wrangler.
 
+Production frontend builds now require explicit backend endpoints:
+
+- VITE_API_URL=https://api.example.com/api/v1
+- VITE_WS_URL=https://api.example.com
+- VITE_APP_URL=https://app.example.com
+
 SPA routing is production-safe via `public/_redirects`:
 
 - `/projects/:id`
@@ -271,11 +286,26 @@ This command:
 3. Runs Prisma migrations (`prisma migrate deploy`).
 4. Waits for backend health check success.
 
+Notes for separated production deployments:
+
+- `apps/api/docker-compose.prod.yml` now builds from `apps/api` directly and keeps API port mapping aligned with `API_PORT`.
+- Refresh cookie behavior is configurable with `COOKIE_SAME_SITE` and `COOKIE_DOMAIN` for cross-origin frontend/backend deployments.
+- `API_ENV_FILE` can be exported to point Compose and the API service at a non-default environment file.
+
 Root one-command deploy:
 
 ```bash
 npm run deploy
 ```
+
+One-command production refresh for code or env changes:
+
+```bash
+cd apps/api
+npm run update:prod
+```
+
+This command re-reads the env file, forces Docker recreation, reapplies migrations, and waits for health before returning.
 
 ## CI/CD Ready
 
@@ -286,6 +316,16 @@ Workflow includes:
 - backend tests
 - frontend build
 - docker image build
+
+Validated in this workspace:
+
+- `npm run typecheck -w apps/api`
+- `npm run build -w apps/api`
+- `npm run build -w apps/web`
+- `docker compose --project-name gopass_api_probe --env-file /tmp/gopass-api-prod.env -f apps/api/docker-compose.prod.yml up -d --build`
+- `GET /api/v1/health`
+- `GET /api/v1/health/ws`
+- `GET /api/v1/health/ready`
 
 ## Testing
 

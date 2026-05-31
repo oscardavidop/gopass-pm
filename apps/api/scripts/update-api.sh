@@ -2,11 +2,11 @@
 set -euo pipefail
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is required for API deploy"
+  echo "Docker is required for API update"
   exit 1
 fi
 
-API_ENV_FILE="${API_ENV_FILE:-./.env}"
+API_ENV_FILE="${API_ENV_FILE:-./.env.docker.prod}"
 export API_ENV_FILE
 
 if [[ ! -f "$API_ENV_FILE" ]]; then
@@ -29,9 +29,9 @@ if [[ "$SEND_REAL_EMAIL_VALUE" == "true" && -z "${ZAVU_SENDER_ID:-}" ]]; then
   exit 1
 fi
 
-echo "Building and starting API stack (postgres, redis, api)..."
+echo "Updating API stack (code + env)..."
 docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml config >/dev/null
-docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml up -d --build
+docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml up -d --build --force-recreate --remove-orphans
 
 echo "Running database migrations..."
 docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml exec -T api ./node_modules/.bin/prisma migrate deploy
@@ -42,8 +42,8 @@ API_PREFIX_VALUE="${API_PREFIX_VALUE#/}"
 HEALTH_URL="http://localhost:${API_PORT_VALUE}/${API_PREFIX_VALUE}/health"
 
 echo "Waiting for API health at ${HEALTH_URL}"
-for attempt in {1..30}; do
-  echo "Health check attempt ${attempt}/30..."
+for attempt in {1..45}; do
+  echo "Health check attempt ${attempt}/45..."
   if curl -fsS --connect-timeout 2 --max-time 4 "$HEALTH_URL" >/dev/null; then
     echo "API is healthy"
     exit 0
@@ -52,4 +52,6 @@ for attempt in {1..30}; do
 done
 
 echo "API health check failed"
+docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml ps
+docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml logs api --tail=80
 exit 1

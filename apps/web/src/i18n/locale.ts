@@ -1,11 +1,9 @@
-export const DEFAULT_LOCALE = (import.meta.env.VITE_DEFAULT_LOCALE || 'en').toLowerCase();
+import { WEB_ENV } from '@/config/env';
+
+export const DEFAULT_LOCALE = WEB_ENV.defaultLocale;
 
 export function getSupportedLocales(): string[] {
-  const raw = import.meta.env.VITE_SUPPORTED_LOCALES || 'en,es';
-  const locales = raw
-    .split(',')
-    .map((s: string) => s.trim().toLowerCase())
-    .filter(Boolean);
+  const locales = WEB_ENV.supportedLocales;
 
   if (locales.length === 0) return [DEFAULT_LOCALE];
   return Array.from(new Set(locales));

@@ -26,6 +26,12 @@ export class HealthController {
     return this.healthService.realtime();
   }
 
+  @Get('ws')
+  @ApiOperation({ summary: 'WebSocket probe alias' })
+  ws() {
+    return this.healthService.realtime();
+  }
+
   @Get('email')
   @ApiOperation({ summary: 'Email provider probe' })
   email() {

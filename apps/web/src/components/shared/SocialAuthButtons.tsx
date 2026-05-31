@@ -6,16 +6,17 @@ import { useOAuthLogin } from '@/hooks/useAuth';
 import type { OAuthProvider } from '@/services/auth.service';
 import { translateByKey } from '@/i18n/translate';
 import { cn } from '@/utils/cn';
+import { WEB_ENV } from '@/config/env';
 
 function buildOAuthUrl(provider: OAuthProvider, redirectUri: string, state: string) {
   if (provider === 'google') {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = WEB_ENV.googleClientId;
     const scope = encodeURIComponent('openid email profile');
     return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
   }
 
   if (provider === 'github') {
-    const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+    const clientId = WEB_ENV.githubClientId;
     const scope = encodeURIComponent('read:user user:email');
     return `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${encodeURIComponent(state)}`;
   }
@@ -82,15 +83,15 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
   const { t } = useTranslation();
 
   const startOAuth = (provider: OAuthProvider) => {
-    if (provider === 'google' && !import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+    if (provider === 'google' && !WEB_ENV.googleClientId) {
       return;
     }
-    if (provider === 'github' && !import.meta.env.VITE_GITHUB_CLIENT_ID) {
+    if (provider === 'github' && !WEB_ENV.githubClientId) {
       return;
     }
 
     const state = crypto.randomUUID();
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const appUrl = WEB_ENV.appUrl || window.location.origin;
     const redirectUri = `${appUrl}/auth/oauth/callback`;
     const authUrl = buildOAuthUrl(provider, redirectUri, state);
 
@@ -134,8 +135,8 @@ export function SocialAuthButtons({ className = '' }: SocialAuthButtonsProps) {
     window.addEventListener('message', listener);
   };
 
-  const isGoogleEnabled = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const isGithubEnabled = !!import.meta.env.VITE_GITHUB_CLIENT_ID;
+  const isGoogleEnabled = !!WEB_ENV.googleClientId;
+  const isGithubEnabled = !!WEB_ENV.githubClientId;
 
   return (
   <div className={cn('space-y-3', className)}>

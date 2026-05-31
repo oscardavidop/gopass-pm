@@ -2,7 +2,9 @@
 set -euo pipefail
 
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+  set -a
+  . ./.env
+  set +a
 fi
 
 if ! command -v npx >/dev/null 2>&1; then
@@ -20,6 +22,7 @@ fi
 : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required}"
 : "${CLOUDFLARE_PAGES_PROJECT:?CLOUDFLARE_PAGES_PROJECT is required}"
 : "${VITE_API_URL:?VITE_API_URL is required}"
+: "${VITE_WS_URL:?VITE_WS_URL is required}"
 : "${VITE_APP_URL:?VITE_APP_URL is required}"
 
 export VITE_SUPPORTED_LOCALES="${VITE_SUPPORTED_LOCALES:-en,es}"

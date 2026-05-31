@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 import { usePreferencesStore } from '@/store/preferences.store';
+import { WEB_ENV } from '@/config/env';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? '/api/v1',
+  baseURL: WEB_ENV.apiUrl,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -31,7 +32,7 @@ api.interceptors.response.use(
         refreshing = (async () => {
           try {
             const { data } = await axios.post(
-              `${import.meta.env.VITE_API_URL ?? '/api/v1'}/auth/refresh`,
+              `${WEB_ENV.apiUrl}/auth/refresh`,
               {},
               { withCredentials: true },
             );

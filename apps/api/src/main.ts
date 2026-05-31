@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType, BadRequestException, NestInterceptor } from '@nestjs/common';
+import { ValidationPipe, VersioningType, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import cookieParser = require('cookie-parser');
@@ -78,7 +78,7 @@ async function bootstrap() {
 
   // Global filters & interceptors
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new TransformInterceptor() as unknown as NestInterceptor);
+  app.useGlobalInterceptors(new TransformInterceptor());
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()
@@ -105,9 +105,9 @@ async function bootstrap() {
     jsonDocumentUrl: 'api/docs-json',
   });
 
-  await app.listen(port);
-  console.log(`\n🚀 API running on http://localhost:${port}/${prefix}`);
-  console.log(`📚 Swagger docs at http://localhost:${port}/api/docs\n`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`\nAPI running on http://0.0.0.0:${port}/${prefix}`);
+  console.log(`Swagger docs at http://0.0.0.0:${port}/api/docs\n`);
 }
 
 bootstrap();

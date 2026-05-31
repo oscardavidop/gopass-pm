@@ -5,8 +5,9 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 import { useNotificationsStore } from '@/store/notifications.store';
 import { useCollaborationStore } from '@/store/collaboration.store';
+import { WEB_ENV } from '@/config/env';
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000';
+const WS_URL = WEB_ENV.wsUrl;
 
 let socketInstance: Socket | null = null;
 

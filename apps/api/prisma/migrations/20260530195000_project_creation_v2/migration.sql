@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS "project_invitations" (
   "invited_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "accepted_at" TIMESTAMP(3),
   "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL,
   "project_id" TEXT NOT NULL,
   "invited_by_id" TEXT NOT NULL,
   "invited_user_id" TEXT,

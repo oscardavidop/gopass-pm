@@ -38,7 +38,6 @@ export class AuthController {
 
   @Post('register')
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Register a new user' })
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(dto);
@@ -49,7 +48,6 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 7, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login with email and password' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(
@@ -64,7 +62,6 @@ export class AuthController {
   @Post('oauth/:provider')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login or register with OAuth provider' })
   async oauth(
     @Param('provider') providerRaw: string,
@@ -81,7 +78,6 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'Request a password reset link' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
@@ -90,7 +86,6 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 4, ttl: 60_000 } })
   @ApiOperation({ summary: 'Reset password with one-time token' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
@@ -99,7 +94,6 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Refresh access token using HTTP-only cookie' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.['refresh_token'];
@@ -119,7 +113,7 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.['refresh_token'];
     if (token) await this.authService.logout(token);
-    res.clearCookie('refresh_token');
+    this.clearRefreshCookie(res);
     return { data: { ok: true }, i18nKey: 'auth.logoutSuccess' };
   }
 
@@ -130,7 +124,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout all sessions' })
   async logoutAll(@CurrentUser('id') userId: string, @Res({ passthrough: true }) res: Response) {
     await this.authService.logoutAll(userId);
-    res.clearCookie('refresh_token');
+    this.clearRefreshCookie(res);
     return { data: { ok: true }, i18nKey: 'auth.logoutAllSuccess' };
   }
 
@@ -168,11 +162,28 @@ export class AuthController {
 
   private setRefreshCookie(res: Response, token: string) {
     const isProd = this.config.get<string>('NODE_ENV') === 'production';
+    const sameSite = this.config.get<'strict' | 'lax' | 'none'>('COOKIE_SAME_SITE', isProd ? 'lax' : 'lax');
+    const domain = this.config.get<string>('COOKIE_DOMAIN') || undefined;
     res.cookie('refresh_token', token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'strict',
+      sameSite,
+      domain,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+  }
+
+  private clearRefreshCookie(res: Response) {
+    const isProd = this.config.get<string>('NODE_ENV') === 'production';
+    const sameSite = this.config.get<'strict' | 'lax' | 'none'>('COOKIE_SAME_SITE', isProd ? 'lax' : 'lax');
+    const domain = this.config.get<string>('COOKIE_DOMAIN') || undefined;
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite,
+      domain,
       path: '/',
     });
   }
