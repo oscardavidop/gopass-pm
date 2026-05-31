@@ -30,6 +30,9 @@ export VITE_SUPPORTED_LOCALES="${VITE_SUPPORTED_LOCALES:-en,es}"
 echo "Building web app..."
 npm run build
 
+mkdir -p dist/assets/img && cp /home/tina/gopass-pm/apps/web/assets/img/logo-dark.png dist/assets/img/logo-dark.png && cp /home/tina/gopass-pm/apps/web/assets/img/logo-light.png dist/assets/img/logo-light.png
+
+
 echo "Deploying dist/ to Cloudflare Pages project: ${CLOUDFLARE_PAGES_PROJECT}"
 npx wrangler pages deploy dist --project-name "${CLOUDFLARE_PAGES_PROJECT}" --branch main
 

@@ -3,6 +3,8 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -45,8 +47,17 @@ interface PasswordResetTokenModel {
   update: (args: any) => Promise<any>;
 }
 
+interface EmailVerificationTokenModel {
+  deleteMany: (args: any) => Promise<any>;
+  create: (args: any) => Promise<any>;
+  findUnique: (args: any) => Promise<any>;
+  update: (args: any) => Promise<any>;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -60,6 +71,10 @@ export class AuthService {
 
   private get passwordResetTokenModel(): PasswordResetTokenModel {
     return (this.prisma as any)['passwordResetToken'] as PasswordResetTokenModel;
+  }
+
+  private get emailVerificationTokenModel(): EmailVerificationTokenModel {
+    return (this.prisma as any)['emailVerificationToken'] as EmailVerificationTokenModel;
   }
 
 
@@ -83,6 +98,7 @@ export class AuthService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         collaborationColor: this.pickCollaborationColor(dto.email),
+        emailVerified: false,
       },
       select: {
         id: true,
@@ -91,28 +107,23 @@ export class AuthService {
         firstName: true,
         lastName: true,
         collaborationColor: true,
+        emailVerified: true,
         role: true,
         avatar: true,
         createdAt: true,
       },
     });
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
-    await this.saveRefreshToken(tokens.refreshToken, user.id);
-
-    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
-    await this.email.sendWelcomeEmail({
-      to: user.email,
-      userId: user.id,
-      userName: user.firstName,
-      appUrl,
-      supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
-      year: new Date().getFullYear().toString(),
-      companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),
-      companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+    await this.sendEmailVerification(user.id, user.email, user.firstName);
+    await this.logAuthActivity(user.id, 'EMAIL_VERIFICATION_SENT', {
+      source: 'register',
     });
 
-    return { user, ...tokens };
+    return {
+      user,
+      requiresEmailVerification: true,
+      verificationSent: true,
+    };
   }
 
   async login(dto: LoginDto, userAgent?: string, ipAddress?: string) {
@@ -124,12 +135,29 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!user.emailVerified) {
+      await this.logAuthActivity(user.id, 'LOGIN_BLOCKED_UNVERIFIED', {
+        reason: 'email_not_verified',
+      });
+      throw new ForbiddenException({
+        i18nKey: 'auth.emailNotVerified',
+        i18nParams: { email: user.email },
+      });
+    }
+
     const isValid = await bcrypt.compare(dto.password, user.password);
-    if (!isValid) throw new UnauthorizedException('Invalid credentials');
+    if (!isValid) {
+      await this.logAuthActivity(user.id, 'LOGIN_FAILED', { reason: 'invalid_password' });
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     await this.saveRefreshToken(tokens.refreshToken, user.id, userAgent, ipAddress);
+    await this.logAuthActivity(user.id, 'LOGIN_SUCCESS', {
+      userAgent,
+      ipAddress,
+    });
 
     const { password: _, ...safeUser } = user;
     return { user: safeUser, ...tokens };
@@ -239,6 +267,8 @@ export class AuthService {
             firstName: profile.firstName || 'User',
             lastName: profile.lastName || normalized.toLowerCase(),
             collaborationColor: this.pickCollaborationColor(profile.email),
+            emailVerified: true,
+            emailVerifiedAt: new Date(),
             role: Role.USER,
           },
         });
@@ -304,18 +334,45 @@ export class AuthService {
       year: new Date().getFullYear().toString(),
     });
 
+    await this.logAuthActivity(user.id, 'PASSWORD_RESET_REQUESTED', {
+      source: 'forgot_password',
+    });
+
     return { message: 'If your email exists, you will receive reset instructions shortly.' };
   }
 
-  async resetPassword(dto: ResetPasswordDto) {
-    const tokenHash = this.hashToken(dto.token);
+  async validateResetPasswordToken(rawToken: string) {
+    const tokenHash = this.hashToken(rawToken);
     const record = await this.passwordResetTokenModel.findUnique({
       where: { tokenHash },
       include: { user: true },
     });
 
-    if (!record || record.usedAt || record.expiresAt < new Date()) {
-      throw new BadRequestException('Invalid or expired reset token');
+    if (!record || !record.user || !record.user.isActive || record.user.deletedAt) {
+      return { valid: false, reason: 'invalid' as const };
+    }
+    if (record.usedAt) {
+      return { valid: false, reason: 'used' as const };
+    }
+    if (record.expiresAt < new Date()) {
+      return { valid: false, reason: 'expired' as const };
+    }
+
+    return { valid: true, reason: 'ok' as const };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = this.hashToken(dto.token);
+    const validation = await this.validateResetPasswordToken(dto.token);
+    if (!validation.valid) {
+      throw new BadRequestException({
+        i18nKey: 'auth.invalidResetToken',
+      });
+    }
+
+    const record = await this.passwordResetTokenModel.findUnique({ where: { tokenHash }, include: { user: true } });
+    if (!record) {
+      throw new BadRequestException({ i18nKey: 'auth.invalidResetToken' });
     }
 
     const newPasswordHash = await bcrypt.hash(dto.newPassword, 12);
@@ -334,7 +391,109 @@ export class AuthService {
       await tx.refreshToken.deleteMany({ where: { userId: record.userId } });
     });
 
+    await this.logAuthActivity(record.userId, 'PASSWORD_RESET_USED', {
+      source: 'reset_password',
+    });
+
     return { message: 'Password reset successful. Please login again.' };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email: normalized } });
+
+    if (!user || !user.isActive || user.deletedAt || user.emailVerified) {
+      return { sent: true };
+    }
+
+    await this.sendEmailVerification(user.id, user.email, user.firstName);
+    await this.logAuthActivity(user.id, 'EMAIL_VERIFICATION_SENT', { source: 'resend' });
+    return { sent: true };
+  }
+
+  async verifyEmail(rawToken: string) {
+    const tokenHash = this.hashToken(rawToken);
+    const record = await this.emailVerificationTokenModel.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!record || !record.user || !record.user.isActive || record.user.deletedAt) {
+      throw new BadRequestException({ i18nKey: 'auth.invalidVerificationToken' });
+    }
+
+    if (record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException({ i18nKey: 'auth.invalidVerificationToken' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: record.userId },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      await (tx as typeof tx & { emailVerificationToken: EmailVerificationTokenModel }).emailVerificationToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      });
+
+      await (tx as typeof tx & { emailVerificationToken: EmailVerificationTokenModel }).emailVerificationToken.deleteMany({
+        where: { userId: record.userId, usedAt: null },
+      });
+    });
+
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+    await this.email.sendWelcomeEmail({
+      to: record.user.email,
+      userId: record.user.id,
+      userName: record.user.firstName,
+      appUrl,
+      supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+      year: new Date().getFullYear().toString(),
+      companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),
+      companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+    });
+
+    await this.logAuthActivity(record.user.id, 'EMAIL_VERIFICATION_COMPLETED', {
+      source: 'verify_email',
+    });
+
+    return { verified: true };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive || user.deletedAt) {
+      throw new UnauthorizedException({ i18nKey: 'auth.userNotFoundOrInactive' });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      throw new UnauthorizedException({ i18nKey: 'auth.invalidCredentials' });
+    }
+
+    const nextHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: nextHash } });
+    await this.logAuthActivity(userId, 'PASSWORD_CHANGED', { source: 'settings_security' });
+    return { changed: true };
+  }
+
+  async listActiveSessions(userId: string) {
+    return this.prisma.refreshToken.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userAgent: true,
+        ipAddress: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+      take: 20,
+    });
   }
 
   async listEmailPreviews(limit = 25) {
@@ -353,6 +512,55 @@ export class AuthService {
     const preview = await this.email.getPreview(id);
     if (!preview) throw new BadRequestException('Preview not found');
     return preview;
+  }
+
+  private async sendEmailVerification(userId: string, email: string, firstName?: string | null) {
+    await this.emailVerificationTokenModel.deleteMany({ where: { userId, usedAt: null } });
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const ttlMinutes = Number(this.config.get<string>('EMAIL_VERIFICATION_TTL_MINUTES', '60'));
+    const expiresAt = new Date(Date.now() + Math.max(15, Math.min(60, ttlMinutes)) * 60 * 1000);
+
+    await this.emailVerificationTokenModel.create({
+      data: {
+        userId,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
+
+    await this.email.sendEmailVerificationEmail({
+      to: email,
+      userId,
+      userName: firstName || 'there',
+      verificationUrl,
+      expirationTime: `${Math.max(15, Math.min(60, ttlMinutes))} minutes`,
+      companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),
+      supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
+      companyAddress: this.config.get<string>('COMPANY_ADDRESS', '123 Main St, Anytown'),
+      year: new Date().getFullYear().toString(),
+    });
+  }
+
+  private async logAuthActivity(userId: string, action: string, payload?: Record<string, unknown>) {
+    try {
+      await this.prisma.activityLog.create({
+        data: {
+          action,
+          entity: 'Auth',
+          entityId: userId,
+          userId,
+          newValue: payload as any,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Auth activity log failed for ${action}: ${message}`);
+    }
   }
 
   private async generateTokens(userId: string, email: string, role: string) {

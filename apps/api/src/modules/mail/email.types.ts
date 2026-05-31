@@ -1,4 +1,5 @@
 export type EmailTemplateType =
+  | 'email_verification'
   | 'reset_password'
   | 'welcome'
   | 'project_invitation'
@@ -15,6 +16,16 @@ export type SemanticTemplateVariables = Record<string, TemplateScalar>;
 export interface ResetPasswordVariables {
   userName: string;
   resetUrl: string;
+  expirationTime: string;
+  supportEmail: string;
+  year: string;
+  companyName: string;
+  companyAddress: string;
+}
+
+export interface EmailVerificationVariables {
+  userName: string;
+  verificationUrl: string;
   expirationTime: string;
   supportEmail: string;
   year: string;
@@ -84,6 +95,7 @@ export interface WeeklyDigestVariables {
 }
 
 export interface TemplateVariablesByType {
+  email_verification: EmailVerificationVariables;
   reset_password: ResetPasswordVariables;
   welcome: WelcomeVariables;
   project_invitation: ProjectInvitationVariables;
@@ -134,6 +146,19 @@ export interface SendResetPasswordEmailInput {
   locale?: string | null;
   userName?: string | null;
   resetUrl: string;
+  expirationTime: string;
+  companyName: string;
+  supportEmail: string;
+  companyAddress: string;
+  year: string;
+}
+
+export interface SendEmailVerificationEmailInput {
+  to: string;
+  userId?: string;
+  locale?: string | null;
+  userName?: string | null;
+  verificationUrl: string;
   expirationTime: string;
   companyName: string;
   supportEmail: string;

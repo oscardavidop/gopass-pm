@@ -14,6 +14,7 @@ import { EventsModule } from './modules/events/events.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { AiModule } from './modules/ai/ai.module';
 import { HealthModule } from './modules/health/health.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -40,6 +41,7 @@ import { validateEnv } from './config/env.validation';
     SchedulerModule,
     AiModule,
     HealthModule,
+    UploadsModule,
   ],
   providers: [
     {

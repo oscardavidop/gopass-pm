@@ -26,7 +26,7 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@tasku.pro' },
-    update: {},
+    update: { emailVerified: true, emailVerifiedAt: new Date() },
     create: {
       email: 'admin@tasku.pro',
       username: 'admin',
@@ -35,12 +35,14 @@ async function main() {
       lastName: 'GoPass',
       role: 'ADMIN',
       bio: 'Platform administrator',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
   const manager = await prisma.user.upsert({
     where: { email: 'manager@tasku.pro' },
-    update: {},
+    update: { emailVerified: true, emailVerifiedAt: new Date() },
     create: {
       email: 'manager@tasku.pro',
       username: 'manager',
@@ -49,12 +51,14 @@ async function main() {
       lastName: 'Connor',
       role: 'MANAGER',
       bio: 'Engineering manager',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
   const user1 = await prisma.user.upsert({
     where: { email: 'user@tasku.pro' },
-    update: {},
+    update: { emailVerified: true, emailVerifiedAt: new Date() },
     create: {
       email: 'user@tasku.pro',
       username: 'john_doe',
@@ -63,12 +67,14 @@ async function main() {
       lastName: 'Doe',
       role: 'USER',
       bio: 'Frontend developer',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
   const user2 = await prisma.user.upsert({
     where: { email: 'jane@tasku.pro' },
-    update: {},
+    update: { emailVerified: true, emailVerifiedAt: new Date() },
     create: {
       email: 'jane@tasku.pro',
       username: 'jane_smith',
@@ -77,6 +83,8 @@ async function main() {
       lastName: 'Smith',
       role: 'USER',
       bio: 'Backend developer',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 

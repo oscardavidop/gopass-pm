@@ -1,7 +1,26 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, LayoutGrid, Sparkles, Clock3, CircleDashed, CheckCircle2, Gauge, ChevronDown, Bot, FilePenLine, CalendarDays, Rows3 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Plus,
+  LayoutGrid,
+  Sparkles,
+  Clock3,
+  CircleDashed,
+  CheckCircle2,
+  Gauge,
+  ChevronDown,
+  Bot,
+  FilePenLine,
+  CalendarDays,
+  Rows3,
+  FolderOpen,
+  Users,
+  Activity,
+  Settings as SettingsIcon,
+  ClipboardList,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
@@ -18,6 +37,8 @@ import { TaskListView } from '@/features/tasks/TaskListView';
 import { TaskCalendarView } from '@/features/tasks/TaskCalendarView';
 import { PresenceAvatars } from '@/components/shared/PresenceAvatars';
 import { MemberManager } from '@/features/projects/MemberManager';
+import { EntityFilesSection } from '@/components/shared/EntityFilesSection';
+import { ProjectFilesHub } from '@/features/projects/ProjectFilesHub';
 import { useProject } from '@/hooks/useProjects';
 import { useProjectTasks, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -40,6 +61,8 @@ const STATUS_LABEL: Record<string, string> = {
   DONE: 'status.done',
 };
 
+type ProjectMainTab = 'overview' | 'tasks' | 'calendar' | 'files' | 'members' | 'activity' | 'settings';
+
 export function ProjectDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
@@ -51,7 +74,8 @@ export function ProjectDetailPage() {
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [labelFilter, setLabelFilter] = useState('');
   const [groupBy, setGroupBy] = useState<TaskGroupBy>('none');
-  const [viewMode, setViewMode] = useState<'board' | 'list' | 'calendar'>('board');
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  const [activeTab, setActiveTab] = useState<ProjectMainTab>('tasks');
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const [manualCreateOpen, setManualCreateOpen] = useState(false);
   const [taskEditOpen, setTaskEditOpen] = useState(false);
@@ -67,7 +91,7 @@ export function ProjectDetailPage() {
   useEffect(() => {
     if (!id) return;
     const stored = window.localStorage.getItem(`project-view:${id}`);
-    if (stored === 'board' || stored === 'list' || stored === 'calendar') {
+    if (stored === 'board' || stored === 'list') {
       setViewMode(stored);
     }
   }, [id]);
@@ -77,7 +101,6 @@ export function ProjectDetailPage() {
     window.localStorage.setItem(`project-view:${id}`, viewMode);
   }, [id, viewMode]);
 
-  // Redirect if the current user gets removed from this project in real-time
   useEffect(() => {
     const handleRevoked = (e: Event) => {
       const detail = (e as CustomEvent<{ projectId: string }>).detail;
@@ -101,12 +124,17 @@ export function ProjectDetailPage() {
       setDefaultStatus('TODO');
       setEditingTask(null);
       setTaskIdeaSeed('');
+      setActiveTab('tasks');
       setAiCreateOpen(true);
     };
     const handleOpenTaskDetail = (e: Event) => {
       const detail = (e as CustomEvent<{ taskId?: string }>).detail;
-      if (detail?.taskId) setSelectedTaskId(detail.taskId);
+      if (detail?.taskId) {
+        setActiveTab('tasks');
+        setSelectedTaskId(detail.taskId);
+      }
     };
+
     window.addEventListener('gopass:open-task-form', handleOpenTaskForm);
     window.addEventListener('gopass:open-task-detail', handleOpenTaskDetail);
     return () => {
@@ -126,6 +154,7 @@ export function ProjectDetailPage() {
       if (isTextInput) return;
       if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'n') {
         e.preventDefault();
+        setActiveTab('tasks');
         setEditingTask(null);
         setDefaultStatus('TODO');
         setManualTitleSeed('');
@@ -156,10 +185,8 @@ export function ProjectDetailPage() {
     if (!labelQuery) return tasks;
     return tasks.filter((task) => task.tags.some((tag) => tag.toLowerCase().includes(labelQuery)));
   }, [tasks, labelFilter]);
-  const members = useMemo(
-    () => project?.members?.map(({ user }) => user) ?? [],
-    [project],
-  );
+
+  const members = useMemo(() => project?.members?.map(({ user }) => user) ?? [], [project]);
 
   const currentProjectRole = useMemo(
     () => project?.members?.find((m) => m.userId === currentUser?.id)?.role ?? 'MEMBER',
@@ -168,10 +195,7 @@ export function ProjectDetailPage() {
 
   const doneCount = useMemo(() => visibleTasks.filter((t) => t.status === 'DONE').length, [visibleTasks]);
   const progress = visibleTasks.length ? Math.round((doneCount / visibleTasks.length) * 100) : 0;
-  const projectDescriptionPreview = useMemo(
-    () => stripRichText(project?.description ?? ''),
-    [project?.description],
-  );
+  const projectDescriptionPreview = useMemo(() => stripRichText(project?.description ?? ''), [project?.description]);
   const inProgressCount = useMemo(() => visibleTasks.filter((t) => t.status === 'IN_PROGRESS').length, [visibleTasks]);
   const reviewCount = useMemo(() => visibleTasks.filter((t) => t.status === 'REVIEW').length, [visibleTasks]);
   const todoCount = useMemo(() => visibleTasks.filter((t) => t.status === 'TODO').length, [visibleTasks]);
@@ -220,7 +244,6 @@ export function ProjectDetailPage() {
     setSelectedTaskId(null);
   }, [deleteTaskId, deleteTask]);
 
-  /* ── loading state ── */
   if (projectLoading) {
     return (
       <div className="space-y-5 page-enter">
@@ -255,7 +278,6 @@ export function ProjectDetailPage() {
 
   return (
     <div className="space-y-4 page-enter">
-      {/* ── Header ── */}
       <div className="premium-panel p-4 md:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-3">
@@ -310,19 +332,14 @@ export function ProjectDetailPage() {
 
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-t border-border/60 pt-3.5">
           <div className="flex flex-wrap items-center gap-3">
-            {/* Presence (online users) */}
             <PresenceAvatars projectId={id ?? ''} />
-
-            {/* Members — modal trigger */}
-            {project && (
-              <MemberManager
-                projectId={id!}
-                members={project.members}
-                currentUserId={currentUser?.id ?? ''}
-                currentRole={currentProjectRole}
-                pendingInvitations={(project.invitations ?? []).filter((invitation) => invitation.status === 'PENDING') as any}
-              />
-            )}
+            <MemberManager
+              projectId={id!}
+              members={project.members}
+              currentUserId={currentUser?.id ?? ''}
+              currentRole={currentProjectRole}
+              pendingInvitations={(project.invitations ?? []).filter((invitation) => invitation.status === 'PENDING') as any}
+            />
           </div>
 
           <div className="flex items-center gap-3">
@@ -362,12 +379,13 @@ export function ProjectDetailPage() {
                       setDefaultStatus('TODO');
                       setTaskIdeaSeed('');
                       setAiCreateOpen(true);
+                      setActiveTab('tasks');
                     }}
                   >
                     <div className="flex items-start gap-2.5">
                       <span className="mt-0.5 rounded-md bg-primary/15 p-1 text-primary"><Bot className="h-3.5 w-3.5" /></span>
                       <div>
-                        <div className="flex items-center gap-1.5 text-sm font-medium">{t('task.createWithAi', { defaultValue: 'Create with AI' })} <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{t('common.suggested', { defaultValue: 'Suggested' })}</span></div>
+                        <div className="flex items-center gap-1.5 text-sm font-medium">{t('task.createWithAi', { defaultValue: 'Create with AI' })}</div>
                         <p className="text-xs text-muted-foreground">{t('task.createWithAiDesc', { defaultValue: 'Generate complete task draft with AI context.' })}</p>
                       </div>
                     </div>
@@ -378,6 +396,7 @@ export function ProjectDetailPage() {
                       setDefaultStatus('TODO');
                       setManualTitleSeed('');
                       setManualCreateOpen(true);
+                      setActiveTab('tasks');
                     }}
                   >
                     <div className="flex items-start gap-2.5">
@@ -395,139 +414,244 @@ export function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* ── Filters ── */}
-      <TaskFilters
-        search={search}
-        onSearchChange={(value) => {
-          setSearch(value);
-          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'search' } });
-        }}
-        priority={priority}
-        onPriorityChange={(value) => {
-          setPriority(value as Priority | '');
-          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'priority', value } });
-        }}
-        status={statusFilter}
-        onStatusChange={(value) => {
-          setStatusFilter(value as TaskStatus | '');
-          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'status', value } });
-        }}
-        assigneeId={assigneeFilter}
-        onAssigneeChange={(value) => {
-          setAssigneeFilter(value);
-          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'assignee', value } });
-        }}
-        labelFilter={labelFilter}
-        onLabelFilterChange={(value) => {
-          setLabelFilter(value);
-          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'labels', value } });
-        }}
-        groupBy={groupBy}
-        onGroupByChange={(value) => {
-          setGroupBy(value);
-          trackUiEvent({ event: 'Filters Applied', payload: { filter: 'groupBy', value } });
-        }}
-        members={members}
-      />
+      <div className="rounded-xl border border-border/70 bg-card/50 p-1.5">
+        <div className="flex flex-wrap gap-1">
+          {[
+            { key: 'overview', label: t('project.tab.overview', { defaultValue: 'Overview' }), icon: LayoutGrid },
+            { key: 'tasks', label: t('project.tab.tasks', { defaultValue: 'Tasks' }), icon: ClipboardList },
+            { key: 'calendar', label: t('project.tab.calendar', { defaultValue: 'Calendar' }), icon: CalendarDays },
+            { key: 'files', label: t('project.tab.files', { defaultValue: 'Files' }), icon: FolderOpen },
+            { key: 'members', label: t('project.tab.members', { defaultValue: 'Members' }), icon: Users },
+            { key: 'activity', label: t('project.tab.activity', { defaultValue: 'Activity' }), icon: Activity },
+            { key: 'settings', label: t('project.tab.settings', { defaultValue: 'Settings' }), icon: SettingsIcon },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key as ProjectMainTab)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {/* ── Stats bar and view switcher ── */}
-      <div className="flex items-center justify-between">
-      {visibleTasks.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <CircleDashed className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
-            {t('project.todoCount', { defaultValue: '{{count}} todo', count: todoCount })}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Clock3 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-            {t('project.inProgressCount', { defaultValue: '{{count}} in progress', count: inProgressCount })}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <LayoutGrid className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            {t('project.reviewCount', { defaultValue: '{{count}} review', count: reviewCount })}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            {t('project.doneCount', { defaultValue: '{{count}} done', count: doneCount })}
-          </span>
+      {activeTab === 'overview' && (
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-xl border border-border/70 bg-card/60 p-4">
+            <p className="text-xs text-muted-foreground">{t('project.totalTasks', { defaultValue: 'Total tasks' })}</p>
+            <p className="mt-1 text-2xl font-semibold">{tasks.length}</p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card/60 p-4">
+            <p className="text-xs text-muted-foreground">{t('project.sprintCompletion', { defaultValue: 'Sprint completion' })}</p>
+            <p className="mt-1 text-2xl font-semibold">{progress}%</p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card/60 p-4">
+            <p className="text-xs text-muted-foreground">{t('project.membersCount', { defaultValue: 'Members' })}</p>
+            <p className="mt-1 text-2xl font-semibold">{members.length}</p>
+          </div>
         </div>
       )}
 
-      <div className="inline-flex rounded-xl border border-border bg-background p-1">
-        {[
-          { key: 'board', icon: LayoutGrid, label: t('project.view.board', { defaultValue: 'Board' }) },
-          { key: 'list', icon: Rows3, label: t('project.view.list', { defaultValue: 'List' }) },
-          { key: 'calendar', icon: CalendarDays, label: t('project.view.calendar', { defaultValue: 'Calendar' }) },
-        ].map((item) => {
-          const Icon = item.icon;
-          const active = viewMode === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${active
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                }`}
-              onClick={() => {
-                setViewMode(item.key as 'board' | 'list' | 'calendar');
-                trackUiEvent({ event: 'View Switched', payload: { view: item.key, projectId: id } });
-              }}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-      </div>
-
-      {/* ── Views ── */}
-      {viewMode === 'board' && (
-        tasksLoading ? (
-          <div className="flex gap-3 overflow-x-auto pb-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="min-w-[272px] space-y-2">
-                <Skeleton className="h-10 w-full rounded-xl" />
-                <div className="space-y-2 p-2">
-                  {Array.from({ length: 3 }).map((_, j) => (
-                    <Skeleton key={j} className="h-24 w-full rounded-lg" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <KanbanBoard
-            tasks={visibleTasks}
-            onTaskClick={handleTaskClick}
-            onAddTask={handleAddTask}
-            onQuickAdd={handleQuickAdd}
+      {activeTab === 'tasks' && (
+        <>
+          <TaskFilters
+            search={search}
+            onSearchChange={(value) => {
+              setSearch(value);
+              trackUiEvent({ event: 'Filters Applied', payload: { filter: 'search' } });
+            }}
+            priority={priority}
+            onPriorityChange={(value) => {
+              setPriority(value as Priority | '');
+              trackUiEvent({ event: 'Filters Applied', payload: { filter: 'priority', value } });
+            }}
+            status={statusFilter}
+            onStatusChange={(value) => {
+              setStatusFilter(value as TaskStatus | '');
+              trackUiEvent({ event: 'Filters Applied', payload: { filter: 'status', value } });
+            }}
+            assigneeId={assigneeFilter}
+            onAssigneeChange={(value) => {
+              setAssigneeFilter(value);
+              trackUiEvent({ event: 'Filters Applied', payload: { filter: 'assignee', value } });
+            }}
+            labelFilter={labelFilter}
+            onLabelFilterChange={(value) => {
+              setLabelFilter(value);
+              trackUiEvent({ event: 'Filters Applied', payload: { filter: 'labels', value } });
+            }}
+            groupBy={groupBy}
+            onGroupByChange={(value) => {
+              setGroupBy(value);
+              trackUiEvent({ event: 'Filters Applied', payload: { filter: 'groupBy', value } });
+            }}
+            members={members}
           />
-        )
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {visibleTasks.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <CircleDashed className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
+                  {t('project.todoCount', { defaultValue: '{{count}} todo', count: todoCount })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  {t('project.inProgressCount', { defaultValue: '{{count}} in progress', count: inProgressCount })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <LayoutGrid className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  {t('project.reviewCount', { defaultValue: '{{count}} review', count: reviewCount })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  {t('project.doneCount', { defaultValue: '{{count}} done', count: doneCount })}
+                </span>
+              </div>
+            )}
+
+            <div className="inline-flex rounded-xl border border-border bg-background p-1">
+              {[
+                { key: 'board', icon: LayoutGrid, label: t('project.view.board', { defaultValue: 'Board' }) },
+                { key: 'list', icon: Rows3, label: t('project.view.list', { defaultValue: 'List' }) },
+              ].map((item) => {
+                const Icon = item.icon;
+                const active = viewMode === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                    onClick={() => {
+                      setViewMode(item.key as 'board' | 'list');
+                      trackUiEvent({ event: 'View Switched', payload: { view: item.key, projectId: id } });
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {viewMode === 'board' && (
+            tasksLoading ? (
+              <div className="flex gap-3 overflow-x-auto pb-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="min-w-[272px] space-y-2">
+                    <Skeleton className="h-10 w-full rounded-xl" />
+                    <div className="space-y-2 p-2">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <Skeleton key={j} className="h-24 w-full rounded-lg" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <KanbanBoard
+                tasks={visibleTasks}
+                onTaskClick={handleTaskClick}
+                onAddTask={handleAddTask}
+                onQuickAdd={handleQuickAdd}
+              />
+            )
+          )}
+
+          {viewMode === 'list' && (
+            <TaskListView
+              tasks={visibleTasks}
+              loading={tasksLoading}
+              projectName={project.name}
+              groupBy={groupBy}
+              members={members}
+              onTaskClick={handleTaskClick}
+              onInlineUpdate={handleInlineUpdate}
+              onDeleteTasks={handleBulkDelete}
+            />
+          )}
+        </>
       )}
 
-      {viewMode === 'list' && (
-        <TaskListView
-          tasks={visibleTasks}
-          loading={tasksLoading}
-          projectName={project.name}
-          groupBy={groupBy}
-          members={members}
-          onTaskClick={handleTaskClick}
-          onInlineUpdate={handleInlineUpdate}
-          onDeleteTasks={handleBulkDelete}
-        />
-      )}
-
-      {viewMode === 'calendar' && (
+      {activeTab === 'calendar' && (
         <TaskCalendarView
           tasks={visibleTasks}
           onTaskClick={handleTaskClick}
         />
       )}
 
-      {/* ── Task Form Dialog ── */}
+      {activeTab === 'files' && id && (
+        <ProjectFilesHub projectId={id} />
+      )}
+
+      {activeTab === 'members' && (
+        <div className="rounded-xl border border-border/70 bg-card/60 p-4">
+          <h3 className="text-sm font-semibold">{t('project.tab.members', { defaultValue: 'Members' })}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{t('project.currentMembersHint', { defaultValue: 'Manage team roles and access from this panel.' })}</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {project.members.map((member) => (
+              <div key={member.id} className="rounded-lg border border-border/70 bg-background/50 p-2.5">
+                <p className="text-sm font-medium truncate">{member.user.firstName} {member.user.lastName}</p>
+                <p className="text-xs text-muted-foreground truncate">{member.user.email}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">{member.role}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'activity' && (
+        <div className="rounded-xl border border-border/70 bg-card/60 p-6 text-center">
+          <Activity className="mx-auto h-7 w-7 text-muted-foreground/60" />
+          <p className="mt-2 text-sm font-semibold">{t('project.activityTitle', { defaultValue: 'Project activity' })}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('project.activityHint', { defaultValue: 'Task-level realtime activity is available from each task drawer.' })}</p>
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border/70 bg-card/60 p-4">
+            <h3 className="text-sm font-semibold">{t('uploads.brandingTitle', { defaultValue: 'Branding' })}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{t('uploads.brandingDesc', { defaultValue: 'Manage project visual assets without cluttering your main workspace.' })}</p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <EntityFilesSection
+              entityType="PROJECT"
+              entityId={id}
+              title={t('uploads.projectCover', { defaultValue: 'Project cover' })}
+              kind="cover"
+              accept="image/jpeg,image/png,image/webp"
+              multiple={false}
+            />
+            <EntityFilesSection
+              entityType="PROJECT"
+              entityId={id}
+              title={t('uploads.projectIcon', { defaultValue: 'Project icon/image' })}
+              kind="icon"
+              accept="image/jpeg,image/png,image/webp"
+              multiple={false}
+            />
+            <EntityFilesSection
+              entityType="PROJECT"
+              entityId={id}
+              title={t('uploads.projectBanner', { defaultValue: 'Project banner' })}
+              kind="banner"
+              accept="image/jpeg,image/png,image/webp"
+              multiple={false}
+            />
+          </div>
+        </div>
+      )}
+
       <AiTaskCreateDrawer
         open={aiCreateOpen}
         projectId={id ?? ''}
@@ -563,7 +687,6 @@ export function ProjectDetailPage() {
         members={members}
       />
 
-      {/* ── Task Drawer ── */}
       <TaskDrawer
         taskId={selectedTaskId}
         onClose={() => setSelectedTaskId(null)}
@@ -573,7 +696,6 @@ export function ProjectDetailPage() {
         }}
       />
 
-      {/* ── Delete Confirm ── */}
       <ConfirmDialog
         open={!!deleteTaskId}
         onOpenChange={(open) => { if (!open) setDeleteTaskId(null); }}

@@ -1,5 +1,6 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
+import { StreamableFile } from '@nestjs/common';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -17,11 +18,14 @@ function isApiResponse<T>(value: unknown): value is ApiResponse<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
-  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<ApiResponse<T>> {
+export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T> | StreamableFile> {
+  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<ApiResponse<T> | StreamableFile> {
     return next.handle().pipe(
       map((data) => {
         // If the handler already returns our envelope, pass through
+          if (data instanceof StreamableFile) {
+          return data;
+        }
         if (isApiResponse<T>(data)) {
           return data;
         }

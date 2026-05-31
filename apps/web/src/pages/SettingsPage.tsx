@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Moon, Sun, Bell, Globe, Palette, Check, Loader2 } from 'lucide-react';
+import { Moon, Sun, Bell, Globe, Palette, Check, Loader2, Shield, KeyRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/hooks/useTheme';
+import { useChangePassword, useLogoutAllSessions, useSessions } from '@/hooks/useAuth';
 import { usePreferencesStore } from '@/store/preferences.store';
 import { usersService } from '@/services/users.service';
 import { cn } from '@/utils/cn';
@@ -64,6 +65,11 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const changePassword = useChangePassword();
+  const sessions = useSessions();
+  const logoutAllSessions = useLogoutAllSessions();
 
   useEffect(() => {
     let cancelled = false;
@@ -229,6 +235,86 @@ export function SettingsPage() {
               <p className="text-xs text-muted-foreground pt-1">
                 {t('app.autoSaved')}
               </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Security */}
+        <motion.div variants={item}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                {t('settings.securityTitle', { defaultValue: 'Security' })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium inline-flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  {t('settings.changePassword', { defaultValue: 'Change password' })}
+                </p>
+                <input
+                  type="password"
+                  placeholder={t('settings.currentPassword', { defaultValue: 'Current password' })}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <input
+                  type="password"
+                  placeholder={t('settings.newPassword', { defaultValue: 'New password' })}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-background/60 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  loading={changePassword.isPending}
+                  disabled={currentPassword.length < 8 || newPassword.length < 8}
+                  onClick={async () => {
+                    await changePassword.mutateAsync({ currentPassword, newPassword });
+                    setCurrentPassword('');
+                    setNewPassword('');
+                  }}
+                >
+                  {t('settings.updatePassword', { defaultValue: 'Update password' })}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{t('settings.activeSessions', { defaultValue: 'Active sessions' })}</p>
+                {sessions.isLoading ? (
+                  <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {t('common.loading', { defaultValue: 'Loading...' })}
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {(sessions.data ?? []).map((session) => (
+                      <div key={session.id} className="rounded-lg border border-border/70 px-2.5 py-2 text-xs">
+                        <p className="truncate font-medium text-foreground">{session.userAgent || t('settings.unknownDevice', { defaultValue: 'Unknown device' })}</p>
+                        <p className="text-muted-foreground">{session.ipAddress || '-'} · {new Date(session.createdAt).toLocaleString()}</p>
+                      </div>
+                    ))}
+                    {(sessions.data ?? []).length === 0 && (
+                      <p className="text-xs text-muted-foreground">{t('settings.noActiveSessions', { defaultValue: 'No active sessions' })}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-1">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  loading={logoutAllSessions.isPending}
+                  onClick={() => logoutAllSessions.mutate()}
+                >
+                  {t('settings.logoutAllDevices', { defaultValue: 'Force logout all devices' })}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

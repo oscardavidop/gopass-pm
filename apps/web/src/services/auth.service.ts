@@ -1,16 +1,18 @@
 import { api } from './api';
-import type { AuthResponse } from '@/types/auth.types';
+import type { AuthResponse, RegisterResponse } from '@/types/auth.types';
 
 export type OAuthProvider = 'google' | 'github' | 'microsoft' | 'discord' | 'linkedin';
 
 export const authService = {
   register: (data: { email: string; username: string; password: string; firstName: string; lastName: string }) =>
-    api.post<{ data: AuthResponse }>('/auth/register', data).then((r) => r.data.data),
+    api.post<{ data: RegisterResponse }>('/auth/register', data).then((r) => r.data.data),
 
   login: (data: { email: string; password: string }) =>
     api.post<{ data: AuthResponse }>('/auth/login', data).then((r) => r.data.data),
 
   logout: () => api.post('/auth/logout'),
+
+  logoutAll: () => api.post('/auth/logout-all'),
 
   refresh: () => api.post<{ data: { accessToken: string } }>('/auth/refresh').then((r) => r.data.data),
 
@@ -24,6 +26,24 @@ export const authService = {
 
   resetPassword: (data: { token: string; newPassword: string }) =>
     api.post<{ data: { message: string } }>('/auth/reset-password', data).then((r) => r.data.data),
+
+  validateResetPasswordToken: (token: string) =>
+    api.get<{ data: { valid: boolean; reason: 'ok' | 'invalid' | 'expired' | 'used' } }>('/auth/reset-password/validate', {
+      params: { token },
+    }).then((r) => r.data.data),
+
+  verifyEmail: (token: string) =>
+    api.get<{ data: { verified: boolean } }>('/auth/verify-email', { params: { token } }).then((r) => r.data.data),
+
+  resendVerificationEmail: (email: string) =>
+    api.post<{ data: { sent: boolean } }>('/auth/resend-verification', { email }).then((r) => r.data.data),
+
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.patch<{ data: { changed: boolean } }>('/auth/change-password', data).then((r) => r.data.data),
+
+  listSessions: () =>
+    api.get<{ data: Array<{ id: string; userAgent?: string | null; ipAddress?: string | null; createdAt: string; expiresAt: string }> }>('/auth/sessions')
+      .then((r) => r.data.data),
 
   listEmailPreviews: (limit = 30) =>
     api.get<{ data: Array<{ id: string; to: string; subject: string; kind: string; createdAt: string }> }>('/auth/email-previews', {

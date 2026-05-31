@@ -23,6 +23,18 @@ const envSchema = z.object({
   CLOUDFLARE_API_TOKEN: z.string().optional(),
   ZAVU_API_KEY: z.string().optional(),
   ZAVU_SENDER_ID: z.string().optional(),
+  UPLOADS_PROVIDER: z.enum(['local', 's3', 'r2']).optional().default('local'),
+  UPLOADS_LOCAL_ROOT: z.string().optional().default('storage/uploads'),
+  UPLOADS_MAX_FILE_SIZE_MB: z.coerce.number().int().positive().optional().default(25),
+  UPLOADS_ANTIVIRUS_ENABLED: z.string().optional().default('false'),
+  UPLOADS_SIGNING_SECRET: z.string().optional().default(''),
+  UPLOADS_S3_BUCKET: z.string().optional().default(''),
+  UPLOADS_S3_REGION: z.string().optional().default('auto'),
+  UPLOADS_S3_ENDPOINT: z.string().optional().default(''),
+  UPLOADS_S3_ACCESS_KEY: z.string().optional().default(''),
+  UPLOADS_S3_SECRET_KEY: z.string().optional().default(''),
+  UPLOADS_S3_PUBLIC_BASE_URL: z.string().optional().default(''),
+  UPLOADS_S3_FORCE_PATH_STYLE: z.string().optional().default('true'),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

@@ -1,6 +1,10 @@
 import { EmailTemplateRegistryEntry, EmailTemplateType } from './email.types';
 
 export const EMAIL_TEMPLATES = {
+  EMAIL_VERIFICATION: {
+    type: 'email_verification',
+    envKey: 'ZAVU_TEMPLATE_EMAIL_VERIFICATION',
+  },
   RESET_PASSWORD: {
     type: 'reset_password',
     envKey: 'ZAVU_TEMPLATE_RESET_PASSWORD',

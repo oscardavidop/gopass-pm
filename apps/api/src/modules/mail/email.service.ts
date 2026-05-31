@@ -9,6 +9,7 @@ import {
 import {
   EmailProvider,
   ResolvedTemplate,
+  SendEmailVerificationEmailInput,
   SendProjectInvitationEmailInput,
   SendResetPasswordEmailInput,
   SendTaskAssignedEmailInput,
@@ -28,6 +29,24 @@ export class EmailService {
     private readonly prisma: PrismaService,
     @Inject(EMAIL_PROVIDER_TOKEN) private readonly provider: EmailProvider,
   ) {}
+
+  async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput) {
+    return this.sendTemplate({
+      template: 'email_verification',
+      to: input.to,
+      userId: input.userId,
+      locale: input.locale,
+      variables: {
+        userName: input.userName || 'there',
+        verificationUrl: input.verificationUrl,
+        expirationTime: input.expirationTime,
+        companyName: input.companyName,
+        supportEmail: input.supportEmail,
+        year: input.year,
+        companyAddress: input.companyAddress,
+      },
+    });
+  }
 
   async sendTemplate(input: SendTemplateRequest) {
     const resolved = this.resolveTemplate(input.template, input.locale);

@@ -33,6 +33,7 @@ import { useTranslation } from 'react-i18next';
 import { translateByKey } from '@/i18n/translate';
 import { useCollaborationStore } from '@/store/collaboration.store';
 import { AvatarGroup } from '@/components/ui/Avatar';
+import { EntityFilesSection } from '@/components/shared/EntityFilesSection';
 
 /* ─── config maps ──────────────────────────────────────────── */
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -548,6 +549,15 @@ export function TaskDrawer({ taskId, onClose, onEdit }: TaskDrawerProps) {
                       </div>
                     </div>
                   )}
+
+                  <EntityFilesSection
+                    entityType="TASK"
+                    entityId={task.id}
+                    title={t('uploads.attachments', { defaultValue: 'Attachments' })}
+                    kind="attachment"
+                    accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv"
+                    multiple
+                  />
 
                   {/* Tabs */}
                   <div>

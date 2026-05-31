@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsOptional, MaxLength, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -20,8 +20,12 @@ export class UpdateProfileDto {
   @MaxLength(200)
   bio?: string;
 
-  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatar.jpg' })
-  @IsUrl()
+  @ApiPropertyOptional({ example: '/api/v1/files/uuid?exp=123&sig=abc' })
+  @IsString()
   @IsOptional()
+  @MaxLength(2048)
+  @Matches(/^(https?:\/\/.+|\/.+|file:[a-zA-Z0-9-]+)$/i, {
+    message: 'avatar must be an absolute URL, a relative URL, or a file reference',
+  })
   avatar?: string;
 }

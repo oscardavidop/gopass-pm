@@ -69,6 +69,13 @@ enum OAuthProvider {
   LINKEDIN
 }
 
+enum FileEntityType {
+  TASK
+  PROJECT
+  USER
+  COMMENT
+}
+
 // ──────────────────────────── Models ───────────────────────────
 
 model User {
@@ -81,6 +88,8 @@ model User {
   avatar    String?
   collaborationColor String? @map("collaboration_color")
   bio       String?
+  emailVerified Boolean @default(false) @map("email_verified")
+  emailVerifiedAt DateTime? @map("email_verified_at")
   notificationPrefs Json? @map("notification_prefs")
   role      Role      @default(USER)
   isActive  Boolean   @default(true) @map("is_active")
@@ -97,6 +106,8 @@ model User {
   refreshTokens  RefreshToken[]
   oauthAccounts  OAuthAccount[]
   resetTokens    PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  files     File[]
   notifications  Notification[]
   emailLogs      EmailLog[]
   sentProjectInvitations ProjectInvitation[] @relation("ProjectInvitationActor")
@@ -323,6 +334,21 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
 model Notification {
   id        String    @id @default(uuid())
   title     String
@@ -374,4 +400,25 @@ model EmailPreview {
 
   @@index([createdAt])
   @@map("email_previews")
+}
+
+model File {
+  id         String         @id @default(uuid())
+  url        String
+  path       String
+  filename   String
+  mimeType   String         @map("mime_type")
+  size       Int
+  entityType FileEntityType @map("entity_type")
+  entityId   String         @map("entity_id")
+  uploadedBy String         @map("uploaded_by")
+  kind       String?        @default("attachment")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  uploader User @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([uploadedBy])
+  @@index([createdAt])
+  @@map("files")
 }

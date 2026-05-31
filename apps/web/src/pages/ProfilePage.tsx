@@ -1,5 +1,5 @@
 import { useForm } from 'react-hook-form';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Mail, User, Shield, Key, Loader2, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/store/auth.store';
 import { useUpdateProfile } from '@/hooks/useUsers';
+import { useUploadFile } from '@/hooks/useUploads';
 
 const ROLE_VARIANT: Record<string, any> = {
   ADMIN: 'destructive', MANAGER: 'warning', USER: 'secondary',
@@ -24,7 +25,20 @@ interface FormValues {
 export function ProfilePage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
   const updateProfile = useUpdateProfile();
+  const uploadAvatar = useUploadFile('USER', user?.id);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarProgress, setAvatarProgress] = useState(0);
+
+  const avatarUploading = uploadAvatar.isPending;
+  const avatarRingStyle = useMemo(() => {
+    const radius = 34;
+    const circumference = 2 * Math.PI * radius;
+    const progress = Math.min(100, Math.max(0, avatarProgress));
+    const dashOffset = circumference - (progress / 100) * circumference;
+    return { radius, circumference, dashOffset };
+  }, [avatarProgress]);
 
   const { register, handleSubmit, formState: { isDirty } } = useForm<FormValues>({
     defaultValues: {
@@ -36,6 +50,24 @@ export function ProfilePage() {
 
   const onSubmit = (data: FormValues) => {
     updateProfile.mutate(data);
+  };
+
+  const handleAvatarFile = async (file?: File) => {
+    if (!file || !user?.id) return;
+    setAvatarProgress(0);
+    const uploaded = await uploadAvatar.mutateAsync({
+      file,
+      kind: 'avatar',
+      onProgress: setAvatarProgress,
+    });
+
+    if (user) {
+      setUser({
+        ...user,
+        avatar: uploaded.signedUrl || uploaded.url,
+      });
+    }
+    setAvatarProgress(100);
   };
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
@@ -55,18 +87,60 @@ export function ProfilePage() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-5">
                 <div className="relative group">
-                  <Avatar
-                    firstName={user?.firstName ?? ''}
-                    lastName={user?.lastName ?? ''}
-                    size="2xl"
-                    online
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      await handleAvatarFile(file);
+                    }}
                   />
                   <button
                     type="button"
-                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    title={t('profile.changeAvatarSoon', { defaultValue: 'Change avatar (coming soon)' })}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative rounded-full focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <Camera className="h-5 w-5 text-white" />
+                    <Avatar
+                      src={user?.avatar}
+                      firstName={user?.firstName ?? ''}
+                      lastName={user?.lastName ?? ''}
+                      size="2xl"
+                      online
+                    />
+                    {avatarUploading && (
+                      <>
+                        <svg className="pointer-events-none absolute -inset-1 h-[72px] w-[72px] -rotate-90" viewBox="0 0 80 80">
+                          <circle cx="40" cy="40" r={avatarRingStyle.radius} stroke="currentColor" strokeWidth="4" className="text-primary/30" fill="none" />
+                          <circle
+                            cx="40"
+                            cy="40"
+                            r={avatarRingStyle.radius}
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            className="text-primary transition-all"
+                            fill="none"
+                            strokeDasharray={avatarRingStyle.circumference}
+                            strokeDashoffset={avatarRingStyle.dashOffset}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </span>
+                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-medium">
+                          {avatarProgress}%
+                        </span>
+                      </>
+                    )}
+                    <span className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/55 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Camera className="h-4.5 w-4.5 text-white" />
+                      <span className="mt-1 text-[10px] font-medium text-white">
+                        {user?.avatar ? t('uploads.changePhoto', { defaultValue: 'Change Photo' }) : t('uploads.uploadPhoto', { defaultValue: 'Upload Photo' })}
+                      </span>
+                    </span>
                   </button>
                 </div>
 
@@ -85,6 +159,7 @@ export function ProfilePage() {
                   </div>
                 </div>
               </div>
+
             </CardContent>
           </Card>
         </motion.div>

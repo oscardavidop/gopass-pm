@@ -39,7 +39,13 @@ api.interceptors.response.use(
             useAuthStore.getState().setAccessToken(data.data.accessToken);
           } catch {
             useAuthStore.getState().clearAuth();
-            window.location.href = '/login';
+            const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+            const onAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password') || path.startsWith('/reset-password') || path.startsWith('/verify-email');
+            if (onAuthPage) {
+              window.location.href = '/login';
+            } else {
+              window.location.href = `/login?redirectTo=${encodeURIComponent(path)}`;
+            }
           } finally {
             refreshing = null;
           }

@@ -42,12 +42,24 @@ async function bootstrap() {
   });
   app.use(cookieParser());
 
+  const allowedOrigins = corsOrigins.split(',').map((o) => o.trim());
+
   app.enableCors({
-    origin: corsOrigins.split(',').map((o) => o.trim()),
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-  });
+    // cross-origin-resource-policy
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  }); 
 
   app.enableVersioning({
     type: VersioningType.URI,
@@ -94,6 +106,7 @@ async function bootstrap() {
     .addTag('Notifications', 'Notification operations')
     .addTag('Activity', 'Activity and audit trail')
     .addTag('AI', 'AI structured generation endpoints')
+    .addTag('Uploads', 'File upload and serving endpoints')
     .addTag('Settings', 'User and workspace settings')
     .addTag('Dashboard', 'Analytics and metrics')
     .addTag('Health', 'Service probes')

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as AvatarPrimitive from '@radix-ui/react-avatar';
 import { cn } from '@/utils/cn';
+import { resolveApiAssetUrl } from '@/utils/url';
 
 const SIZES = {
   xs: 'h-6 w-6 text-[10px]',
@@ -60,6 +61,7 @@ export function Avatar({
   online,
   color,
 }: AvatarProps) {
+  const resolvedSrc = resolveApiAssetUrl(src);
   const initials = getInitials(firstName, lastName);
   const colorClass = color ? '' : seedColor(initials);
 
@@ -73,9 +75,9 @@ export function Avatar({
           SIZES[size]
         )}
       >
-        {src && (
+        {resolvedSrc && (
           <AvatarPrimitive.Image
-            src={src}
+            src={resolvedSrc}
             alt={`${firstName ?? ''} ${lastName ?? ''}`.trim()}
             className="aspect-square h-full w-full object-cover"
           />

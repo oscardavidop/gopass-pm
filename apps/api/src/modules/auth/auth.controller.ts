@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   Query,
+  Patch,
   Req,
   Res,
   UseGuards,
@@ -25,6 +26,8 @@ import { LoginDto } from './dto/login.dto';
 import { OAuthLoginDto } from './dto/oauth-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -37,12 +40,25 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Register a new user' })
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+  async register(@Body() dto: RegisterDto) {
     const result = await this.authService.register(dto);
-    this.setRefreshCookie(res, result.refreshToken);
-    return { data: { user: result.user, accessToken: result.accessToken }, i18nKey: 'auth.registerSuccess' };
+    return { data: result, i18nKey: 'auth.registerSuccess' };
+  }
+
+  @Get('verify-email')
+  @ApiOperation({ summary: 'Verify email with one-time token' })
+  verifyEmail(@Query('token') token?: string) {
+    if (!token) throw new BadRequestException({ i18nKey: 'auth.invalidVerificationToken' });
+    return this.authService.verifyEmail(token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @ApiOperation({ summary: 'Resend verification email' })
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerificationEmail(dto.email);
   }
 
   @Post('login')
@@ -91,6 +107,13 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
+  @Get('reset-password/validate')
+  @ApiOperation({ summary: 'Validate reset password token' })
+  validateResetPassword(@Query('token') token?: string) {
+    if (!token) return { valid: false, reason: 'invalid' as const };
+    return this.authService.validateResetPasswordToken(token);
+  }
+
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
@@ -126,6 +149,22 @@ export class AuthController {
     await this.authService.logoutAll(userId);
     this.clearRefreshCookie(res);
     return { data: { ok: true }, i18nKey: 'auth.logoutAllSuccess' };
+  }
+
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Change password from authenticated session' })
+  changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(userId, dto.currentPassword, dto.newPassword);
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List active sessions for current user' })
+  sessions(@CurrentUser('id') userId: string) {
+    return this.authService.listActiveSessions(userId);
   }
 
   @Get('me')

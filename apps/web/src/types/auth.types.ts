@@ -8,6 +8,8 @@ export interface User {
   lastName: string;
   avatar: string | null;
   collaborationColor?: string | null;
+  emailVerified?: boolean;
+  emailVerifiedAt?: string | null;
   bio: string | null;
   role: Role;
   isActive: boolean;
@@ -22,4 +24,10 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: User;
   accessToken: string;
+}
+
+export interface RegisterResponse {
+  user: User;
+  requiresEmailVerification: boolean;
+  verificationSent: boolean;
 }
