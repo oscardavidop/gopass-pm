@@ -73,10 +73,10 @@ async function main() {
   });
 
   const user2 = await prisma.user.upsert({
-    where: { email: 'jane@tasku.pro' },
+    where: { email: 'oscarpara3015@gmail.com' },
     update: { emailVerified: true, emailVerifiedAt: new Date() },
     create: {
-      email: 'jane@tasku.pro',
+      email: 'oscarpara3015@gmail.com',
       username: 'jane_smith',
       password: userHash,
       firstName: 'Jane',

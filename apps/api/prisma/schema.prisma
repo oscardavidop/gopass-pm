@@ -462,6 +462,7 @@ model ApiKey {
   name         String
   keyPrefix    String       @map("key_prefix")
   hashedSecret String       @map("hashed_secret")
+  fullKey      String?      @map("full_key")
   scopes       String[]     @default([])
   status       ApiKeyStatus @default(ACTIVE)
   usageCount   Int          @default(0) @map("usage_count")

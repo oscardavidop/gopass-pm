@@ -42,6 +42,7 @@ export class DevelopersService {
         userId,
         name: dto.name,
         keyPrefix: key.prefix,
+        fullKey: key.full,
         hashedSecret: key.hash,
         scopes: this.normalizeScopes(dto.scopes),
         expiresAt,
@@ -68,12 +69,29 @@ export class DevelopersService {
     };
   }
 
+  async getApiKeyFull(userId: string) {
+    const key = await this.prisma.apiKey.findFirst({
+      where: { userId, status: ApiKeyStatus.ACTIVE },
+      select: {
+        id: true,
+        userId: true,
+        fullKey: true,
+      },
+    });
+
+    if (!key || key.userId !== userId) {
+      throw new NotFoundException({ i18nKey: 'developers.apiKey.notFound' });
+    }
+
+    return key;
+  }
+
   listApiKeys(userId: string) {
     return this.cacheManager.remember({
       key: `tasku:developers:${userId}:keys`,
       ttlSeconds: this.config.get('CACHE_TTL_DEVELOPER', 980000),
       loader: () => this.prisma.apiKey.findMany({
-        where: { userId },
+        where: { userId, status: { not: ApiKeyStatus.REVOKED } },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,

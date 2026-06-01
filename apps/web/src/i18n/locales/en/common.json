@@ -66,6 +66,7 @@
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.forgotPassword": "Forgot your password?",
+  "common.demoAccounts": "Demo accounts",
   "auth.noAccount": "Don't have an account?",
   "auth.createAccount": "Create one",
   "auth.registerFailed": "Registration failed",

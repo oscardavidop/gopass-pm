@@ -125,6 +125,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       success: false,
       statusCode: status,
+      message,
       i18nKey,
       i18nParams,
       path: request.url,

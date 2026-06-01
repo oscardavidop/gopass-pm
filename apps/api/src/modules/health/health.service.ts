@@ -17,23 +17,38 @@ export class HealthService {
   ) {}
 
   async summary() {
-    const [db, realtime, email, cache] = await Promise.all([
+    const [api, database, redis, realtime, email, cache] = await Promise.all([
+      this.api(),
       this.database(),
+      this.checkRedis(),
       this.realtime(),
       this.email(),
       this.cache(),
     ]);
-    const ok = db.status === 'ok' && realtime.status === 'ok' && email.status !== 'error';
+    const ok = api.status === 'ok' && database.status === 'ok' && redis.status === 'ok';
 
     return {
       status: ok ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       checks: {
-        db,
+        api,
+        database,
+        redis,
         realtime,
         email,
         cache,
       },
+    };
+  }
+
+  async api() {
+    return {
+      status: 'ok',
+      service: 'api',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Number(process.uptime().toFixed(2)),
+      pid: process.pid,
+      nodeEnv: this.config.get<string>('NODE_ENV', 'development'),
     };
   }
 

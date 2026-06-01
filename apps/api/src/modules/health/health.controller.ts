@@ -9,7 +9,7 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Overall health summary' })
+  @ApiOperation({ summary: 'Overall health summary (API + PostgreSQL + Redis)' })
   health() {
     return this.healthService.summary();
   }

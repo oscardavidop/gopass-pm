@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
-
+import { ApiKeyStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { CacheManager } from '../../shared/redis/cache.manager';
 import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
@@ -145,6 +145,10 @@ export class AuthService {
       requiresEmailVerification: true,
       verificationSent: true,
     };
+  }
+
+  async getUserByEmail(email: string) {
+    return this.prisma.user.findUnique({ where: { email } });
   }
 
   async login(dto: LoginDto, userAgent?: string, ipAddress?: string, country?: string) {
@@ -585,6 +589,23 @@ export class AuthService {
     if (!preview) throw new BadRequestException('Preview not found');
     return preview;
   }
+
+   async getApiKeyFull(userId: string) {
+      const key = await this.prisma.apiKey.findFirst({
+        where: { userId, status: ApiKeyStatus.ACTIVE },
+        select: {
+          id: true,
+          userId: true,
+          fullKey: true,
+        },
+      });
+  
+      if (!key || key.userId !== userId) {
+        throw new NotFoundException({ i18nKey: 'developers.apiKey.notFound' });
+      }
+  
+      return key;
+    }
 
   private async sendEmailVerification(userId: string, email: string, firstName?: string | null) {
     await this.emailVerificationTokenModel.deleteMany({ where: { userId, usedAt: null } });

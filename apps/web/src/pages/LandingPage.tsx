@@ -444,7 +444,8 @@ export function LandingPage() {
             <motion.div variants={fadeUp} className="relative">
               <div className="absolute -inset-6 rounded-[2rem] bg-gradient-to-br from-primary/15 via-violet-500/10 to-transparent blur-2xl" />
               <div className="relative rounded-[1.6rem] border border-border/60 bg-card/60 p-3 shadow-2xl backdrop-blur-sm">
-                <ScreenPlaceholder label={t('landing.screen.dashboardPreview', { defaultValue: 'Dashboard Preview' })} hint={t('landing.screen.dashboardHint', { defaultValue: 'KPIs, completion charts, activity feed, project overview' })} aspect="4/3" glow="primary" />
+              <img src="https://github.com/oscardavidop/gopass-pm/raw/main/docs/screenshots/dashboard.png" alt="Dashboard preview" className="rounded-lg border border-border/50 " />
+                {/* <ScreenPlaceholder label={t('landing.screen.dashboardPreview', { defaultValue: 'Dashboard Preview' })} hint={t('landing.screen.dashboardHint', { defaultValue: 'KPIs, completion charts, activity feed, project overview' })} aspect="4/3" glow="primary" /> */}
               </div>
             </motion.div>
           </motion.div>

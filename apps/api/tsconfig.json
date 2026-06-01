@@ -16,13 +16,10 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "types": ["node", "jest"],
     "paths": {
       "@modules/*": ["./src/modules/*"],
       "@shared/*": ["./src/shared/*"],
-      "@config/*": ["./src/config/*"],
-      "rxjs": ["../../node_modules/rxjs"],
-      "rxjs/*": ["../../node_modules/rxjs/*"]
+      "@config/*": ["./src/config/*"]
     }
   }
 }

@@ -416,6 +416,72 @@ The file `apps/api/docker-compose.prod.yml` is tuned for backend deployment and 
 - Redis password support
 - API health checks against the versioned health route
 
+## Deploy with PM2
+
+PM2 is the official non-Docker production mode for traditional Linux servers such as Ubuntu, Debian, VPS, DigitalOcean, AWS EC2, Hetzner, and Contabo.
+
+### Instalación
+
+```bash
+cd apps/api
+npm install
+```
+
+PM2 is installed as a runtime dependency together with `pm2-runtime`.
+
+### Build
+
+```bash
+npm run build
+```
+
+The production bundle runs from `dist/main.js`.
+
+### Start
+
+```bash
+npm run pm2:start
+```
+
+This loads `ecosystem.config.js`, reads `.env.production` first and then `.env`, and starts the API in PM2 cluster mode by default.
+
+### Restart
+
+```bash
+npm run pm2:restart
+```
+
+### Logs
+
+```bash
+npm run pm2:logs
+```
+
+PM2 writes logs to `logs/out.log` and `logs/error.log`.
+
+For log rotation on Linux hosts:
+
+```bash
+pm2 install pm2-logrotate
+```
+
+### Startup
+
+```bash
+pm2 startup
+pm2 save
+```
+
+Run those commands after the process is registered so PM2 restores it on reboot.
+
+### Zero Downtime Reload
+
+```bash
+pm2 reload gopass-api --update-env
+```
+
+If the deployment uses WebSockets and the infrastructure does not provide sticky sessions, set `PM2_INSTANCES=1` before starting PM2. The default remains `instances: "max"` with `exec_mode: "cluster"` for standard horizontal scaling.
+
 ## Deployment
 
 ### Frontend: Cloudflare Pages

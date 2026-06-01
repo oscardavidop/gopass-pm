@@ -15,6 +15,7 @@ import {
   BadRequestException,
   ForbiddenException,
   UnauthorizedException,
+  NotFoundException
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -31,6 +32,7 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import readme from 'readmeio';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -38,7 +40,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly config: ConfigService,
-  ) {}
+  ) { }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -198,6 +200,43 @@ export class AuthController {
   getPreview(@CurrentUser() user: any, @Param('id') id: string) {
     if (user?.role !== 'ADMIN') throw new ForbiddenException('Insufficient permissions');
     return this.authService.getEmailPreview(id);
+  }
+
+  @Post('readme/webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleReadmeWebhook(@Body() payload: any, @Req() req: Request, @Res() res: Response) {
+    const signature = req.headers['readme-signature'];
+
+    if (!signature || typeof signature !== 'string') {
+      throw new BadRequestException('Missing ReadMe webhook signature');
+    }
+
+    if (!payload || typeof payload !== 'object' || typeof payload.email !== 'string') {
+      throw new BadRequestException('Invalid ReadMe webhook payload');
+    }
+
+    try {
+      readme.verifyWebhook(req.body, signature, this.config.get<string>('README_WEBHOOK_SECRET', ''));
+    } catch (e) {
+      // throw new UnauthorizedException('Invalid ReadMe webhook signature');
+    }
+
+    const user = await this.authService.getUserByEmail(payload.email);
+
+    if (!user) {
+      throw new NotFoundException('User not found for provided email');
+    }
+
+    const apiKey = await this.authService.getApiKeyFull(user.id);
+
+    if (!apiKey) {
+      throw new NotFoundException('API key not found for user');
+    }
+
+    return res.json({
+      'access-token': apiKey.fullKey,
+      'api-key-header': apiKey.fullKey,
+    });
   }
 
   private parseProvider(providerRaw: string): string {

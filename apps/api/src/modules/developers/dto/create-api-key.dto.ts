@@ -6,7 +6,7 @@ export class CreateApiKeyDto {
   @IsString()
   @MinLength(3)
   @MaxLength(80)
-  name: string;
+  name!: string;
 
   @ApiProperty({
     required: false,
