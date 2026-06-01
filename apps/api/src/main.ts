@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType, BadRequestException } from '@nestjs/common';
+import { ValidationPipe, VersioningType, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import cookieParser = require('cookie-parser');
@@ -7,6 +7,8 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
 import { TransformInterceptor } from './shared/interceptors/transform.interceptor';
+import { RedisService } from './shared/redis/redis.service';
+import { RedisIoAdapter } from './shared/redis/redis-io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -14,6 +16,7 @@ async function bootstrap() {
   });
 
   const config = app.get(ConfigService);
+  const redisService = app.get(RedisService);
   const port = config.get<number>('API_PORT', 3001);
   const prefix = config.get<string>('API_PREFIX', 'api/v1');
   const corsOrigins = config.get<string>('CORS_ORIGINS', 'http://localhost:3000');
@@ -23,7 +26,19 @@ async function bootstrap() {
   (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          frameAncestors: ["'none'"],
+          objectSrc: ["'none'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          connectSrc: ["'self'", 'https:', 'wss:'],
+        },
+      },
       hsts: isProd
         ? {
           maxAge: 31536000,
@@ -36,10 +51,6 @@ async function bootstrap() {
       noSniff: true,
     }),
   );
-  app.use((_, res, next) => {
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    next();
-  });
   app.use(cookieParser());
 
   const allowedOrigins = corsOrigins.split(',').map((o) => o.trim());
@@ -50,7 +61,7 @@ async function bootstrap() {
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(new ForbiddenException(`CORS origin denied: ${origin}`));
       }
     },
     credentials: true,
@@ -67,6 +78,12 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix(prefix);
+
+  // Set header for all responses
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Max-Age', '86400');
+    next();
+  });
 
   // Global pipes
   app.useGlobalPipes(
@@ -91,6 +108,10 @@ async function bootstrap() {
   // Global filters & interceptors
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
+
+  const redisIoAdapter = new RedisIoAdapter(app, redisService);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()

@@ -23,12 +23,20 @@ describe('TasksService', () => {
   const events = { emitTaskUpdated: jest.fn() } as any;
   const config = { get: jest.fn(() => 'http://localhost:3000') } as any;
   const email = { sendTaskAssignedEmail: jest.fn() } as any;
+  const cacheManager = { remember: jest.fn() } as any;
+  const cacheInvalidation = {
+    invalidateTask: jest.fn(),
+    invalidateProject: jest.fn(),
+    invalidateDashboard: jest.fn(),
+    invalidateNotifications: jest.fn(),
+    invalidateUser: jest.fn(),
+  } as any;
 
   let service: TasksService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new TasksService(prisma, events, config, email);
+    service = new TasksService(prisma, events, config, email, cacheManager, cacheInvalidation);
     jest.spyOn(service as any, 'findOne').mockResolvedValue({ id: 'task-1', projectId: 'project-1' });
   });
 

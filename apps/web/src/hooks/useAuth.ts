@@ -27,7 +27,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: authService.login,
     onSuccess: (data) => {
-      setAuth(data.user, data.accessToken);
+      setAuth(data.user, data.accessToken, data.sessionId);
       const params = new URLSearchParams(location.search);
       const redirectTo = resolveRedirectTarget(params.get('redirectTo'));
       navigate(redirectTo, { replace: true });
@@ -68,7 +68,7 @@ export function useOAuthLogin() {
     mutationFn: ({ provider, code, redirectUri, state }: { provider: OAuthProvider; code: string; redirectUri: string; state?: string }) =>
       authService.oauthLogin(provider, { code, redirectUri, state }),
     onSuccess: (data) => {
-      setAuth(data.user, data.accessToken);
+      setAuth(data.user, data.accessToken, data.sessionId);
       const params = new URLSearchParams(location.search);
       const redirectTo = resolveRedirectTarget(params.get('redirectTo'));
       navigate(redirectTo, { replace: true });
@@ -134,6 +134,24 @@ export function useSessions() {
     queryKey: ['auth', 'sessions'],
     queryFn: () => authService.listSessions(),
     staleTime: 30_000,
+  });
+}
+
+export function useLogoutSession() {
+  const { sessionId: currentSessionId, clearAuth } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => authService.logoutSession(sessionId),
+    onSuccess: (_, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
+      if (sessionId === currentSessionId) {
+        clearAuth();
+        queryClient.clear();
+        window.location.href = '/login';
+      }
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'common.internalError', 'Unexpected server error')),
   });
 }
 

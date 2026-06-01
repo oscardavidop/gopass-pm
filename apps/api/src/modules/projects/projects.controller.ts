@@ -130,8 +130,6 @@ export class ProjectsController {
   }
 
   @Post(':id/invitations')
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Invite member by email' })
   inviteMember(
     @Param('id') id: string,

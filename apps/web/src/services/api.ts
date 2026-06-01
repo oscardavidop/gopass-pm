@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 import { usePreferencesStore } from '@/store/preferences.store';
 import { WEB_ENV } from '@/config/env';
+import { broadcastAuthSnapshot } from '@/services/auth-sync';
 
 export const api = axios.create({
   baseURL: WEB_ENV.apiUrl,
@@ -18,7 +19,47 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let refreshing: Promise<void> | null = null;
+let refreshing: Promise<boolean> | null = null;
+
+function getRedirectPath() {
+  if (typeof window === 'undefined') return '/login';
+  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const onAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password') || path.startsWith('/reset-password') || path.startsWith('/verify-email');
+  return onAuthPage ? '/login' : `/login?redirectTo=${encodeURIComponent(path)}`;
+}
+
+function clearSessionAndRedirect() {
+  useAuthStore.getState().clearAuth();
+  if (typeof window !== 'undefined') {
+    window.location.href = getRedirectPath();
+  }
+}
+
+export async function refreshAuthSession() {
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const { data } = await axios.post(
+          `${WEB_ENV.apiUrl}/auth/refresh`,
+          {},
+          { withCredentials: true },
+        );
+        const payload = data.data as { accessToken: string; sessionId: string };
+        const currentUser = useAuthStore.getState().user;
+        useAuthStore.setState({ accessToken: payload.accessToken, sessionId: payload.sessionId });
+        broadcastAuthSnapshot({ user: currentUser, accessToken: payload.accessToken, sessionId: payload.sessionId });
+        return true;
+      } catch {
+        clearSessionAndRedirect();
+        return false;
+      } finally {
+        refreshing = null;
+      }
+    })();
+  }
+
+  return refreshing;
+}
 
 api.interceptors.response.use(
   (res) => res,
@@ -28,32 +69,12 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
 
-      if (!refreshing) {
-        refreshing = (async () => {
-          try {
-            const { data } = await axios.post(
-              `${WEB_ENV.apiUrl}/auth/refresh`,
-              {},
-              { withCredentials: true },
-            );
-            useAuthStore.getState().setAccessToken(data.data.accessToken);
-          } catch {
-            useAuthStore.getState().clearAuth();
-            const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-            const onAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password') || path.startsWith('/reset-password') || path.startsWith('/verify-email');
-            if (onAuthPage) {
-              window.location.href = '/login';
-            } else {
-              window.location.href = `/login?redirectTo=${encodeURIComponent(path)}`;
-            }
-          } finally {
-            refreshing = null;
-          }
-        })();
-      }
-
-      await refreshing;
-      original.headers.Authorization = `Bearer ${useAuthStore.getState().accessToken}`;
+      const refreshed = await refreshAuthSession();
+      if (!refreshed) return Promise.reject(error);
+      original.headers = {
+        ...original.headers,
+        Authorization: `Bearer ${useAuthStore.getState().accessToken}`,
+      };
       return api(original);
     }
 

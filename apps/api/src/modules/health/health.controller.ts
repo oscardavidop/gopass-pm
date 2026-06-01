@@ -49,4 +49,10 @@ export class HealthController {
   ready() {
     return this.healthService.ready();
   }
+
+  @Get('cache')
+  @ApiOperation({ summary: 'Cache and Redis metrics' })
+  cache() {
+    return this.healthService.cache();
+  }
 }

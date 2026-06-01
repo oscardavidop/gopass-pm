@@ -4,6 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
+  REDIS_PREFIX: z.string().min(1).default('tasku'),
   API_PORT: z.coerce.number().int().positive().default(3001),
   API_PREFIX: z.string().min(1).default('api/v1'),
   CORS_ORIGINS: z.string().min(1, 'CORS_ORIGINS is required'),
@@ -15,9 +16,15 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+  API_KEY_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(1000),
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
+  CACHE_TTL_USER: z.coerce.number().int().positive().default(300),
+  CACHE_TTL_PROJECT: z.coerce.number().int().positive().default(120),
+  CACHE_TTL_TASK: z.coerce.number().int().positive().default(90),
+  CACHE_TTL_ACTIVITY: z.coerce.number().int().positive().default(30),
+  CACHE_TTL_DASHBOARD: z.coerce.number().int().positive().default(60),
   SEND_REAL_EMAIL: z.string().optional().default('false'),
   CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
   CLOUDFLARE_API_TOKEN: z.string().optional(),
@@ -27,7 +34,7 @@ const envSchema = z.object({
   UPLOADS_LOCAL_ROOT: z.string().optional().default('storage/uploads'),
   UPLOADS_MAX_FILE_SIZE_MB: z.coerce.number().int().positive().optional().default(25),
   UPLOADS_ANTIVIRUS_ENABLED: z.string().optional().default('false'),
-  UPLOADS_SIGNING_SECRET: z.string().optional().default(''),
+  UPLOADS_SIGNING_SECRET: z.string().min(32, 'UPLOADS_SIGNING_SECRET must be at least 32 chars'),
   UPLOADS_S3_BUCKET: z.string().optional().default(''),
   UPLOADS_S3_REGION: z.string().optional().default('auto'),
   UPLOADS_S3_ENDPOINT: z.string().optional().default(''),
@@ -56,6 +63,10 @@ export function validateEnv(config: Record<string, unknown>) {
 
     if (env.JWT_ACCESS_SECRET.includes('change_me') || env.JWT_REFRESH_SECRET.includes('change_me')) {
       throw new Error('Production secrets cannot use placeholder values');
+    }
+
+    if (!env.UPLOADS_SIGNING_SECRET || env.UPLOADS_SIGNING_SECRET.length < 32) {
+      throw new Error('UPLOADS_SIGNING_SECRET must be at least 32 chars in production');
     }
 
     if (!env.ZAVU_API_KEY) {

@@ -5,6 +5,7 @@ import {
   FolderKanban,
   Calendar,
   Settings,
+  Code2,
   ChevronsUpDown,
   Menu,
   PanelLeft,
@@ -64,6 +65,7 @@ function SidebarContent({
     {
       title: t('sidebar.system', { defaultValue: 'System' }),
       items: [
+        { label: t('sidebar.developers', { defaultValue: 'Developers' }), href: '/developers', icon: Code2 },
         { label: t('sidebar.team', { defaultValue: 'Team' }), href: '/profile', icon: Users },
         { label: t('app.settings', { defaultValue: 'Settings' }), href: '/settings', icon: Settings },
       ],

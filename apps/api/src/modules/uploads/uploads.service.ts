@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Inject,
+  InternalServerErrorException,
   Injectable,
   Logger,
   NotFoundException,
@@ -268,7 +269,10 @@ export class UploadsService {
   }
 
   private sign(fileId: string, exp: number) {
-    const secret = this.config.get<string>('UPLOADS_SIGNING_SECRET') || this.config.get<string>('JWT_ACCESS_SECRET', 'change-me');
+    const secret = this.config.get<string>('UPLOADS_SIGNING_SECRET') || this.config.get<string>('JWT_ACCESS_SECRET');
+    if (!secret || secret.includes('change_me') || secret === 'change-me') {
+      throw new InternalServerErrorException('File signing secret is not configured');
+    }
     return createHmac('sha256', secret).update(`${fileId}:${exp}`).digest('hex');
   }
 

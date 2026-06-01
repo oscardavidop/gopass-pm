@@ -23,6 +23,9 @@ describe('AuthService', () => {
     // @ts-ignore
 
   const email = { send: jest.fn() } as any;
+  const cacheManager = { remember: jest.fn() } as any;
+  const cacheService = { set: jest.fn(), delByPattern: jest.fn() } as any;
+  const cacheInvalidation = { invalidateSession: jest.fn(), invalidateUser: jest.fn() } as any;
 
   let service: AuthService;
     // @ts-ignore
@@ -31,7 +34,7 @@ describe('AuthService', () => {
     // @ts-ignore
 
     jest.clearAllMocks();
-    service = new AuthService(prisma, jwt, config, email);
+    service = new AuthService(prisma, jwt, config, email, cacheManager, cacheService, cacheInvalidation);
   });
     // @ts-ignore
 

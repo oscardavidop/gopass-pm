@@ -21,7 +21,6 @@ export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   @Post('generate')
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Generate a complete task draft from user idea' })
   generateTask(@Body() dto: GenerateTaskAiDto, @CurrentUser() user: any) {
     return this.aiService.generateTask(dto, user.id);

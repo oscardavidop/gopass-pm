@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -13,6 +14,10 @@ import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 
 import { PrismaService } from '../../shared/database/prisma.service';
+import { CacheManager } from '../../shared/redis/cache.manager';
+import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
+import { CacheService } from '../../shared/redis/cache.service';
+import { CacheKeys } from '../../shared/redis/cache-keys';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -47,6 +52,15 @@ interface PasswordResetTokenModel {
   update: (args: any) => Promise<any>;
 }
 
+interface RefreshTokenSessionModel {
+  create: (args: any) => Promise<any>;
+  findMany: (args: any) => Promise<any>;
+  findUnique: (args: any) => Promise<any>;
+  delete: (args: any) => Promise<any>;
+  deleteMany: (args: any) => Promise<any>;
+  update: (args: any) => Promise<any>;
+}
+
 interface EmailVerificationTokenModel {
   deleteMany: (args: any) => Promise<any>;
   create: (args: any) => Promise<any>;
@@ -63,6 +77,9 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly email: EmailService,
+    private readonly cacheManager: CacheManager,
+    private readonly cacheService: CacheService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   private get oauthAccountModel(): OAuthAccountModel {
@@ -75,6 +92,10 @@ export class AuthService {
 
   private get emailVerificationTokenModel(): EmailVerificationTokenModel {
     return (this.prisma as any)['emailVerificationToken'] as EmailVerificationTokenModel;
+  }
+
+  private get refreshTokenModel(): RefreshTokenSessionModel {
+    return this.prisma.refreshToken as any as RefreshTokenSessionModel;
   }
 
 
@@ -126,7 +147,7 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto, userAgent?: string, ipAddress?: string) {
+  async login(dto: LoginDto, userAgent?: string, ipAddress?: string, country?: string) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -153,17 +174,17 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
-    await this.saveRefreshToken(tokens.refreshToken, user.id, userAgent, ipAddress);
+    const session = await this.saveRefreshToken(tokens.refreshToken, user.id, userAgent, ipAddress, country);
     await this.logAuthActivity(user.id, 'LOGIN_SUCCESS', {
       userAgent,
       ipAddress,
     });
 
     const { password: _, ...safeUser } = user;
-    return { user: safeUser, ...tokens };
+    return { user: safeUser, sessionId: session.id, ...tokens };
   }
 
-  async refresh(token: string) {
+  async refresh(token: string, userAgent?: string, ipAddress?: string) {
     let payload: { sub: string; email: string; role: string };
 
     try {
@@ -184,24 +205,66 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token revoked or expired');
     }
 
+    if (stored.userAgent && userAgent && stored.userAgent !== userAgent) {
+      await this.prisma.refreshToken.deleteMany({ where: { userId: stored.userId } });
+      throw new UnauthorizedException('Refresh token context mismatch');
+    }
+
+    if (stored.ipAddress && ipAddress && stored.ipAddress !== ipAddress) {
+      await this.prisma.refreshToken.deleteMany({ where: { userId: stored.userId } });
+      throw new UnauthorizedException('Refresh token context mismatch');
+    }
+
+    // Mark session activity before rotating the token.
+    await this.prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: {
+        lastUsedAt: new Date(),
+        userAgent: userAgent || stored.userAgent,
+        ipAddress: ipAddress || stored.ipAddress,
+      },
+    });
+
     // Rotate refresh token
     await this.prisma.refreshToken.delete({ where: { token: tokenHash } });
+    await this.cacheInvalidation.invalidateSession(stored.id, stored.userId);
 
     const newTokens = await this.generateTokens(payload.sub, payload.email, payload.role);
-    await this.saveRefreshToken(newTokens.refreshToken, payload.sub);
+    const session = await this.saveRefreshToken(newTokens.refreshToken, payload.sub, userAgent, ipAddress, stored.country ?? undefined);
 
-    return newTokens;
+    return { ...newTokens, sessionId: session.id };
   }
 
   async logout(token: string) {
-    await this.prisma.refreshToken.deleteMany({ where: { token: this.hashToken(token) } });
+    const tokenHash = this.hashToken(token);
+    const existing = await this.prisma.refreshToken.findUnique({ where: { token: tokenHash }, select: { id: true, userId: true } });
+    await this.prisma.refreshToken.deleteMany({ where: { token: tokenHash } });
+    if (existing) {
+      await this.cacheInvalidation.invalidateSession(existing.id, existing.userId);
+    }
   }
 
   async logoutAll(userId: string) {
     await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    await this.cacheInvalidation.invalidateSession('all', userId);
   }
 
-  async oauthLogin(provider: string, dto: OAuthLoginDto, userAgent?: string, ipAddress?: string) {
+  async logoutSession(userId: string, sessionId: string) {
+    const session = await this.prisma.refreshToken.findFirst({
+      where: { id: sessionId, userId },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    await this.prisma.refreshToken.delete({ where: { id: sessionId } });
+    await this.cacheInvalidation.invalidateSession(sessionId, userId);
+    return { revoked: true };
+  }
+
+  async oauthLogin(provider: string, dto: OAuthLoginDto, userAgent?: string, ipAddress?: string, country?: string) {
     const normalized = provider.toUpperCase() as OAuthProviderInput;
 
     if (normalized !== 'GOOGLE' && normalized !== 'GITHUB') {
@@ -291,10 +354,10 @@ export class AuthService {
     }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
-    await this.saveRefreshToken(tokens.refreshToken, user.id, userAgent, ipAddress);
+    const session = await this.saveRefreshToken(tokens.refreshToken, user.id, userAgent, ipAddress, country);
 
     const { password: _, ...safeUser } = user;
-    return { user: safeUser, ...tokens };
+    return { user: safeUser, sessionId: session.id, ...tokens };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
@@ -477,22 +540,31 @@ export class AuthService {
 
     const nextHash = await bcrypt.hash(newPassword, 12);
     await this.prisma.user.update({ where: { id: userId }, data: { password: nextHash } });
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    await this.cacheInvalidation.invalidateUser(userId);
+    await this.cacheInvalidation.invalidateSession('all', userId);
     await this.logAuthActivity(userId, 'PASSWORD_CHANGED', { source: 'settings_security' });
     return { changed: true };
   }
 
   async listActiveSessions(userId: string) {
-    return this.prisma.refreshToken.findMany({
-      where: { userId, expiresAt: { gt: new Date() } },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        userAgent: true,
-        ipAddress: true,
-        createdAt: true,
-        expiresAt: true,
-      },
-      take: 20,
+    return this.cacheManager.remember({
+      key: CacheKeys.userSessions(userId),
+      ttlSeconds: 60,
+      loader: () => this.prisma.refreshToken.findMany({
+        where: { userId, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userAgent: true,
+          ipAddress: true,
+          country: true,
+          lastUsedAt: true,
+          createdAt: true,
+          expiresAt: true,
+        },
+        take: 20,
+      }),
     });
   }
 
@@ -584,19 +656,35 @@ export class AuthService {
     return createHash('sha256').update(rawToken).digest('hex');
   }
 
-  private async saveRefreshToken(rawToken: string, userId: string, userAgent?: string, ipAddress?: string) {
+  private async saveRefreshToken(rawToken: string, userId: string, userAgent?: string, ipAddress?: string, country?: string) {
+    const refreshTtlDays = Number(this.config.get<string>('JWT_REFRESH_TTL_DAYS', '30'));
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + Math.max(1, Math.min(refreshTtlDays, 365)));
 
-    await this.prisma.refreshToken.create({
+    const session = await this.prisma.refreshToken.create({
       data: {
         token: this.hashToken(rawToken),
         userId,
         userAgent,
         ipAddress,
+        country,
+        lastUsedAt: new Date(),
         expiresAt,
       },
     });
+
+    await this.cacheService.set(CacheKeys.session(session.id), {
+      id: session.id,
+      userId,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      country: session.country,
+      lastUsedAt: session.lastUsedAt,
+      expiresAt: session.expiresAt,
+    }, Math.max(1, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000)));
+    await this.cacheInvalidation.invalidateSession(session.id, userId);
+
+    return session;
   }
 
   private async generateUniqueUsername(email: string, firstName?: string, lastName?: string) {

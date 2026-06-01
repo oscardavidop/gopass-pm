@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import { RedisService } from '../../shared/redis/redis.service';
+import { CacheService } from '../../shared/redis/cache.service';
 
 @Injectable()
 export class HealthService {
@@ -11,13 +12,16 @@ export class HealthService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly eventsGateway: EventsGateway,
+    private readonly redisService: RedisService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async summary() {
-    const [db, realtime, email] = await Promise.all([
+    const [db, realtime, email, cache] = await Promise.all([
       this.database(),
       this.realtime(),
       this.email(),
+      this.cache(),
     ]);
     const ok = db.status === 'ok' && realtime.status === 'ok' && email.status !== 'error';
 
@@ -28,6 +32,7 @@ export class HealthService {
         db,
         realtime,
         email,
+        cache,
       },
     };
   }
@@ -68,6 +73,14 @@ export class HealthService {
     };
   }
 
+  async cache() {
+    const metrics = await this.cacheService.getMetrics();
+    return {
+      status: metrics.redisReady ? 'ok' : 'degraded',
+      ...metrics,
+    };
+  }
+
   async ready() {
     const [db, redis] = await Promise.all([this.checkDatabase(), this.checkRedis()]);
     const ok = db.status === 'ok' && redis.status === 'ok';
@@ -95,15 +108,11 @@ export class HealthService {
     const redisUrl = this.config.get<string>('REDIS_URL');
     if (!redisUrl) return { status: 'error', message: 'REDIS_URL is not configured' };
 
-    const client = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
     try {
-      await client.connect();
-      const pong = await client.ping();
+      const pong = await this.redisService.ping();
       return { status: pong === 'PONG' ? 'ok' : 'error' };
     } catch (error) {
       return { status: 'error', message: error instanceof Error ? error.message : 'Redis check failed' };
-    } finally {
-      client.disconnect();
     }
   }
 }

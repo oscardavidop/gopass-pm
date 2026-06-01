@@ -14,7 +14,7 @@ export const authService = {
 
   logoutAll: () => api.post('/auth/logout-all'),
 
-  refresh: () => api.post<{ data: { accessToken: string } }>('/auth/refresh').then((r) => r.data.data),
+  refresh: () => api.post<{ data: { accessToken: string; sessionId: string } }>('/auth/refresh').then((r) => r.data.data),
 
   me: () => api.get<{ data: AuthResponse['user'] }>('/auth/me').then((r) => r.data.data),
 
@@ -42,8 +42,10 @@ export const authService = {
     api.patch<{ data: { changed: boolean } }>('/auth/change-password', data).then((r) => r.data.data),
 
   listSessions: () =>
-    api.get<{ data: Array<{ id: string; userAgent?: string | null; ipAddress?: string | null; createdAt: string; expiresAt: string }> }>('/auth/sessions')
+    api.get<{ data: Array<{ id: string; userAgent?: string | null; ipAddress?: string | null; country?: string | null; lastUsedAt?: string | null; createdAt: string; expiresAt: string }> }>('/auth/sessions')
       .then((r) => r.data.data),
+
+  logoutSession: (sessionId: string) => api.delete(`/auth/sessions/${sessionId}`),
 
   listEmailPreviews: (limit = 30) =>
     api.get<{ data: Array<{ id: string; to: string; subject: string; kind: string; createdAt: string }> }>('/auth/email-previews', {

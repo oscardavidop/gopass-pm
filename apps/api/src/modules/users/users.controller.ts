@@ -17,8 +17,9 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'List all users (for assignment etc.)' })
   @ApiQuery({ name: 'search', required: false })
-  findAll(@Query('search') search?: string) {
-    return this.usersService.findAll(search);
+  @ApiQuery({ name: 'limit', required: false })
+  findAll(@Query('search') search?: string, @Query('limit') limit?: string) {
+    return this.usersService.findAll(search, limit ? Number(limit) : undefined);
   }
 
   @Get('me')
@@ -51,6 +52,6 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   findOne(@Param('id') id: string) {
-    return this.usersService.findById(id);
+    return this.usersService.findPublicById(id);
   }
 }

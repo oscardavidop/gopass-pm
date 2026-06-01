@@ -20,6 +20,7 @@ import { ProjectDetailPage } from '@/pages/projects/ProjectDetailPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { DevelopersPage } from '@/pages/DevelopersPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';  
 
@@ -73,6 +74,7 @@ export function AppRoutes() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/developers" element={<DevelopersPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

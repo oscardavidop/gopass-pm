@@ -1,12 +1,13 @@
 import {
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { createHmac } from 'crypto';
+import { createHash, createHmac } from 'crypto';
 import { FileEntityType, ProjectInvitationStatus, ProjectRole, Role } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -16,6 +17,9 @@ import { EventsGateway } from '../events/events.gateway';
 import { EmailService } from '../mail/email.service';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { hasProjectPermission } from '../auth/authorization/project-rbac';
+import { CacheManager } from '../../shared/redis/cache.manager';
+import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
+import { CacheKeys } from '../../shared/redis/cache-keys';
 
 @Injectable()
 export class ProjectsService {
@@ -26,6 +30,8 @@ export class ProjectsService {
     private readonly events: EventsGateway,
     private readonly config: ConfigService,
     private readonly email: EmailService,
+    private readonly cacheManager: CacheManager,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) { }
 
   async create(dto: CreateProjectDto, userId: string) {
@@ -112,50 +118,64 @@ export class ProjectsService {
       await this.inviteMember(created.id, invitation, userId, Role.USER);
     }
 
+    await this.invalidateProjectCaches(created.id, userId);
     return this.findOne(created.id, userId, Role.USER);
   }
 
   async findAll(userId: string, userRole: Role, filters: FilterProjectsDto) {
     const { search, status, page = 1, limit = 20, sortBy = 'createdAt', order = 'desc' } = filters;
     const skip = (page - 1) * limit;
+    const ttl = Number(this.config.get<string>('CACHE_TTL_PROJECT', '120'));
+    const listHash = createHash('sha1').update(JSON.stringify({ userId, userRole, search, status, page, limit, sortBy, order })).digest('hex').slice(0, 16);
 
-    const where: any = {
-      deletedAt: null,
-      ...(userRole !== Role.ADMIN && {
-        members: { some: { userId } },
-      }),
-      ...(status && { status }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-    };
+    return this.cacheManager.remember({
+      key: CacheKeys.searchProjects(listHash),
+      ttlSeconds: ttl,
+      loader: async () => {
+        const where: any = {
+          deletedAt: null,
+          ...(userRole !== Role.ADMIN && {
+            members: { some: { userId } },
+          }),
+          ...(status && { status }),
+          ...(search && {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+            ],
+          }),
+        };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.project.findMany({
-        where,
-        include: this.projectIncludes(),
-        orderBy: { [sortBy]: order },
-        skip,
-        take: limit,
-      }),
-      this.prisma.project.count({ where }),
-    ]);
+        const [items, total] = await this.prisma.$transaction([
+          this.prisma.project.findMany({
+            where,
+            include: this.projectIncludes(),
+            orderBy: { [sortBy]: order },
+            skip,
+            take: limit,
+          }),
+          this.prisma.project.count({ where }),
+        ]);
 
-    const withBranding = await this.decorateProjectsWithBranding(items);
+        const withBranding = await this.decorateProjectsWithBranding(items);
 
-    return {
-      items: withBranding,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+        return {
+          items: withBranding,
+          meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        };
+      },
+    });
   }
 
   async findOne(id: string, userId: string, userRole: Role) {
-    const project = await this.prisma.project.findFirst({
-      where: { id, deletedAt: null },
-      include: this.projectIncludes(),
+    const ttl = Number(this.config.get<string>('CACHE_TTL_PROJECT', '120'));
+    const project = await this.cacheManager.remember({
+      key: CacheKeys.project(id),
+      ttlSeconds: ttl,
+      loader: () => this.prisma.project.findFirst({
+        where: { id, deletedAt: null },
+        include: this.projectIncludes(),
+      }),
     });
 
     if (!project) throw new NotFoundException('Project not found');
@@ -215,20 +235,27 @@ export class ProjectsService {
     });
     this.events.emitActivityCreated(id, activity);
 
+    await this.invalidateProjectCaches(id, userId);
     return this.decorateProjectWithBranding(updated);
   }
 
   async findActivity(id: string, userId: string, userRole: Role, limit = 100) {
     await this.findOne(id, userId, userRole);
 
-    return this.prisma.activityLog.findMany({
-      where: { projectId: id },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
-        task: { select: { id: true, title: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(Math.max(limit || 50, 1), 300),
+    const take = Math.min(Math.max(limit || 50, 1), 300);
+    const ttl = Number(this.config.get<string>('CACHE_TTL_ACTIVITY', '30'));
+    return this.cacheManager.remember({
+      key: CacheKeys.projectActivity(id, take),
+      ttlSeconds: ttl,
+      loader: () => this.prisma.activityLog.findMany({
+        where: { projectId: id },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true } },
+          task: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }),
     });
   }
 
@@ -270,6 +297,7 @@ export class ProjectsService {
       });
     }
 
+    await this.invalidateProjectCaches(id, userId);
     return deleted;
   }
 
@@ -338,6 +366,7 @@ export class ProjectsService {
     });
     this.events.emitActivityCreated(projectId, activity);
 
+    await this.invalidateProjectCaches(projectId, currentUserId);
     return result;
   }
 
@@ -386,6 +415,7 @@ export class ProjectsService {
     this.events.emitActivityCreated(projectId, activity);
     this.events.emitProjectUpdated(projectId, project, await this.getActorSnapshot(currentUserId));
 
+    await this.invalidateProjectCaches(projectId, currentUserId);
     return updated;
   }
 
@@ -484,6 +514,7 @@ export class ProjectsService {
       });
       this.events.emitActivityCreated(projectId, activity);
 
+      await this.invalidateProjectCaches(projectId, currentUserId);
       return { mode: 'existing_user', invitation };
     }
 
@@ -550,6 +581,7 @@ export class ProjectsService {
       createdAt: invitation.createdAt.toISOString(),
     });
 
+    await this.invalidateProjectCaches(projectId, currentUserId);
     return { mode: 'pending_invite', invitation };
   }
 
@@ -587,6 +619,7 @@ export class ProjectsService {
     // Broadcast removal to all members + force-remove the kicked user from the WS room
     this.events.emitMemberRemoved(projectId, memberId, { projectId, userId: memberId });
 
+    await this.invalidateProjectCaches(projectId, currentUserId);
     return result;
   }
 
@@ -647,6 +680,7 @@ export class ProjectsService {
       });
     }
 
+    await this.invalidateProjectCaches(projectId, currentUserId);
     return { left: true, projectId };
   }
 
@@ -705,7 +739,17 @@ export class ProjectsService {
     }
 
     this.events.emitProjectUpdated(projectId, updated, await this.getActorSnapshot(currentUserId));
+    await this.invalidateProjectCaches(projectId, currentUserId);
     return this.decorateProjectWithBranding(updated);
+  }
+
+  private async invalidateProjectCaches(projectId: string, userId?: string) {
+    await this.cacheInvalidation.invalidateProject(projectId);
+    await this.cacheInvalidation.invalidateDashboard();
+    if (userId) {
+      await this.cacheInvalidation.invalidateUser(userId);
+      await this.cacheInvalidation.invalidateNotifications(userId);
+    }
   }
 
   private projectIncludes() {
@@ -783,7 +827,10 @@ export class ProjectsService {
   }
 
   private signFileUrl(fileId: string, exp: number) {
-    const secret = this.config.get<string>('UPLOADS_SIGNING_SECRET') || this.config.get<string>('JWT_ACCESS_SECRET', 'change-me');
+    const secret = this.config.get<string>('UPLOADS_SIGNING_SECRET') || this.config.get<string>('JWT_ACCESS_SECRET');
+    if (!secret || secret.includes('change_me') || secret === 'change-me') {
+      throw new InternalServerErrorException('File signing secret is not configured');
+    }
     return createHmac('sha256', secret).update(`${fileId}:${exp}`).digest('hex');
   }
 

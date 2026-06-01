@@ -12,6 +12,8 @@ import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../shared/database/prisma.service';
+import { CacheService } from '../../shared/redis/cache.service';
+import { CacheKeys } from '../../shared/redis/cache-keys';
 
 interface PresenceUser {
   id: string;
@@ -70,6 +72,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -108,6 +111,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         collaborationColor,
       };
       client.join(`user:${payload.sub}`);
+      await this.cacheService.set(CacheKeys.presenceOnline(user.id), {
+        userId: user.id,
+        socketId: client.id,
+        connectedAt: new Date().toISOString(),
+      }, 90);
       this.logger.log(`Client connected: ${client.id} (user: ${user.firstName} ${user.lastName})`);
     } catch {
       client.disconnect();
@@ -116,6 +124,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+    const disconnectedUserId = client.data.userId as string | undefined;
+    if (disconnectedUserId) {
+      void this.cacheService.del(CacheKeys.presenceOnline(disconnectedUserId));
+      void this.cacheService.delByPattern(`tasku:presence:project:*:${disconnectedUserId}`);
+      void this.cacheService.delByPattern(`tasku:presence:task:*:*:${disconnectedUserId}`);
+    }
+
     this.presenceRooms.forEach((members, projectId) => {
       if (members.has(client.id)) {
         const leaving = members.get(client.id);
@@ -182,6 +197,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
         timestamp: new Date().toISOString(),
       });
+      void this.cacheService.set(CacheKeys.presenceProjectMember(projectId, user.id), {
+        userId: user.id,
+        socketId: client.id,
+        mode: 'online',
+      }, 90);
     }
     this._broadcastPresence(projectId);
   }
@@ -195,6 +215,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       presence.lastActiveAt = new Date().toISOString();
       presence.status = 'online';
       room!.set(client.id, presence);
+      void this.cacheService.set(CacheKeys.presenceProjectMember(projectId, presence.id), {
+        userId: presence.id,
+        socketId: client.id,
+        mode: 'online',
+      }, 90);
       this._broadcastPresence(projectId);
     }
   }
@@ -205,6 +230,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.leave(`project:${projectId}`);
     const leaving = this.presenceRooms.get(projectId)?.get(client.id);
     this.presenceRooms.get(projectId)?.delete(client.id);
+    const currentUserId = client.data.userId as string | undefined;
+    if (currentUserId) {
+      void this.cacheService.del(CacheKeys.presenceProjectMember(projectId, currentUserId));
+    }
     this.server.to(`project:${projectId}`).emit('member.left', {
       projectId,
       user: leaving,
@@ -305,6 +334,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (mode === null) {
       if (!previous) return;
       taskMap.delete(client.id);
+      void this.cacheService.del(CacheKeys.presenceTask(projectId, taskId, previous.user.id));
       this._broadcastTaskPresence(projectId, taskId, client.id);
       return;
     }
@@ -329,6 +359,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       socketId: client.id,
       updatedAt: Date.now(),
     });
+    void this.cacheService.set(CacheKeys.presenceTask(projectId, taskId, user.id), {
+      userId: user.id,
+      mode,
+      field,
+      socketId: client.id,
+    }, 90);
 
     this._broadcastTaskPresence(projectId, taskId, client.id);
   }

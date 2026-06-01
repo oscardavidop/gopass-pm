@@ -17,6 +17,7 @@ import {
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { FileEntityType, Role } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -39,6 +40,7 @@ export class UploadsController {
     @Post('uploads')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('access-token')
+    @Throttle({ default: { limit: 100, ttl: 60 * 60_000 } })
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(FileInterceptor('file'))
     @ApiOperation({ summary: 'Upload file for task/project/user entity' })

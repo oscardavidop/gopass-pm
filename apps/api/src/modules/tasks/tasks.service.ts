@@ -6,6 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 import { ProjectRole, Role, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
@@ -16,6 +17,9 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
 import { hasProjectPermission } from '../auth/authorization/project-rbac';
+import { CacheManager } from '../../shared/redis/cache.manager';
+import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
+import { CacheKeys } from '../../shared/redis/cache-keys';
 
 @Injectable()
 export class TasksService {
@@ -27,6 +31,8 @@ export class TasksService {
     private readonly events: EventsGateway,
     private readonly config: ConfigService,
     private readonly email: EmailService,
+    private readonly cacheManager: CacheManager,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) { }
 
   async create(projectId: string, dto: CreateTaskDto, userId: string, userRole: Role = Role.USER) {
@@ -163,6 +169,7 @@ export class TasksService {
       }
     }
 
+    await this.invalidateTaskCaches(task.id, task.projectId, task.assigneeId ?? undefined);
     return task;
   }
 
@@ -171,58 +178,71 @@ export class TasksService {
 
     const { search, status, priority, assigneeId, page = 1, limit = 50, sortBy = 'position', order = 'asc' } = filters;
     const skip = (page - 1) * limit;
+    const cacheHash = createHash('sha1').update(JSON.stringify({ userId, userRole, search, status, priority, assigneeId, page, limit, sortBy, order })).digest('hex').slice(0, 16);
+    const ttl = Number(this.config.get<string>('CACHE_TTL_TASK', '90'));
 
-    const where: any = {
-      projectId,
-      deletedAt: null,
-      ...(status && { status }),
-      ...(priority && { priority }),
-      ...(assigneeId && { assigneeId }),
-      ...(search && {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-    };
+    return this.cacheManager.remember({
+      key: CacheKeys.projectTasks(projectId, cacheHash),
+      ttlSeconds: ttl,
+      loader: async () => {
+        const where: any = {
+          projectId,
+          deletedAt: null,
+          ...(status && { status }),
+          ...(priority && { priority }),
+          ...(assigneeId && { assigneeId }),
+          ...(search && {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+            ],
+          }),
+        };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.task.findMany({
-        where,
-        include: this.taskIncludes(),
-        orderBy: { [sortBy]: order },
-        skip,
-        take: limit,
-      }),
-      this.prisma.task.count({ where }),
-    ]);
+        const [items, total] = await this.prisma.$transaction([
+          this.prisma.task.findMany({
+            where,
+            include: this.taskIncludes(),
+            orderBy: { [sortBy]: order },
+            skip,
+            take: limit,
+          }),
+          this.prisma.task.count({ where }),
+        ]);
 
-    return {
-      items,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+        return {
+          items,
+          meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        };
+      },
+    });
   }
 
   async findOne(id: string, userId: string, userRole: Role = Role.USER) {
-    const task = await this.prisma.task.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        ...this.taskIncludes(),
-        comments: {
-          where: { deletedAt: null },
-          include: {
-            author: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+    const ttl = Number(this.config.get<string>('CACHE_TTL_TASK', '90'));
+    const task = await this.cacheManager.remember({
+      key: CacheKeys.task(id),
+      ttlSeconds: ttl,
+      loader: () => this.prisma.task.findFirst({
+        where: { id, deletedAt: null },
+        include: {
+          ...this.taskIncludes(),
+          comments: {
+            where: { deletedAt: null },
+            include: {
+              author: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+            },
+            orderBy: { createdAt: 'asc' },
           },
-          orderBy: { createdAt: 'asc' },
-        },
-        activityLogs: {
-          include: {
-            user: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+          activityLogs: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
           },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
         },
-      },
+      }),
     });
 
     if (!task) throw new NotFoundException('Task not found');
@@ -432,6 +452,7 @@ export class TasksService {
       this.events.emitActivityCreated(task.projectId, activity);
     }
 
+    await this.invalidateTaskCaches(updated.id, updated.projectId, updated.assigneeId ?? undefined);
     return updated;
   }
 
@@ -477,18 +498,26 @@ export class TasksService {
       },
     });
     this.events.emitActivityCreated(task.projectId, activity);
+    await this.invalidateTaskCaches(task.id, task.projectId, task.assigneeId ?? undefined);
     return deleted;
   }
 
-  async getActivity(taskId: string, userId: string, userRole: Role = Role.USER) {
+  async getActivity(taskId: string, userId: string, userRole: Role = Role.USER, limit = 100) {
     await this.findOne(taskId, userId, userRole);
 
-    return this.prisma.activityLog.findMany({
-      where: { taskId },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, avatar: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+    const take = Math.min(Math.max(limit || 50, 1), 300);
+    const ttl = Number(this.config.get<string>('CACHE_TTL_ACTIVITY', '30'));
+    return this.cacheManager.remember({
+      key: CacheKeys.taskActivity(taskId, take),
+      ttlSeconds: ttl,
+      loader: () => this.prisma.activityLog.findMany({
+        where: { taskId },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }),
     });
   }
 
@@ -530,6 +559,7 @@ export class TasksService {
       changedFields: ['comments'],
     });
 
+    await this.invalidateTaskCaches(taskId, task.projectId, task.assigneeId ?? undefined);
     return comment;
   }
 
@@ -541,10 +571,16 @@ export class TasksService {
       throw new ForbiddenException('Cannot delete this comment');
     }
 
-    return this.prisma.comment.update({
+    const deleted = await this.prisma.comment.update({
       where: { id: commentId },
       data: { deletedAt: new Date() },
     });
+
+    const relatedTask = await this.prisma.task.findFirst({ where: { comments: { some: { id: commentId } } }, select: { id: true, projectId: true, assigneeId: true } });
+    if (relatedTask) {
+      await this.invalidateTaskCaches(relatedTask.id, relatedTask.projectId, relatedTask.assigneeId ?? undefined);
+    }
+    return deleted;
   }
 
   async addSubtask(taskId: string, payload: CreateSubtaskDto, userId: string, userRole: Role = Role.USER) {
@@ -595,6 +631,7 @@ export class TasksService {
       actor,
       changedFields: ['subtasks'],
     });
+    await this.invalidateTaskCaches(taskId, task.projectId, task.assigneeId ?? undefined);
     return subtask;
   }
 
@@ -664,6 +701,7 @@ export class TasksService {
       changedFields: ['subtasks'],
     });
 
+    await this.invalidateTaskCaches(taskId, task.projectId, task.assigneeId ?? undefined);
     return updated;
   }
 
@@ -720,6 +758,7 @@ export class TasksService {
       changedFields: ['subtasks'],
     });
 
+    await this.invalidateTaskCaches(taskId, task.projectId, task.assigneeId ?? undefined);
     return { id: subtaskId };
   }
 
@@ -776,6 +815,7 @@ export class TasksService {
       changedFields: ['subtasks'],
     });
 
+    await this.invalidateTaskCaches(taskId, task.projectId, task.assigneeId ?? undefined);
     return updatedTask.subtasks;
   }
 
@@ -886,5 +926,15 @@ export class TasksService {
         collaborationColor: true,
       },
     });
+  }
+
+  private async invalidateTaskCaches(taskId: string, projectId: string, assigneeId?: string) {
+    await this.cacheInvalidation.invalidateTask(taskId, projectId);
+    await this.cacheInvalidation.invalidateProject(projectId);
+    await this.cacheInvalidation.invalidateDashboard();
+    if (assigneeId) {
+      await this.cacheInvalidation.invalidateNotifications(assigneeId);
+      await this.cacheInvalidation.invalidateUser(assigneeId);
+    }
   }
 }

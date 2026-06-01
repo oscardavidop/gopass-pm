@@ -6,6 +6,7 @@ import {
   Param,
   Query,
   Patch,
+  Delete,
   Req,
   Res,
   UseGuards,
@@ -18,7 +19,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -55,7 +56,6 @@ export class AuthController {
 
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Resend verification email' })
   resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(dto.email);
@@ -63,21 +63,21 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Login with email and password' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const country = this.resolveCountry(req);
     const result = await this.authService.login(
       dto,
       req.headers['user-agent'],
       req.ip,
+      country,
     );
     this.setRefreshCookie(res, result.refreshToken);
-    return { data: { user: result.user, accessToken: result.accessToken }, i18nKey: 'auth.loginSuccess' };
+    return { data: { user: result.user, accessToken: result.accessToken, sessionId: result.sessionId }, i18nKey: 'auth.loginSuccess' };
   }
 
   @Post('oauth/:provider')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Login or register with OAuth provider' })
   async oauth(
     @Param('provider') providerRaw: string,
@@ -86,14 +86,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const provider = this.parseProvider(providerRaw);
-    const result = await this.authService.oauthLogin(provider, dto, req.headers['user-agent'], req.ip);
+    const country = this.resolveCountry(req);
+    const result = await this.authService.oauthLogin(provider, dto, req.headers['user-agent'], req.ip, country);
     this.setRefreshCookie(res, result.refreshToken);
-    return { data: { user: result.user, accessToken: result.accessToken }, i18nKey: 'auth.loginSuccess' };
+    return { data: { user: result.user, accessToken: result.accessToken, sessionId: result.sessionId }, i18nKey: 'auth.loginSuccess' };
   }
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Request a password reset link' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
@@ -101,7 +101,6 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Reset password with one-time token' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
@@ -116,16 +115,15 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Refresh access token using HTTP-only cookie' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.['refresh_token'];
     if (!token) {
       throw new UnauthorizedException({ i18nKey: 'auth.noRefreshToken' });
     }
-    const result = await this.authService.refresh(token);
+    const result = await this.authService.refresh(token, req.headers['user-agent'], req.ip);
     this.setRefreshCookie(res, result.refreshToken);
-    return { data: { accessToken: result.accessToken }, i18nKey: 'auth.loginSuccess' };
+    return { data: { accessToken: result.accessToken, sessionId: result.sessionId }, i18nKey: 'auth.loginSuccess' };
   }
 
   @Post('logout')
@@ -149,6 +147,15 @@ export class AuthController {
     await this.authService.logoutAll(userId);
     this.clearRefreshCookie(res);
     return { data: { ok: true }, i18nKey: 'auth.logoutAllSuccess' };
+  }
+
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke a single active session' })
+  async revokeSession(@CurrentUser('id') userId: string, @Param('id') sessionId: string) {
+    return this.authService.logoutSession(userId, sessionId);
   }
 
   @Patch('change-password')
@@ -208,7 +215,7 @@ export class AuthController {
       secure: isProd,
       sameSite,
       domain,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
   }
@@ -225,5 +232,11 @@ export class AuthController {
       domain,
       path: '/',
     });
+  }
+
+  private resolveCountry(req: Request) {
+    const headerCountry = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || req.headers['x-country'];
+    if (Array.isArray(headerCountry)) return headerCountry[0];
+    return typeof headerCountry === 'string' ? headerCountry : undefined;
   }
 }

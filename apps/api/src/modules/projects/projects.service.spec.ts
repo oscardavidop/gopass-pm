@@ -10,12 +10,14 @@ describe('ProjectsService', () => {
   const events = {} as any;
   const config = {} as any;
   const email = {} as any;
+  const cacheManager = { remember: jest.fn() } as any;
+  const cacheInvalidation = { invalidateProject: jest.fn(), invalidateDashboard: jest.fn(), invalidateUser: jest.fn(), invalidateNotifications: jest.fn() } as any;
 
   let service: ProjectsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ProjectsService(prisma, events, config, email);
+    service = new ProjectsService(prisma, events, config, email, cacheManager, cacheInvalidation);
   });
 
   it('rejects delete when non-owner user is not admin', async () => {

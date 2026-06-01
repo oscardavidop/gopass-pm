@@ -24,6 +24,7 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: User;
   accessToken: string;
+  sessionId: string;
 }
 
 export interface RegisterResponse {

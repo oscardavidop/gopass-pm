@@ -31,7 +31,7 @@ class CreateCommentDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)
-  content: string;
+  content!: string;
 }
 
 @ApiTags('Tasks')
@@ -94,8 +94,12 @@ export class TasksController {
 
   @Get('tasks/:id/activity')
   @ApiOperation({ summary: 'Get task audit log' })
-  getActivity(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.tasksService.getActivity(id, user.id, user.role);
+  getActivity(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('limit') limit?: string,
+  ) {
+    return this.tasksService.getActivity(id, user.id, user.role, Number(limit || 100));
   }
 
   // ── Comments ─────────────────────────────────────────────
@@ -114,6 +118,7 @@ export class TasksController {
   @ApiOperation({ summary: 'Delete comment' })
   deleteComment(
     @Param('commentId') commentId: string,
+    @Param('taskId') taskId: string,
     @CurrentUser() user: any,
   ) {
     return this.tasksService.deleteComment(commentId, user.id, user.role);

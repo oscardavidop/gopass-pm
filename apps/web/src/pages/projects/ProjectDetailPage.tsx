@@ -1067,24 +1067,56 @@ export function ProjectDetailPage() {
 
           <SettingsSection title={t('project.settings.notifications', { defaultValue: 'Notifications' })}>
             <div className="grid gap-2 md:grid-cols-2">
-              {[
-                ['taskCreated', t('project.notification.taskCreated', { defaultValue: 'Task Created' })],
-                ['taskAssigned', t('project.notification.taskAssigned', { defaultValue: 'Task Assigned' })],
-                ['taskCompleted', t('project.notification.taskCompleted', { defaultValue: 'Task Completed' })],
-                ['memberAdded', t('project.notification.memberAdded', { defaultValue: 'Member Added' })],
-                ['workflowUpdated', t('project.notification.workflowUpdated', { defaultValue: 'Workflow Updated' })],
-                ['fileUploaded', t('project.notification.fileUploaded', { defaultValue: 'File Uploaded' })],
-              ].map(([key, label]) => (
-                <label key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-sm">
-                  <span>{label}</span>
-                  <input
-                    type="checkbox"
-                    checked={generalDraft.notificationSettings[key as keyof typeof generalDraft.notificationSettings]}
-                    onChange={() => toggleNotificationSetting(key as keyof typeof generalDraft.notificationSettings)}
-                    
-                  />
-                </label>
-              ))}
+            {[
+  ['taskCreated', t('project.notification.taskCreated', { defaultValue: 'Task Created' })],
+  ['taskAssigned', t('project.notification.taskAssigned', { defaultValue: 'Task Assigned' })],
+  ['taskCompleted', t('project.notification.taskCompleted', { defaultValue: 'Task Completed' })],
+  ['memberAdded', t('project.notification.memberAdded', { defaultValue: 'Member Added' })],
+  ['workflowUpdated', t('project.notification.workflowUpdated', { defaultValue: 'Workflow Updated' })],
+  ['fileUploaded', t('project.notification.fileUploaded', { defaultValue: 'File Uploaded' })],
+].map(([key, label]) => {
+  const isChecked = generalDraft.notificationSettings[key as keyof typeof generalDraft.notificationSettings];
+
+  return (
+    <label key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-sm cursor-pointer hover:bg-background/80 transition-colors select-none">
+      <span>{label}</span>
+      
+      <div className="relative flex items-center">
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={() => toggleNotificationSetting(key as keyof typeof generalDraft.notificationSettings)}
+          className="sr-only peer"
+        />
+        
+        {/* Círculo del Checkbox */}
+        <div className={`
+          h-4 w-4 rounded-full border transition-all duration-200 flex items-center justify-center
+          peer-focus-visible:ring-2 peer-focus-visible:ring-primary/20
+          ${isChecked 
+            ? 'border-primary bg-primary text-primary-foreground' 
+            : 'border-muted-foreground/40 bg-transparent text-transparent'
+          }
+        `}>
+          {/* Icono SVG del Check */}
+          <svg 
+            xmlns="http://w3.org" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="3" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            className={`h-2.5 w-2.5 transition-transform duration-200 ${isChecked ? 'scale-100' : 'scale-0'}`}
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+      </div>
+    </label>
+  );
+})}
+
             </div>
           </SettingsSection>
 

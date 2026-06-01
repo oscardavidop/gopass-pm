@@ -95,6 +95,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let i18nKey = 'common.internalError';
     let i18nParams: Record<string, unknown> | undefined;
 
+    console.error('Exception caught by HttpExceptionFilter:', exception);
+
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
