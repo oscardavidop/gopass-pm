@@ -62,6 +62,7 @@
   "auth.oauth.github": "Continue with GitHub",
   "auth.login.title": "Welcome back",
   "auth.login.subtitle": "Sign in to continue",
+  "common.orUseEmail": "Or use email",
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.forgotPassword": "Forgot your password?",
