@@ -40,61 +40,61 @@ export function ResetPasswordPage() {
   return (
     <Card className="border-border/70 bg-card/90 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>{t('auth.createNewPassword', { defaultValue: 'Create new password' })}</CardTitle>
+        <CardTitle>{t('auth.createNewPassword')}</CardTitle>
         <p className="text-sm text-muted-foreground">
           {tokenValid
-            ? t('auth.createNewPasswordDesc', { defaultValue: 'Use a strong password you have not used before.' })
-            : t('auth.resetPasswordInvalidLink', { defaultValue: 'Invalid or expired link. Request a new one.' })}
+            ? t('auth.createNewPasswordDesc')
+            : t('auth.resetPasswordInvalidLink')}
         </p>
       </CardHeader>
       <CardContent>
         {validatingToken && token ? (
           <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
             <Lock className="h-4 w-4" />
-            {t('auth.validatingResetToken', { defaultValue: 'Validating reset link...' })}
+            {t('auth.validatingResetToken')}
           </p>
         ) : tokenValid ? (
           <form onSubmit={handleSubmit((data) => mutate({ token, newPassword: data.newPassword }))} className="space-y-4">
             <Input
-              label={t('auth.newPassword', { defaultValue: 'New password' })}
+              label={t('auth.newPassword')}
               type="password"
-              placeholder="••••••••"
+              placeholder={t('auth.passwordPlaceholder', { defaultValue: '••••••••' })}
               icon={<Lock />}
               error={errors.newPassword?.message ? translateByKey(errors.newPassword.message, undefined, errors.newPassword.message) : undefined}
               {...register('newPassword')}
             />
             <Input
-              label={t('auth.confirmPassword', { defaultValue: 'Confirm password' })}
+              label={t('auth.confirmPassword')}
               type="password"
-              placeholder="••••••••"
+              placeholder={t('auth.passwordPlaceholder', { defaultValue: '••••••••' })}
               icon={<Lock />}
               error={errors.confirmPassword?.message ? translateByKey(errors.confirmPassword.message, undefined, errors.confirmPassword.message) : undefined}
               {...register('confirmPassword')}
             />
 
             <Button type="submit" className="w-full" isLoading={isPending}>
-              {t('auth.resetPassword', { defaultValue: 'Reset password' })}
+              {t('auth.resetPassword')}
             </Button>
           </form>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-destructive">
               {invalidReason === 'used'
-                ? t('auth.resetTokenUsed', { defaultValue: 'This reset link was already used.' })
-                : t('auth.resetTokenMissing', { defaultValue: 'Reset token missing or expired. Request a new password reset link.' })}
+                ? t('auth.resetTokenUsed')
+                : t('auth.resetTokenMissing')}
             </p>
             <Link to="/forgot-password" className="inline-flex">
               <Button type="button" variant="outline">
-                {t('auth.sendResetLink', { defaultValue: 'Send reset link' })}
+                {t('auth.sendResetLink')}
               </Button>
             </Link>
           </div>
         )}
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          {t('common.backTo', { defaultValue: 'Back to' })}{' '}
+          {t('common.backTo')}{' '}
           <Link to="/login" className="text-primary hover:underline font-medium">
-            {t('auth.signIn', { defaultValue: 'sign in' })}
+            {t('auth.signIn')}
           </Link>
         </p>
       </CardContent>

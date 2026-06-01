@@ -5,6 +5,7 @@ import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { EmailService } from '../mail/email.service';
 import { TaskStatus } from '@prisma/client';
+import { WebhookDispatchService } from '../developers/webhook-dispatch.service';
 
 @Injectable()
 export class SchedulerService {
@@ -15,7 +16,13 @@ export class SchedulerService {
     private readonly events: EventsGateway,
     private readonly config: ConfigService,
     private readonly email: EmailService,
+    private readonly webhookDispatch: WebhookDispatchService,
   ) {}
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async retryWebhookDeliveries() {
+    await this.webhookDispatch.retryPendingDeliveries();
+  }
 
   /**
    * Every hour: find tasks that just became overdue (within last hour)

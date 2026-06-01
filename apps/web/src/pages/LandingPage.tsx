@@ -37,6 +37,7 @@ import {
 
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslation } from 'react-i18next';
+import { LanguageThemeSwitcher } from '@/components/shared/LanguageThemeSwitcher';
 import logoLight from '../../assets/img/logo-light.png';
 import logoDark from '../../assets/img/logo-dark.png';
 
@@ -98,9 +99,8 @@ function ScreenPlaceholder({ label, hint, aspect = '16/9', glow = 'primary', cla
   );
 }
 
-function LandingNavbar({ onNavigate }: { onNavigate: (to: string) => void }) {
+function LandingNavbar({ onNavigate, isDark }: { onNavigate: (to: string) => void, isDark: boolean }) {
   const { t } = useTranslation();
-  const { isDark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -127,16 +127,14 @@ function LandingNavbar({ onNavigate }: { onNavigate: (to: string) => void }) {
         </button>
         <nav className="hidden items-center gap-1 md:flex">
           {navLinks.map((link) => (
-            <a key={link.label} href={link.href} className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">{link.label}</a>
+            <a key={link.label} href={link.href} className="rounded-lg px-3 py-1.5 text-sm hover:bg-accent hover:text-foreground">{link.label}</a>
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <button onClick={toggleTheme} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" title={t('landing.toggleTheme', { defaultValue: 'Toggle theme' })}>
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          <LanguageThemeSwitcher variant="surface" />
           <button onClick={() => onNavigate('/login')} className="hidden rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:block">{t('auth.signInCta', { defaultValue: 'Sign in' })}</button>
           <button onClick={() => onNavigate('/register')} className="hidden h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-[0.98] md:flex">
-            {t('landing.getStarted', { defaultValue: 'Get Started' })} <ArrowRight className="h-3.5 w-3.5" />
+            {t('landing.getStarted')} <ArrowRight className="h-3.5 w-3.5" />
           </button>
           <button onClick={() => setMenuOpen((v) => !v)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-card md:hidden">
             {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -152,7 +150,7 @@ function LandingNavbar({ onNavigate }: { onNavigate: (to: string) => void }) {
               ))}
               <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-3">
                 <button onClick={() => { onNavigate('/login'); setMenuOpen(false); }} className="rounded-lg border border-border py-2 text-sm font-medium text-foreground hover:bg-accent">{t('auth.signInCta', { defaultValue: 'Sign in' })}</button>
-                <button onClick={() => { onNavigate('/register'); setMenuOpen(false); }} className="rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground">{t('landing.getStarted', { defaultValue: 'Get Started' })}</button>
+                <button onClick={() => { onNavigate('/register'); setMenuOpen(false); }} className="rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground">{t('landing.getStarted')}</button>
               </div>
             </div>
           </motion.div>
@@ -410,7 +408,7 @@ export function LandingPage() {
       </div>
 
       <div className="relative z-10">
-        <LandingNavbar onNavigate={onNavigate} />
+        <LandingNavbar onNavigate={onNavigate} isDark={isDark} />
 
         {/* Hero */}
         <Section className="pb-12 pt-16 md:pb-20 md:pt-24">
@@ -715,7 +713,7 @@ export function LandingPage() {
               </div>
             </div>
             <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-border/60 pt-6 text-xs text-muted-foreground md:flex-row">
-              <p>{t('landing.footer.copyright', { defaultValue: '2025 Tasku Workspace. All rights reserved.' })}</p>
+              <p>{t('landing.footer.copyright', { defaultValue: '2026 Tasku. All rights reserved.' })}</p>
               <div className="flex flex-wrap items-center gap-4">
                 {[{ icon: Sparkles, label: t('landing.footer.badgeAiNative', { defaultValue: 'AI-native' }) }, { icon: Zap, label: t('landing.footer.badgeRealtime', { defaultValue: 'Realtime sync' }) }, { icon: Lock, label: t('landing.footer.badgeRbac', { defaultValue: 'RBAC security' }) }, { icon: Globe, label: t('landing.footer.badgeTimezone', { defaultValue: 'Multi-timezone' }) }].map(({ icon: Icon, label }) => (
                   <span key={label} className="flex items-center gap-1.5"><Icon className="h-3 w-3 text-primary" />{label}</span>

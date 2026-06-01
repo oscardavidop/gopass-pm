@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Tasku Kanban Placeholder</title>
+  <desc id="desc">Placeholder artwork for the Tasku kanban screenshot.</desc>
+  <rect width="1440" height="900" fill="#020617" />
+  <text x="100" y="120" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="42" font-weight="700">Tasku Kanban Board</text>
+  <text x="100" y="170" fill="#94a3b8" font-family="Arial, sans-serif" font-size="24">Add a real board capture here.</text>
+  <rect x="90" y="240" width="280" height="560" rx="24" fill="#111827" stroke="#334155" />
+  <rect x="410" y="240" width="280" height="560" rx="24" fill="#111827" stroke="#334155" />
+  <rect x="730" y="240" width="280" height="560" rx="24" fill="#111827" stroke="#334155" />
+  <rect x="1050" y="240" width="280" height="560" rx="24" fill="#111827" stroke="#334155" />
+  <rect x="120" y="300" width="220" height="90" rx="18" fill="#1d4ed8" />
+  <rect x="120" y="420" width="220" height="90" rx="18" fill="#0f766e" />
+  <rect x="440" y="300" width="220" height="90" rx="18" fill="#7c3aed" />
+  <rect x="760" y="300" width="220" height="90" rx="18" fill="#ea580c" />
+  <rect x="1080" y="300" width="220" height="90" rx="18" fill="#16a34a" />
+</svg>

@@ -5,7 +5,7 @@ import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth.store';
 import type { OAuthProvider } from '@/services/auth.service';
 import { translateByKey } from '@/i18n/translate';
-import { getApiErrorMessage } from '@/services/api-error';
+import { classifyAuthError, getApiErrorMessage } from '@/services/api-error';
 
 function resolveRedirectTarget(raw: string | null | undefined) {
   if (!raw) return '/dashboard';
@@ -39,7 +39,11 @@ export function useLogin() {
         const email = err?.response?.data?.i18nParams?.email;
         navigate(`/verify-email${email ? `?email=${encodeURIComponent(email)}` : ''}`);
       }
-      toast.error(getApiErrorMessage(err, 'auth.invalidCredentials', 'Invalid email or password'));
+
+      const authKind = classifyAuthError(err);
+      if (authKind !== 'AUTH_INVALID_CREDENTIALS') {
+        toast.error(getApiErrorMessage(err, 'auth.invalidCredentials', 'Invalid email or password'));
+      }
     },
   });
 }

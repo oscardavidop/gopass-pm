@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Priority, TaskStatus } from '@prisma/client';
-import { CreateSubtaskDto } from './create-task.dto';
+import { CreateTaskSubtaskDto } from './create-task.dto';
 
 export class UpdateTaskDto {
   @ApiPropertyOptional({ example: 'Implement JWT authentication' })
@@ -50,10 +50,10 @@ export class UpdateTaskDto {
   @Min(0)
   position?: number;
 
-  @ApiPropertyOptional({ type: [CreateSubtaskDto] })
+  @ApiPropertyOptional({ type: [CreateTaskSubtaskDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateSubtaskDto)
-  subtasks?: CreateSubtaskDto[];
+  @Type(() => CreateTaskSubtaskDto)
+  subtasks?: CreateTaskSubtaskDto[];
 }

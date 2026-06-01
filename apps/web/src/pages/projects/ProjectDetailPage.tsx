@@ -24,6 +24,9 @@ import {
   Trash2,
   Upload,
   UserCheck,
+  ArrowRight,
+  Edit3,
+  Settings,
   Users,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -652,13 +655,16 @@ export function ProjectDetailPage() {
               </div>
             </div>
           </div>
-
           <div className="rounded-xl border border-border/70 bg-card/60 p-4">
             <p className="text-sm font-semibold">{t('project.recentActivity', { defaultValue: 'Recent Activity' })}</p>
             <div className="mt-3 space-y-2">
               {topActivity.length === 0 && <p className="text-xs text-muted-foreground">{t('project.activityEmpty', { defaultValue: 'No project activity yet.' })}</p>}
-              {topActivity.map((log) => (
-                <ActivityRow key={log.id} log={log} />
+              {topActivity.map((log, index) => (
+                <ActivityRow
+                  key={log.id}
+                  log={log as any}
+                  isLast={index === topActivity.length - 1}
+                />
               ))}
             </div>
           </div>
@@ -856,25 +862,16 @@ export function ProjectDetailPage() {
 
             {/* 3. Lista de Actividad (Timeline Real) */}
             {!activityLoading && activity.length > 0 && (
-              <div className="relative ml-3 border-l-2 border-border/40 py-2">
+              <div className="relative ml-3  py-2">
                 <div className="flex flex-col gap-6">
                   {activity.map((log, index) => {
                     // Comprobamos si es el último elemento para opcionalmente atenuar la línea (opcional)
                     const isLast = index === activity.length - 1;
 
                     return (
-                      <div key={log.id} className="relative pl-8 group">
-                        {/* Nodo de la línea de tiempo (Punto) */}
-                        {/* Usamos ring-card para simular un recorte en la línea y que el punto respire */}
-                        <span className="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full border-2 border-primary bg-background ring-4 ring-card transition-colors group-hover:bg-primary" />
-
-                        {/* 
-                    Contenedor del componente hijo.
-                    Asegúrate de que tu componente <ActivityRow /> no tenga 
-                    márgenes excesivos que rompan el flujo de la línea.
-                  */}
+                      <div key={log.id} className="relative">
                         <div className="-mt-1.5">
-                          <ActivityRow log={log} />
+                          <ActivityRow log={log as any} isLast={isLast} />
                         </div>
                       </div>
                     );
@@ -1067,55 +1064,55 @@ export function ProjectDetailPage() {
 
           <SettingsSection title={t('project.settings.notifications', { defaultValue: 'Notifications' })}>
             <div className="grid gap-2 md:grid-cols-2">
-            {[
-  ['taskCreated', t('project.notification.taskCreated', { defaultValue: 'Task Created' })],
-  ['taskAssigned', t('project.notification.taskAssigned', { defaultValue: 'Task Assigned' })],
-  ['taskCompleted', t('project.notification.taskCompleted', { defaultValue: 'Task Completed' })],
-  ['memberAdded', t('project.notification.memberAdded', { defaultValue: 'Member Added' })],
-  ['workflowUpdated', t('project.notification.workflowUpdated', { defaultValue: 'Workflow Updated' })],
-  ['fileUploaded', t('project.notification.fileUploaded', { defaultValue: 'File Uploaded' })],
-].map(([key, label]) => {
-  const isChecked = generalDraft.notificationSettings[key as keyof typeof generalDraft.notificationSettings];
+              {[
+                ['taskCreated', t('project.notification.taskCreated', { defaultValue: 'Task Created' })],
+                ['taskAssigned', t('project.notification.taskAssigned', { defaultValue: 'Task Assigned' })],
+                ['taskCompleted', t('project.notification.taskCompleted', { defaultValue: 'Task Completed' })],
+                ['memberAdded', t('project.notification.memberAdded', { defaultValue: 'Member Added' })],
+                ['workflowUpdated', t('project.notification.workflowUpdated', { defaultValue: 'Workflow Updated' })],
+                ['fileUploaded', t('project.notification.fileUploaded', { defaultValue: 'File Uploaded' })],
+              ].map(([key, label]) => {
+                const isChecked = generalDraft.notificationSettings[key as keyof typeof generalDraft.notificationSettings];
 
-  return (
-    <label key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-sm cursor-pointer hover:bg-background/80 transition-colors select-none">
-      <span>{label}</span>
-      
-      <div className="relative flex items-center">
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onChange={() => toggleNotificationSetting(key as keyof typeof generalDraft.notificationSettings)}
-          className="sr-only peer"
-        />
-        
-        {/* Círculo del Checkbox */}
-        <div className={`
+                return (
+                  <label key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-sm cursor-pointer hover:bg-background/80 transition-colors select-none">
+                    <span>{label}</span>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleNotificationSetting(key as keyof typeof generalDraft.notificationSettings)}
+                        className="sr-only peer"
+                      />
+
+                      {/* Círculo del Checkbox */}
+                      <div className={`
           h-4 w-4 rounded-full border transition-all duration-200 flex items-center justify-center
           peer-focus-visible:ring-2 peer-focus-visible:ring-primary/20
-          ${isChecked 
-            ? 'border-primary bg-primary text-primary-foreground' 
-            : 'border-muted-foreground/40 bg-transparent text-transparent'
-          }
+          ${isChecked
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-muted-foreground/40 bg-transparent text-transparent'
+                        }
         `}>
-          {/* Icono SVG del Check */}
-          <svg 
-            xmlns="http://w3.org" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="3" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            className={`h-2.5 w-2.5 transition-transform duration-200 ${isChecked ? 'scale-100' : 'scale-0'}`}
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </div>
-      </div>
-    </label>
-  );
-})}
+                        {/* Icono SVG del Check */}
+                        <svg
+                          xmlns="http://w3.org"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className={`h-2.5 w-2.5 transition-transform duration-200 ${isChecked ? 'scale-100' : 'scale-0'}`}
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
 
             </div>
           </SettingsSection>
@@ -1264,37 +1261,121 @@ function StatCard({ label, value, tone = 'default' }: { label: string; value: st
   );
 }
 
-function ActivityRow({ log }: { log: any }) {
-  const action = String(log.action || '').replace(/_/g, ' ').toLowerCase();
+// --- Types (Adjust according to your schema) ---
+interface ActivityLog {
+  action: string;
+  createdAt: string;
+  user?: { firstName?: string; lastName?: string };
+  task?: { title: string };
+  oldValue?: Record<string, any>;
+  newValue?: Record<string, any>;
+}
+
+interface ActivityRowProps {
+  log: ActivityLog;
+  isLast?: boolean; // Pass this from the parent map function: index === array.length - 1
+}
+
+export function ActivityRow({ log, isLast = false }: ActivityRowProps) {
+  // --- Data Normalization ---
+  const rawAction = String(log.action || '').toUpperCase();
+  const readableAction = rawAction.replace(/_/g, ' ').toLowerCase();
   const actor = `${log.user?.firstName ?? ''} ${log.user?.lastName ?? ''}`.trim() || 'System';
+
+  // --- Icon & Color Mapping ---
+  const getTheme = () => {
+    if (rawAction.includes('CREATE')) return { Icon: Plus, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' };
+    if (rawAction.includes('DELETE')) return { Icon: Trash2, color: 'text-destructive bg-destructive/10 border-destructive/20' };
+    if (rawAction.includes('FILE') || rawAction.includes('UPLOAD')) return { Icon: Upload, color: 'text-purple-500 bg-purple-500/10 border-purple-500/20' };
+    if (rawAction.includes('UPDATE')) return { Icon: Edit3, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' };
+    if (rawAction.includes('SETTINGS')) return { Icon: Settings, color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' };
+    return { Icon: Activity, color: 'text-muted-foreground bg-muted border-border/50' };
+  };
+
+  const { Icon, color } = getTheme();
+
   return (
-    <div className="rounded-lg border border-border/60 bg-background/50 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm">
-            <span className="font-semibold">{actor}</span>{' '}
-            <span className="text-muted-foreground">{action}</span>
-            {log.task?.title && <span className="font-medium"> "{log.task.title}"</span>}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</p>
+    <div className="group relative flex gap-4 pb-6">
+      {/* Timeline Vertical Line 
+        Hidden on the last item to prevent the line from extending into empty space.
+      */}
+      {!isLast && (
+        <div className="absolute left-[15px] top-8 bottom-0 w-[2px] bg-border/40" aria-hidden="true" />
+      )}
+
+      {/* Timeline Node / Icon */}
+      <div className="relative z-10 shrink-0 mt-1">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-full border ring-4 ring-background ${color}`}>
+          <Icon className="h-3.5 w-3.5" />
         </div>
-        {log.action?.includes('FILE') && <Upload className="h-4 w-4 text-muted-foreground" />}
-        {log.action?.includes('UPDATED') && <SettingsIcon className="h-4 w-4 text-muted-foreground" />}
       </div>
-      {(log.oldValue?.status || log.newValue?.status) && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          {String(log.oldValue?.status || '-')}
-          {' -> '}
-          {String(log.newValue?.status || '-')}
-        </p>
-      )}
-      {(log.oldValue?.priority || log.newValue?.priority) && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          {String(log.oldValue?.priority || '-')}
-          {' -> '}
-          {String(log.newValue?.priority || '-')}
-        </p>
-      )}
+
+      {/* Content Area */}
+      <div className="flex flex-col flex-1 pt-1.5 pb-2">
+
+        {/* Header: Actor & Action */}
+        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1">
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">{actor}</span>{' '}
+            <span className="text-muted-foreground">{readableAction}</span>
+            {log.task?.title && (
+              <span className="font-medium text-foreground"> "{log.task.title}"</span>
+            )}
+          </p>
+          <time className="text-[11px] font-medium text-muted-foreground shrink-0 sm:ml-4">
+            {new Date(log.createdAt).toLocaleString(undefined, {
+              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            })}
+          </time>
+        </div>
+
+        {/* Changes / Metadata Payload */}
+        {((log.oldValue?.status || log.newValue?.status) || (log.oldValue?.priority || log.newValue?.priority)) && (
+          <div className="mt-2.5 rounded-xl border border-border/50 bg-muted/10 p-3 space-y-2">
+
+            {/* Status Transition */}
+            {(log.oldValue?.status || log.newValue?.status) && (
+              <TransitionBadge
+                label="Status"
+                oldVal={log.oldValue?.status}
+                newVal={log.newValue?.status}
+              />
+            )}
+
+            {/* Priority Transition */}
+            {(log.oldValue?.priority || log.newValue?.priority) && (
+              <TransitionBadge
+                label="Priority"
+                oldVal={log.oldValue?.priority}
+                newVal={log.newValue?.priority}
+              />
+            )}
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Subcomponent: Clean State Transitions ---
+function TransitionBadge({ label, oldVal, newVal }: { label: string; oldVal?: string; newVal?: string }) {
+  if (!oldVal && !newVal) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+      <span className="font-medium uppercase tracking-wider text-muted-foreground/70 w-16">
+        {label}
+      </span>
+      <div className="flex items-center gap-2">
+        <span className="rounded-md border border-border/40 bg-muted/50 px-2 py-0.5 text-muted-foreground line-through decoration-muted-foreground/40">
+          {String(oldVal || 'None')}
+        </span>
+        <ArrowRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+        <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-medium text-primary">
+          {String(newVal || 'None')}
+        </span>
+      </div>
     </div>
   );
 }

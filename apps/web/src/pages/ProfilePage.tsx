@@ -236,36 +236,6 @@ export function ProfilePage() {
             </CardContent>
           </Card>
         </motion.div>
-
-        {/* Security section */}
-        <motion.div variants={item}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Key className="h-4 w-4" />
-                {t('profile.security', { defaultValue: 'Security' })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{t('auth.password')}</p>
-                  <p className="text-xs text-muted-foreground">{t('profile.changePassword', { defaultValue: 'Change your account password' })}</p>
-                </div>
-                <Button variant="outline" size="sm" disabled title={t('common.comingSoon', { defaultValue: 'Coming soon' })}>
-                  {t('profile.changePasswordAction', { defaultValue: 'Change password' })}
-                </Button>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{t('profile.activeSessions', { defaultValue: 'Active sessions' })}</p>
-                  <p className="text-xs text-muted-foreground">{t('profile.manageDevices', { defaultValue: 'Manage devices logged in to your account' })}</p>
-                </div>
-                <Badge variant="secondary">{t('profile.activeCount', { defaultValue: '1 active' })}</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </motion.div>
     </div>
   );

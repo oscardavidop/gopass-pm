@@ -67,7 +67,12 @@ import { ChevronDown } from 'lucide-react';
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const prefs = usePreferencesStore();
+  const notifications = usePreferencesStore((s) => s.notifications);
+  const timezone = usePreferencesStore((s) => s.timezone);
+  const language = usePreferencesStore((s) => s.language);
+  const setNotification = usePreferencesStore((s) => s.setNotification);
+  const setTimezone = usePreferencesStore((s) => s.setTimezone);
+  const setLanguage = usePreferencesStore((s) => s.setLanguage);
   const { t } = useTranslation();
   const currentSessionId = useAuthStore((s) => s.sessionId);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -85,7 +90,7 @@ export function SettingsPage() {
       .then((serverPrefs) => {
         if (cancelled) return;
         (Object.keys(serverPrefs) as Array<keyof typeof serverPrefs>).forEach((key) => {
-          prefs.setNotification(key as any, !!serverPrefs[key]);
+          setNotification(key as any, !!serverPrefs[key]);
         });
       })
       .catch(() => undefined)
@@ -96,13 +101,13 @@ export function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [prefs]);
+  }, [setNotification]);
 
   const updateNotificationPref = async (
-    key: keyof typeof prefs.notifications,
+    key: keyof typeof notifications,
     value: boolean,
   ) => {
-    prefs.setNotification(key, value);
+    setNotification(key, value);
     setSavingKey(key);
     try {
       await usersService.updateNotificationPreferences({ [key]: value });
@@ -131,12 +136,12 @@ export function SettingsPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
                   <Palette className="h-4 w-4" />
                 </div>
-                {t('app.appearance', { defaultValue: 'Appearance' })}
+                {t('app.appearance')}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="mb-4">
-                <p className="text-sm font-medium text-foreground">{t('app.theme', { defaultValue: 'Interface Theme' })}</p>
+                <p className="text-sm font-medium text-foreground">{t('app.theme')}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Select your preferred visual style.</p>
               </div>
 
@@ -183,11 +188,11 @@ export function SettingsPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
                   <Bell className="h-4 w-4" />
                 </div>
-                {t('app.notifications', { defaultValue: 'Notifications' })}
+                {t('app.notifications')}
               </CardTitle>
               {/* Indicador de autoguardado sutil en la cabecera */}
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
-                {t('app.autoSaved', { defaultValue: 'Auto-saved' })}
+                {t('app.autoSaved')}
               </span>
             </CardHeader>
             <CardContent className="p-0">
@@ -211,7 +216,7 @@ export function SettingsPage() {
                     <div className="flex items-center gap-3 shrink-0">
                       {savingKey === key && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                       <Toggle
-                        checked={prefs.notifications[key]}
+                        checked={notifications[key]}
                         onChange={(v) => void updateNotificationPref(key, v)}
                       />
                     </div>
@@ -222,7 +227,7 @@ export function SettingsPage() {
               {!prefsLoaded && (
                 <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('common.loading', { defaultValue: 'Loading preferences...' })}
+                  {t('common.loading')}
                 </div>
               )}
             </CardContent>
@@ -237,10 +242,10 @@ export function SettingsPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
                   <Globe className="h-4 w-4" />
                 </div>
-                {t('app.languageRegion', { defaultValue: 'Language & Region' })}
+                {t('app.languageRegion')}
               </CardTitle>
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
-                {t('app.autoSaved', { defaultValue: 'Auto-saved' })}
+                {t('app.autoSaved')}
               </span>
             </CardHeader>
 
@@ -249,12 +254,12 @@ export function SettingsPage() {
                 {/* Selector de Idioma */}
                 <div className="space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">
-                    {t('app.language', { defaultValue: 'Language' })}
+                    {t('app.language')}
                   </label>
                   <div className="relative">
                     <select
-                      value={prefs.language}
-                      onChange={(e) => prefs.setLanguage(e.target.value)}
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
                       className="w-full appearance-none rounded-lg border border-border/60 bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-muted/10 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
                     >
                       {LANGUAGES.map(({ value, label }) => (
@@ -267,12 +272,12 @@ export function SettingsPage() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">
-                    {t('app.timezone', { defaultValue: 'Timezone' })}
+                    {t('app.timezone')}
                   </label>
                   <div className="relative">
                     <select
-                      value={prefs.timezone}
-                      onChange={(e) => prefs.setTimezone(e.target.value)}
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
                       className="w-full appearance-none rounded-lg border border-border/60 bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-muted/10 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
                     >
                       {TIMEZONES.map((tz) => (
@@ -298,7 +303,7 @@ export function SettingsPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Shield className="h-4 w-4" />
                 </div>
-                {t('settings.securityTitle', { defaultValue: 'Security & Access' })}
+                {t('settings.securityTitle')}
               </CardTitle>
             </CardHeader>
 
@@ -307,17 +312,17 @@ export function SettingsPage() {
                 <div className="mb-5">
                   <h4 className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <KeyRound className="h-4 w-4 text-muted-foreground" />
-                    {t('settings.changePassword', { defaultValue: 'Change password' })}
+                    {t('settings.changePassword')}
                   </h4>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {t('settings.changePasswordDesc', { defaultValue: 'Update your password to keep your account secure.' })}
+                    {t('settings.changePasswordDesc')}
                   </p>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground ml-1">
-                      {t('settings.currentPassword', { defaultValue: 'Current password' })}
+                      {t('settings.currentPassword')}
                     </label>
                     <input
                       type="password"
@@ -330,7 +335,7 @@ export function SettingsPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground ml-1">
-                      {t('settings.newPassword', { defaultValue: 'New password' })}
+                      {t('settings.newPassword')}
                     </label>
                     <input
                       type="password"
@@ -353,7 +358,7 @@ export function SettingsPage() {
                       setNewPassword('');
                     }}
                   >
-                    {t('settings.updatePassword', { defaultValue: 'Update password' })}
+                    {t('settings.updatePassword')}
                   </Button>
                 </div>
               </div>
@@ -365,10 +370,10 @@ export function SettingsPage() {
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 className="text-sm font-medium text-foreground">
-                      {t('settings.activeSessions', { defaultValue: 'Active sessions' })}
+                      {t('settings.activeSessions')}
                     </h4>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {t('settings.sessionsDesc', { defaultValue: 'Manage devices currently logged into your account.' })}
+                      {t('settings.sessionsDesc')}
                     </p>
                   </div>
                   <Button
@@ -379,7 +384,7 @@ export function SettingsPage() {
                     onClick={() => logoutAllSessions.mutate()}
                   >
                     <LogOut className="mr-2 h-3.5 w-3.5" />
-                    {t('settings.logoutAllDevices', { defaultValue: 'Log out all devices' })}
+                    {t('settings.logoutAllDevices')}
                   </Button>
                 </div>
 
@@ -391,7 +396,7 @@ export function SettingsPage() {
                   <div className="space-y-3">
                     {(sessions.data ?? []).length === 0 ? (
                       <p className="py-4 text-center text-xs text-muted-foreground">
-                        {t('settings.noActiveSessions', { defaultValue: 'No active sessions found.' })}
+                        {t('settings.noActiveSessions')}
                       </p>
                     ) : (
                       (sessions.data ?? []).map((session) => (
@@ -409,11 +414,11 @@ export function SettingsPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className="text-sm font-semibold text-foreground">
-                                  {getBrowserLabel(session.userAgent) || t('settings.unknownDevice', { defaultValue: 'Unknown device' })}
+                                  {getBrowserLabel(session.userAgent) || t('settings.unknownDevice')}
                                 </p>
                                 {session.id === currentSessionId && (
                                   <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-                                    {t('settings.currentSession', { defaultValue: 'Active Now' })}
+                                    {t('settings.currentSession')}
                                   </span>
                                 )}
                               </div>
@@ -425,7 +430,7 @@ export function SettingsPage() {
                                 </span>
                                 <span className="hidden sm:inline text-border">•</span>
                                 <span>
-                                  {t('settings.lastActivity', { defaultValue: 'Last active' })}: {session.lastUsedAt ? new Date(session.lastUsedAt).toLocaleString() : new Date(session.createdAt).toLocaleString()}
+                                  {t('settings.lastActivity')}: {session.lastUsedAt ? new Date(session.lastUsedAt).toLocaleString() : new Date(session.createdAt).toLocaleString()}
                                 </span>
                               </div>
                             </div>
@@ -442,7 +447,7 @@ export function SettingsPage() {
                                 loading={logoutSession.isPending}
                                 onClick={() => logoutSession.mutate(session.id)}
                               >
-                                {t('settings.logoutSession', { defaultValue: 'Revoke' })}
+                                {t('settings.logoutSession')}
                               </Button>
                             )}
                           </div>

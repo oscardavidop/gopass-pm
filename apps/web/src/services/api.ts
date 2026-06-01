@@ -21,6 +21,11 @@ api.interceptors.request.use((config) => {
 
 let refreshing: Promise<boolean> | null = null;
 
+function isAuthFlowRequest(url?: string) {
+  if (!url) return false;
+  return ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/auth/oauth', '/auth/verify-email', '/auth/resend-verification'].some((path) => url.includes(path));
+}
+
 function getRedirectPath() {
   if (typeof window === 'undefined') return '/login';
   const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -65,6 +70,10 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
+    if (isAuthFlowRequest(original?.url)) {
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;

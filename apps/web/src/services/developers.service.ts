@@ -26,6 +26,34 @@ export type DeveloperUsageRow = {
   };
 };
 
+export type DeveloperWebhook = {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  status: 'ACTIVE' | 'PAUSED' | 'DISABLED';
+  createdAt: string;
+  signingSecret?: string;
+};
+
+export type DeveloperWebhookDelivery = {
+  id: string;
+  event: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'RETRYING';
+  responseCode: number | null;
+  responseBody: string | null;
+  durationMs: number | null;
+  retryCount: number;
+  lastAttemptAt: string | null;
+  nextRetryAt: string | null;
+  createdAt: string;
+  webhook: {
+    id: string;
+    name: string;
+    url: string;
+  };
+};
+
 export const developersService = {
   listApiKeys: () => api.get('/developers/keys').then((r) => r.data.data as DeveloperApiKey[]),
 
@@ -76,25 +104,24 @@ export const developersService = {
           apiKeyHeader: string;
           apiKeyAuthHeader: string;
         };
+        docsUrl: string;
         scopes: string[];
+        scopeGroups?: Array<{ label: string; values: string[] }>;
         webhookEvents: string[];
+        webhookEventGroups?: Array<{ label: string; values: string[] }>;
       },
     ),
 
   listWebhooks: () =>
     api.get('/developers/webhooks').then((r) =>
-      r.data.data as Array<{
-        id: string;
-        name: string;
-        url: string;
-        events: string[];
-        status: 'ACTIVE' | 'PAUSED' | 'DISABLED';
-        createdAt: string;
-      }>,
+      r.data.data as DeveloperWebhook[],
     ),
 
+  listWebhookDeliveries: (limit = 20) =>
+    api.get('/developers/webhooks/deliveries', { params: { limit } }).then((r) => r.data.data as DeveloperWebhookDelivery[]),
+
   createWebhook: (payload: { name: string; url: string; events: string[] }) =>
-    api.post('/developers/webhooks', payload).then((r) => r.data.data),
+    api.post('/developers/webhooks', payload).then((r) => r.data.data as DeveloperWebhook),
 
   disableWebhook: (id: string) => api.delete(`/developers/webhooks/${id}`).then((r) => r.data.data),
 };

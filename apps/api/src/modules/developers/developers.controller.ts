@@ -20,6 +20,18 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { DevelopersService } from './developers.service';
+import {
+  ApiCreateDeveloperKey,
+  ApiCreateWebhook,
+  ApiDeveloperDocs,
+  ApiDeveloperRecentUsage,
+  ApiDeveloperUsageSummary,
+  ApiDisableWebhook,
+  ApiListDeveloperKeys,
+  ApiListWebhooks,
+  ApiRevokeDeveloperKey,
+  ApiWebhookDeliveries,
+} from './swagger/developers.docs';
 
 @ApiTags('Developers')
 @ApiBearerAuth('access-token')
@@ -29,13 +41,13 @@ export class DevelopersController {
   constructor(private readonly developersService: DevelopersService) {}
 
   @Get('keys')
-  @ApiOperation({ summary: 'List API keys for current user' })
+  @ApiListDeveloperKeys()
   listApiKeys(@CurrentUser('id') userId: string) {
     return this.developersService.listApiKeys(userId);
   }
 
   @Post('keys')
-  @ApiOperation({ summary: 'Create a new API key (secret shown only once)' })
+  @ApiCreateDeveloperKey()
   createApiKey(@CurrentUser() user: any, @Body() dto: CreateApiKeyDto) {
     this.ensureHumanSession(user);
     return this.developersService.createApiKey(user.id, dto);
@@ -43,20 +55,20 @@ export class DevelopersController {
 
   @Delete('keys/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Revoke an API key' })
+  @ApiRevokeDeveloperKey()
   revokeApiKey(@CurrentUser() user: any, @Param('id') id: string) {
     this.ensureHumanSession(user);
     return this.developersService.revokeApiKey(user.id, id);
   }
 
   @Get('usage/summary')
-  @ApiOperation({ summary: 'Get API key usage summary' })
+  @ApiDeveloperUsageSummary()
   usageSummary(@CurrentUser('id') userId: string) {
     return this.developersService.getUsageSummary(userId);
   }
 
   @Get('usage/requests')
-  @ApiOperation({ summary: 'Get latest API requests from API key traffic' })
+  @ApiDeveloperRecentUsage()
   recentUsage(@CurrentUser('id') userId: string, @Query('limit') limit?: string) {
     return this.developersService.getRecentUsage(userId, limit ? Number(limit) : 30);
   }
@@ -71,7 +83,7 @@ export class DevelopersController {
   }
 
   @Get('docs')
-  @ApiOperation({ summary: 'Developer docs payload for portal UI' })
+  @ApiDeveloperDocs()
   docs(@Req() req: Request) {
     const host = req.get('host') || 'localhost:3000';
     const protocol = req.protocol || 'http';
@@ -79,13 +91,19 @@ export class DevelopersController {
   }
 
   @Get('webhooks')
-  @ApiOperation({ summary: 'List webhooks' })
+  @ApiListWebhooks()
   listWebhooks(@CurrentUser('id') userId: string) {
     return this.developersService.listWebhooks(userId);
   }
 
+  @Get('webhooks/deliveries')
+  @ApiWebhookDeliveries()
+  listWebhookDeliveries(@CurrentUser('id') userId: string, @Query('limit') limit?: string) {
+    return this.developersService.listWebhookDeliveries(userId, limit ? Number(limit) : 30);
+  }
+
   @Post('webhooks')
-  @ApiOperation({ summary: 'Create webhook (foundation)' })
+  @ApiCreateWebhook()
   createWebhook(@CurrentUser() user: any, @Body() dto: CreateWebhookDto) {
     this.ensureHumanSession(user);
     return this.developersService.createWebhook(user.id, dto);
@@ -93,7 +111,7 @@ export class DevelopersController {
 
   @Delete('webhooks/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Disable webhook (foundation)' })
+  @ApiDisableWebhook()
   disableWebhook(@CurrentUser() user: any, @Param('id') id: string) {
     this.ensureHumanSession(user);
     return this.developersService.disableWebhook(user.id, id);
@@ -101,7 +119,7 @@ export class DevelopersController {
 
   private ensureHumanSession(user: any) {
     if (user?.authType === 'api_key') {
-      throw new ForbiddenException('API key sessions cannot manage developer credentials');
+      throw new ForbiddenException({ i18nKey: 'developers.auth.humanSessionRequired' });
     }
   }
 }

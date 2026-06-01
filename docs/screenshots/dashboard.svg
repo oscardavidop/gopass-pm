@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Tasku Dashboard Placeholder</title>
+  <desc id="desc">Placeholder artwork for the Tasku dashboard screenshot.</desc>
+  <rect width="1440" height="900" fill="#0f172a" />
+  <rect x="60" y="60" width="1320" height="780" rx="28" fill="#111827" stroke="#334155" />
+  <rect x="120" y="120" width="360" height="80" rx="16" fill="#1e293b" />
+  <rect x="120" y="240" width="280" height="180" rx="20" fill="#312e81" />
+  <rect x="430" y="240" width="280" height="180" rx="20" fill="#0f766e" />
+  <rect x="740" y="240" width="280" height="180" rx="20" fill="#7c2d12" />
+  <rect x="1050" y="240" width="270" height="180" rx="20" fill="#1d4ed8" />
+  <rect x="120" y="460" width="570" height="300" rx="24" fill="#1e293b" />
+  <rect x="720" y="460" width="600" height="300" rx="24" fill="#1e293b" />
+  <text x="120" y="120" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="42" font-weight="700">Tasku Dashboard</text>
+  <text x="120" y="180" fill="#94a3b8" font-family="Arial, sans-serif" font-size="24">Replace this placeholder with a production screenshot.</text>
+</svg>

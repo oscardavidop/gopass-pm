@@ -88,6 +88,13 @@ enum WebhookStatus {
   DISABLED
 }
 
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
 // ──────────────────────────── Models ───────────────────────────
 
 model User {
@@ -506,9 +513,34 @@ model Webhook {
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
   @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id           String                @id @default(uuid())
+  event        String
+  status       WebhookDeliveryStatus @default(PENDING)
+  payload      Json
+  responseCode Int?                  @map("response_code")
+  responseBody String?               @map("response_body")
+  durationMs   Int?                  @map("duration_ms")
+  retryCount   Int                   @default(0) @map("retry_count")
+  lastAttemptAt DateTime?            @map("last_attempt_at")
+  nextRetryAt  DateTime?             @map("next_retry_at")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  webhookId String  @map("webhook_id")
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([createdAt])
+  @@index([status, nextRetryAt])
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
 }

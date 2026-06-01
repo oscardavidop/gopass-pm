@@ -99,24 +99,19 @@ function SidebarContent({
         <button
           onClick={() => !collapsed && undefined}
           className={cn(
-            'group flex w-full items-center rounded-xl border border-border/70 bg-background/70 px-2 py-1.5 transition-colors',
+            'group flex w-full items-center',
             collapsed ? 'justify-center px-0' : 'gap-2',
           )}
         >
           <img
             src={theme === 'dark' ? logoDark : logoLight}
             alt="Tasku"
-            className="h-7 w-7 shrink-0 object-contain"
+            className={`transition-all duration-150 object-cover ${collapsed
+                ? 'h-10 w-10 rounded-full object-[12%_center]'
+                : 'object-center w-[134px]'
+              }`}
           />
-          {!collapsed && (
-            <>
-              <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-semibold text-foreground">{t('sidebar.workspaceName', { defaultValue: 'Tasku Workspace' })}</p>
-                <p className="text-[11px] text-muted-foreground">{t('sidebar.enterprisePlan', { defaultValue: 'Enterprise plan' })}</p>
-              </div>
-              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </>
-          )}
+
         </button>
       </div>
 

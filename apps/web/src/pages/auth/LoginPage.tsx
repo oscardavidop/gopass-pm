@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useLogin } from '@/hooks/useAuth';
 import { SocialAuthButtons } from '@/components/shared/SocialAuthButtons';
 import { translateByKey } from '@/i18n/translate';
+import { classifyAuthError, getApiErrorMessage } from '@/services/api-error';
 
 const schema = z.object({
   email: z.string().email('validation.invalidEmail'),
@@ -22,7 +23,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export function LoginPage() {
-  const { mutate: login, isPending } = useLogin();
+  const { mutate: login, isPending, error } = useLogin();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -44,8 +45,8 @@ export function LoginPage() {
   return (
     <Card className="border-border/60 bg-card/90 backdrop-blur-md shadow-xl shadow-primary/5">
       <CardHeader>
-        <CardTitle>{t('auth.login.title', { defaultValue: 'Sign in' })}</CardTitle>
-        <p className="text-sm text-muted-foreground">{t('auth.login.subtitle', { defaultValue: 'Welcome back. Continue where your team left off.' })}</p>
+        <CardTitle>{t('auth.login.title')}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t('auth.login.subtitle')}</p>
       </CardHeader>
       <CardContent>
         <SocialAuthButtons className="mb-4" />
@@ -54,48 +55,53 @@ export function LoginPage() {
             <span className="w-full border-t border-border/70" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground tracking-wide">Or use email</span>
+            <span className="bg-card px-2 text-muted-foreground tracking-wide">{t('common.orUseEmail')}</span>
             
           </div>
         </div>
 
         <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">
+          {classifyAuthError(error) === 'AUTH_INVALID_CREDENTIALS' && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {getApiErrorMessage(error, 'auth.invalidCredentials', t('auth.invalidCredentials'))}
+            </div>
+          )}
           <Input
-            label={t('auth.email', { defaultValue: 'Email' })}
+            label={t('auth.email')}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder', { defaultValue: 'you@example.com' })}
             icon={<Mail />}
             error={errors.email?.message ? translateByKey(errors.email.message, undefined, errors.email.message) : undefined}
             {...register('email')}
           />
           <Input
-            label={t('auth.password', { defaultValue: 'Password' })}
+            label={t('auth.password')}
             type="password"
-            placeholder="••••••••"
+            placeholder={t('auth.passwordPlaceholder', { defaultValue: '••••••••' })}
             icon={<Lock />}
             error={errors.password?.message ? translateByKey(errors.password.message, undefined, errors.password.message) : undefined}
             {...register('password')}
           />
           <Button type="submit" className="w-full" loading={isPending}>
-            {t('auth.login.title', { defaultValue: 'Sign in' })}
+            {t('auth.login.title')}
           </Button>
 
           <div className="text-right">
             <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
-              {t('auth.forgotPassword', { defaultValue: 'Forgot your password?' })}
+              {t('auth.forgotPassword')}
             </Link>
           </div>
         </form>
 
         <div className="mt-4 text-center text-sm text-muted-foreground">
-          {t('auth.noAccount', { defaultValue: "Don't have an account?" })}{' '}
+          {t('auth.noAccount')}{' '}
           <Link to="/register" className="text-primary hover:underline font-medium">
-            {t('auth.createAccount', { defaultValue: 'Create one' })}
+            {t('auth.createAccount')}
           </Link>
         </div>
 
         <div className="mt-4 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground space-y-1">
-          <p className="font-medium text-foreground">Demo accounts</p>
+          <p className="font-medium text-foreground">{t('common.demoAccounts')}</p>
           <p>admin@tasku.pro / Admin123!</p>
           <p>manager@tasku.pro / Manager123!</p>
           <p>user@tasku.pro / User123!</p>

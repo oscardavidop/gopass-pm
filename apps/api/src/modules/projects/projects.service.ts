@@ -20,6 +20,7 @@ import { hasProjectPermission } from '../auth/authorization/project-rbac';
 import { CacheManager } from '../../shared/redis/cache.manager';
 import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
 import { CacheKeys } from '../../shared/redis/cache-keys';
+import { WebhookDispatchService } from '../developers/webhook-dispatch.service';
 
 @Injectable()
 export class ProjectsService {
@@ -32,6 +33,7 @@ export class ProjectsService {
     private readonly email: EmailService,
     private readonly cacheManager: CacheManager,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly webhookDispatch: WebhookDispatchService,
   ) { }
 
   async create(dto: CreateProjectDto, userId: string) {
@@ -81,6 +83,15 @@ export class ProjectsService {
 
     const actor = await this.getActorSnapshot(userId);
     const actorName = [actor?.firstName, actor?.lastName].filter(Boolean).join(' ').trim() || 'A team member';
+    void this.webhookDispatch.dispatchEvent({
+      event: 'project.created',
+      userIds: [userId],
+      payload: {
+        projectId: created.id,
+        actor,
+        project: created,
+      },
+    });
 
     const uniqueMembers = Array.from(new Map(
       (members as Array<{ userId: string; role?: ProjectRole }> || [])
@@ -219,6 +230,15 @@ export class ProjectsService {
       select: { id: true, firstName: true, lastName: true, avatar: true, collaborationColor: true },
     });
     this.events.emitProjectUpdated(id, updated, actor);
+    void this.webhookDispatch.dispatchEvent({
+      event: 'project.updated',
+      projectId: id,
+      payload: {
+        projectId: id,
+        actor,
+        project: updated,
+      },
+    });
 
     const activity = await this.prisma.activityLog.create({
       data: {
@@ -277,6 +297,15 @@ export class ProjectsService {
     const memberUserIds = project.members.map((member) => member.userId).filter((memberId) => memberId !== userId);
 
     this.events.emitProjectDeleted(id, { projectId: id, projectName, actor });
+    void this.webhookDispatch.dispatchEvent({
+      event: 'project.deleted',
+      projectId: id,
+      payload: {
+        projectId: id,
+        actor,
+        project: { id, name: projectName },
+      },
+    });
 
     for (const memberUserId of memberUserIds) {
       await this.prisma.notification.create({
@@ -336,6 +365,16 @@ export class ProjectsService {
       projectId,
       userId: memberId,
       user: newMemberUser,
+    });
+    void this.webhookDispatch.dispatchEvent({
+      event: 'project.member.added',
+      projectId,
+      payload: {
+        projectId,
+        actorId: currentUserId,
+        memberId,
+        user: newMemberUser,
+      },
     });
 
     // 2. Persist notification + notify the newly added member privately
@@ -484,6 +523,16 @@ export class ProjectsService {
         projectId,
         userId: existingUser.id,
         user: existingUser,
+      });
+      void this.webhookDispatch.dispatchEvent({
+        event: 'project.member.added',
+        projectId,
+        payload: {
+          projectId,
+          actorId: currentUserId,
+          memberId: existingUser.id,
+          user: existingUser,
+        },
       });
 
       await this.sendProjectMemberAddedNotification({

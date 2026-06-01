@@ -117,12 +117,12 @@ export function Navbar() {
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/70 bg-card/90 px-3 text-sm text-foreground shadow-sm transition-colors hover:bg-accent"
+                className="inline-flex h-6 items-center gap-2 rounded-md border border-border/70 bg-card/90 px-2 text-xs text-foreground shadow-sm transition-colors hover:bg-accent outline-none"
                 aria-label={t('app.language', { defaultValue: 'Language' })}
               >
-                <Languages className="h-4 w-4 text-muted-foreground" />
+                <Languages className="h-3 w-3 text-muted-foreground" />
                 <span className="hidden sm:inline">{getLocaleLabel(language)}</span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
@@ -138,7 +138,7 @@ export function Navbar() {
                     onSelect={() => setLanguage(locale)}
                   >
                     <span>{getLocaleLabel(locale)}</span>
-                    {language === locale ? <Check className="h-4 w-4 text-primary" /> : null}
+                    {language === locale ? <Check className="h-3 w-3 text-primary" /> : null}
                   </DropdownMenu.Item>
                 ))}
               </DropdownMenu.Content>

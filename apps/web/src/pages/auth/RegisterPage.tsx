@@ -34,8 +34,8 @@ export function RegisterPage() {
   return (
     <Card className="border-border/60 bg-card/90 backdrop-blur-md shadow-xl shadow-primary/5">
       <CardHeader>
-        <CardTitle>{t('auth.createAccountTitle', { defaultValue: 'Create account' })}</CardTitle>
-        <p className="text-sm text-muted-foreground">{t('auth.createAccountDesc', { defaultValue: 'Build your workspace in seconds, scale it for years.' })}</p>
+        <CardTitle>{t('auth.createAccountTitle')}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t('auth.createAccountDesc')}</p>
       </CardHeader>
       <CardContent>
         <SocialAuthButtons className="mb-4" />
@@ -44,29 +44,29 @@ export function RegisterPage() {
             <span className="w-full border-t border-border/70" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground tracking-wide">{t('auth.orCreateWithEmail', { defaultValue: 'Or create with email' })}</span>
+            <span className="bg-card px-2 text-muted-foreground tracking-wide">{t('auth.orCreateWithEmail')}</span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit((data) => register(data))} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label={t('profile.firstName', { defaultValue: 'First name' })}
-              placeholder="John"
+              label={t('profile.firstName')}
+              placeholder={t('auth.firstNamePlaceholder', { defaultValue: 'John' })}
               icon={<User />}
               error={errors.firstName?.message ? translateByKey(errors.firstName.message, undefined, errors.firstName.message) : undefined}
               {...field('firstName')}
             />
             <Input
-              label={t('profile.lastName', { defaultValue: 'Last name' })}
-              placeholder="Doe"
+              label={t('profile.lastName')}
+              placeholder={t('auth.lastNamePlaceholder', { defaultValue: 'Doe' })}
               error={errors.lastName?.message ? translateByKey(errors.lastName.message, undefined, errors.lastName.message) : undefined}
               {...field('lastName')}
             />
           </div>
           <Input
-            label={t('auth.username', { defaultValue: 'Username' })}
-            placeholder="john_doe"
+            label={t('auth.username')}
+            placeholder={t('auth.usernamePlaceholder', { defaultValue: 'john_doe' })}
             icon={<AtSign />}
             error={errors.username?.message ? translateByKey(errors.username.message, undefined, errors.username.message) : undefined}
             {...field('username')}
@@ -87,15 +87,13 @@ export function RegisterPage() {
             error={errors.password?.message ? translateByKey(errors.password.message, undefined, errors.password.message) : undefined}
             {...field('password')}
           />
-          <Button type="submit" className="w-full" loading={isPending}>
-            {t('auth.createAccount', { defaultValue: 'Create one' })}
-          </Button>
+          <Button type="submit" className="w-full" loading={isPending}>{t('auth.createAccount')}</Button>
         </form>
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          {t('auth.alreadyHaveAccount', { defaultValue: 'Already have an account?' })}{' '}
+          {t('auth.alreadyHaveAccount')}{' '}
           <Link to="/login" className="text-primary hover:underline font-medium">
-            {t('auth.signIn', { defaultValue: 'Sign in' })}
+            {t('auth.signIn')}
           </Link>
         </p>
       </CardContent>

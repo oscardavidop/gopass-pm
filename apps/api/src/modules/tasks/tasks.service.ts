@@ -20,6 +20,7 @@ import { hasProjectPermission } from '../auth/authorization/project-rbac';
 import { CacheManager } from '../../shared/redis/cache.manager';
 import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
 import { CacheKeys } from '../../shared/redis/cache-keys';
+import { WebhookDispatchService } from '../developers/webhook-dispatch.service';
 
 @Injectable()
 export class TasksService {
@@ -33,6 +34,7 @@ export class TasksService {
     private readonly email: EmailService,
     private readonly cacheManager: CacheManager,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly webhookDispatch: WebhookDispatchService,
   ) { }
 
   async create(projectId: string, dto: CreateTaskDto, userId: string, userRole: Role = Role.USER) {
@@ -90,6 +92,16 @@ export class TasksService {
 
     const actor = await this.getActorSnapshot(userId);
     this.events.emitTaskCreated(projectId, task, { actor });
+    void this.webhookDispatch.dispatchEvent({
+      event: 'task.created',
+      projectId,
+      payload: {
+        taskId: task.id,
+        projectId,
+        actor,
+        task,
+      },
+    });
 
     const activity = await this.prisma.activityLog.create({
       data: {
@@ -305,6 +317,18 @@ export class TasksService {
       oldValue: oldValues,
       changedFields: changes,
     });
+    void this.webhookDispatch.dispatchEvent({
+      event: dto.status === TaskStatus.DONE && task.status !== TaskStatus.DONE ? 'task.completed' : 'task.updated',
+      projectId: updated.projectId,
+      payload: {
+        taskId: updated.id,
+        projectId: updated.projectId,
+        actor,
+        task: updated,
+        previous: oldValues,
+        changedFields: changes,
+      },
+    });
 
     const assigneeChanged = dto.assigneeId !== undefined && dto.assigneeId !== task.assigneeId;
     if (assigneeChanged && updated.assigneeId) {
@@ -482,6 +506,16 @@ export class TasksService {
       actor,
       task: { id: task.id, title: task.title, status: task.status, priority: task.priority },
     });
+    void this.webhookDispatch.dispatchEvent({
+      event: 'task.deleted',
+      projectId: task.projectId,
+      payload: {
+        taskId: task.id,
+        projectId: task.projectId,
+        actor,
+        task: { id: task.id, title: task.title, status: task.status, priority: task.priority },
+      },
+    });
 
     const activity = await this.prisma.activityLog.create({
       data: {
@@ -557,6 +591,21 @@ export class TasksService {
     this.events.emitTaskUpdated(task.projectId, updatedTask, {
       actor,
       changedFields: ['comments'],
+    });
+    void this.webhookDispatch.dispatchEvent({
+      event: 'task.comment.created',
+      projectId: task.projectId,
+      payload: {
+        taskId,
+        projectId: task.projectId,
+        actor,
+        comment: {
+          id: comment.id,
+          content: comment.content,
+          author: comment.author,
+          createdAt: comment.createdAt,
+        },
+      },
     });
 
     await this.invalidateTaskCaches(taskId, task.projectId, task.assigneeId ?? undefined);

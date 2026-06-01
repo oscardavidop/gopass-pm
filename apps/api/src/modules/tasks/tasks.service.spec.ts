@@ -31,12 +31,13 @@ describe('TasksService', () => {
     invalidateNotifications: jest.fn(),
     invalidateUser: jest.fn(),
   } as any;
+  const webhookDispatch = { dispatchEvent: jest.fn() } as any;
 
   let service: TasksService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new TasksService(prisma, events, config, email, cacheManager, cacheInvalidation);
+    service = new TasksService(prisma, events, config, email, cacheManager, cacheInvalidation, webhookDispatch);
     jest.spyOn(service as any, 'findOne').mockResolvedValue({ id: 'task-1', projectId: 'project-1' });
   });
 

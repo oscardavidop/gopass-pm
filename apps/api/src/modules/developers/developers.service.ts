@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiKeyStatus, Prisma, WebhookStatus } from '@prisma/client';
 import { randomBytes, createHash } from 'crypto';
@@ -9,8 +9,15 @@ import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.
 import { CacheKeys } from '../../shared/redis/cache-keys';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
-
-const DEFAULT_SCOPES = ['projects:read', 'tasks:read'];
+import {
+  ALL_DEVELOPER_SCOPES,
+  ALL_WEBHOOK_EVENTS,
+  DEFAULT_API_SCOPES,
+  DEFAULT_WEBHOOK_EVENTS,
+  DEVELOPER_DOCS_URL,
+  DEVELOPER_SCOPE_GROUPS,
+  DEVELOPER_WEBHOOK_EVENT_GROUPS,
+} from './developers.constants';
 
 @Injectable()
 export class DevelopersService {
@@ -27,7 +34,7 @@ export class DevelopersService {
     const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
 
     if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-      throw new ForbiddenException('Invalid expiration date');
+      throw new BadRequestException({ i18nKey: 'developers.apiKey.invalidExpirationDate' });
     }
 
     const created = await this.prisma.apiKey.create({
@@ -57,7 +64,7 @@ export class DevelopersService {
     return {
       ...created,
       key: key.full,
-      warning: 'Store this API key now. It will not be shown again.',
+      warning: 'developers.apiKey.storeNowWarning',
     };
   }
 
@@ -85,7 +92,7 @@ export class DevelopersService {
 
   async revokeApiKey(userId: string, id: string) {
     const key = await this.prisma.apiKey.findUnique({ where: { id }, select: { userId: true } });
-    if (!key || key.userId !== userId) throw new NotFoundException('API key not found');
+    if (!key || key.userId !== userId) throw new NotFoundException({ i18nKey: 'developers.apiKey.notFound' });
 
     const updated = await this.prisma.apiKey.update({
       where: { id },
@@ -185,13 +192,45 @@ export class DevelopersService {
     });
   }
 
+  async listWebhookDeliveries(userId: string, limit = 30) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+
+    return this.prisma.webhookDelivery.findMany({
+      where: { webhook: { userId } },
+      orderBy: { createdAt: 'desc' },
+      take: safeLimit,
+      select: {
+        id: true,
+        event: true,
+        status: true,
+        responseCode: true,
+        responseBody: true,
+        durationMs: true,
+        retryCount: true,
+        lastAttemptAt: true,
+        nextRetryAt: true,
+        createdAt: true,
+        webhook: {
+          select: {
+            id: true,
+            name: true,
+            url: true,
+          },
+        },
+      },
+    });
+  }
+
   createWebhook(userId: string, dto: CreateWebhookDto) {
+    const secret = randomBytes(24).toString('hex');
+
     return this.prisma.webhook.create({
       data: {
         userId,
         name: dto.name,
         url: dto.url,
         events: this.normalizeEvents(dto.events),
+        secret,
         status: WebhookStatus.ACTIVE,
       },
       select: {
@@ -201,16 +240,20 @@ export class DevelopersService {
         events: true,
         status: true,
         createdAt: true,
+        secret: true,
       },
     }).then(async (created) => {
       await this.cacheInvalidation.invalidateDashboard();
-      return created;
+      return {
+        ...created,
+        signingSecret: created.secret,
+      };
     });
   }
 
   async disableWebhook(userId: string, id: string) {
     const hook = await this.prisma.webhook.findUnique({ where: { id }, select: { userId: true } });
-    if (!hook || hook.userId !== userId) throw new NotFoundException('Webhook not found');
+    if (!hook || hook.userId !== userId) throw new NotFoundException({ i18nKey: 'developers.webhook.notFound' });
 
     return this.prisma.webhook.update({
       where: { id },
@@ -230,27 +273,16 @@ export class DevelopersService {
         title: 'Tasku Developer API',
         version: 'v1',
         baseUrl,
+        docsUrl: DEVELOPER_DOCS_URL,
         auth: {
           bearer: 'Authorization: Bearer <jwt_access_token>',
           apiKeyHeader: 'X-API-Key: tasku_live_<secret>',
           apiKeyAuthHeader: 'Authorization: ApiKey tasku_live_<secret>',
         },
-        scopes: [
-          'projects:read',
-          'projects:write',
-          'tasks:read',
-          'tasks:write',
-          'files:read',
-          'files:write',
-          'notifications:read',
-        ],
-        webhookEvents: [
-          'task.created',
-          'task.updated',
-          'task.completed',
-          'project.created',
-          'project.updated',
-        ],
+        scopes: ALL_DEVELOPER_SCOPES,
+        scopeGroups: DEVELOPER_SCOPE_GROUPS,
+        webhookEvents: ALL_WEBHOOK_EVENTS,
+        webhookEventGroups: DEVELOPER_WEBHOOK_EVENT_GROUPS,
       }),
     });
   }
@@ -266,17 +298,19 @@ export class DevelopersService {
   }
 
   private normalizeScopes(scopes?: string[]) {
-    const clean = (scopes ?? DEFAULT_SCOPES)
+    const clean = (scopes ?? DEFAULT_API_SCOPES)
       .map((scope) => scope.trim())
-      .filter(Boolean);
+      .filter((scope) => Boolean(scope) && ALL_DEVELOPER_SCOPES.includes(scope as (typeof ALL_DEVELOPER_SCOPES)[number]));
 
-    return Array.from(new Set(clean));
+    return Array.from(new Set(clean.length > 0 ? clean : DEFAULT_API_SCOPES));
   }
 
   private normalizeEvents(events?: string[]) {
-    const defaults = ['task.created', 'task.updated'];
-    const clean = (events ?? defaults).map((event) => event.trim()).filter(Boolean);
-    return Array.from(new Set(clean));
+    const clean = (events ?? DEFAULT_WEBHOOK_EVENTS)
+      .map((event) => event.trim())
+      .filter((event) => Boolean(event) && ALL_WEBHOOK_EVENTS.includes(event as (typeof ALL_WEBHOOK_EVENTS)[number]));
+
+    return Array.from(new Set(clean.length > 0 ? clean : DEFAULT_WEBHOOK_EVENTS));
   }
 
   async resolveApiKey(rawKey: string) {

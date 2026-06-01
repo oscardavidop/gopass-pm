@@ -32,12 +32,12 @@ export function VerifyEmailPage() {
   return (
     <Card className="border-border/70 bg-card/90 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>{t('auth.verifyEmailTitle', { defaultValue: 'Verify your email' })}</CardTitle>
+        <CardTitle>{t('auth.verifyEmailTitle')}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          {state === 'pending' && t('auth.verifyEmailPendingDesc', { defaultValue: 'Check your inbox and click the verification link to continue.' })}
-          {state === 'verifying' && t('auth.verifyEmailVerifyingDesc', { defaultValue: 'Verifying your link...' })}
-          {state === 'verified' && t('auth.verifyEmailSuccessDesc', { defaultValue: 'Your email is verified. You can sign in now.' })}
-          {state === 'invalid' && t('auth.verifyEmailInvalidDesc', { defaultValue: 'Invalid or expired verification link.' })}
+          {state === 'pending' && t('auth.verifyEmailPendingDesc')}
+          {state === 'verifying' && t('auth.verifyEmailVerifyingDesc')}
+          {state === 'verified' && t('auth.verifyEmailSuccessDesc')}
+          {state === 'invalid' && t('auth.verifyEmailInvalidDesc')}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -47,7 +47,7 @@ export function VerifyEmailPage() {
           {state === 'verified' && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
           {state === 'invalid' && <AlertTriangle className="h-4 w-4 text-amber-500" />}
           <span className="truncate">
-            {email || t('auth.verifyEmailNoAddress', { defaultValue: 'Waiting for verification confirmation.' })}
+            {email || t('auth.verifyEmailNoAddress')}
           </span>
         </div>
 
@@ -60,18 +60,18 @@ export function VerifyEmailPage() {
             onClick={() => resendMutation.mutate(email)}
           >
             <RefreshCw className="h-4 w-4" />
-            {t('auth.resendVerificationEmail', { defaultValue: 'Resend email' })}
+            {t('auth.resendVerificationEmail')}
           </Button>
 
           <Link to="/login" className="inline-flex">
             <Button type="button">
-              {t('auth.signIn', { defaultValue: 'Sign in' })}
+              {t('auth.signIn')}
             </Button>
           </Link>
 
           <Link to="/register" className="inline-flex">
             <Button type="button" variant="ghost">
-              {t('auth.backToRegister', { defaultValue: 'Back to register' })}
+              {t('auth.backToRegister')}
             </Button>
           </Link>
         </div>

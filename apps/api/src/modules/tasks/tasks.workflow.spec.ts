@@ -8,11 +8,12 @@ describe('Tasks workflow', () => {
   const email = { sendTaskAssignedEmail: jest.fn() } as any;
   const cacheManager = { remember: jest.fn() } as any;
   const cacheInvalidation = { invalidateTask: jest.fn(), invalidateProject: jest.fn(), invalidateDashboard: jest.fn() } as any;
+  const webhookDispatch = { dispatchEvent: jest.fn() } as any;
 
   let service: TasksService;
 
   beforeEach(() => {
-    service = new TasksService(prisma, events, config, email, cacheManager, cacheInvalidation);
+    service = new TasksService(prisma, events, config, email, cacheManager, cacheInvalidation, webhookDispatch);
   });
 
   it('delegates updateStatus to update', async () => {

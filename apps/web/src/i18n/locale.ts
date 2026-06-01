@@ -24,7 +24,8 @@ export function detectBrowserLocale(): string {
 export function getLocaleLabel(locale: string): string {
   try {
     const safe = normalizeLocale(locale);
-    return new Intl.DisplayNames([safe], { type: 'language' }).of(safe) || safe.toUpperCase();
+    const langLabel = new Intl.DisplayNames([safe], { type: 'language' }).of(safe) || safe.toUpperCase();
+    return langLabel.charAt(0).toUpperCase() + langLabel.slice(1);
   } catch {
     return locale.toUpperCase();
   }
