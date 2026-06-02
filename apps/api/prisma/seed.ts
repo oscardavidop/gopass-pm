@@ -1,6 +1,8 @@
 
 import { PrismaClient, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+// uuid
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
@@ -90,12 +92,15 @@ async function main() {
 
   console.log('✅ Users created');
 
+  const uuid1 = uuidv4();
+  const uuid2 = uuidv4();
+  const uuid3 = uuidv4();
   // ── Projects ───────────────────────────────────
   const project1 = await prisma.project.upsert({
-    where: { id: 'seed-project-1' },
+    where: { id: uuid1 },
     update: {},
     create: {
-      id: 'seed-project-1',
+      id: uuid1,
       name: 'GoPass Platform',
       description: 'Core SaaS platform development — authentication, billing, and user management.',
       color: '#6366f1',
@@ -115,10 +120,10 @@ async function main() {
   });
 
   const project2 = await prisma.project.upsert({
-    where: { id: 'seed-project-2' },
+    where: { id: uuid2 },
     update: {},
     create: {
-      id: 'seed-project-2',
+      id: uuid2,
       name: 'Design System',
       description: 'Component library and design tokens for all GoPass products.',
       color: '#ec4899',
@@ -135,10 +140,10 @@ async function main() {
   });
 
   const project3 = await prisma.project.upsert({
-    where: { id: 'seed-project-3' },
+    where: { id: uuid3 },
     update: {},
     create: {
-      id: 'seed-project-3',
+      id: uuid3,
       name: 'Mobile App v2',
       description: 'React Native rewrite with offline-first architecture.',
       color: '#f59e0b',

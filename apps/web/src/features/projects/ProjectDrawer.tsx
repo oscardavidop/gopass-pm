@@ -15,6 +15,7 @@ import {
   Mail,
   X,
   Plus,
+  CalendarDays,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -322,7 +323,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
         <DrawerBody>
           <form id="project-form-v2" onSubmit={handleSubmit(handleFormSubmit)} className="grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_0.9fr]">
             <section className="space-y-4">
-              <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
+              <div className="rounded-2xl  p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <StepIndicator value={1} label={t('project.stepBasic', { defaultValue: 'Basic info' })} />
                   <StepIndicator value={2} label={t('project.stepWorkflow', { defaultValue: 'Workflow' })} />
@@ -331,7 +332,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
 
                 <AnimatePresence mode="wait">
                   {step === 1 && (
-                    <motion.div key="step-1" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-4">
+                    <motion.div key="step-1" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-6">
                       <Input
                         label={t('project.nameRequired', { defaultValue: 'Project name *' })}
                         placeholder={t('project.namePlaceholder', { defaultValue: 'Product redesign sprint' })}
@@ -419,19 +420,74 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
                               {selectedColor === color && <Check className="h-3.5 w-3.5 text-white" />}
                             </button>
                           ))}
-                          <input
-                            type="color"
-                            value={selectedColor}
-                            onChange={(event) => setValue('color', event.target.value, { shouldValidate: true })}
-                            className="h-7 w-7 rounded-full border border-border"
-                            aria-label="Custom color"
-                          />
+                          <div className="relative h-8 w-8 rounded-full border border-border/80 bg-background flex items-center justify-center p-0.5 shadow-sm hover:scale-105 transition-transform">
+                            <input
+                              type="color"
+                              value={selectedColor}
+                              onChange={(event) => setValue('color', event.target.value, { shouldValidate: true })}
+                              className="h-full w-full rounded-full cursor-pointer overflow-hidden border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-full [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-full"
+                              aria-label="Custom color"
+                            />
+                          </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input label={t('project.startDate', { defaultValue: 'Start date' })} type="date" {...register('startDate')} />
-                        <Input label={t('project.endDate', { defaultValue: 'End date' })} type="date" {...register('endDate')} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Fecha de Inicio */}
+                        <div className="relative">
+                          <Input
+                            label={t('project.startDate', { defaultValue: 'Start date' })}
+                            type="date"
+                            icon={<CalendarDays />}
+                            className="
+        w-full 
+        font-sans text-sm
+        /* Reseteo y estilización del indicador nativo del navegador */
+        [&::-webkit-calendar-picker-indicator]:absolute 
+        [&::-webkit-calendar-picker-indicator]:inset-y-0 
+        [&::-webkit-calendar-picker-indicator]:right-3 
+        [&::-webkit-calendar-picker-indicator]:w-5 
+        [&::-webkit-calendar-picker-indicator]:h-full 
+        [&::-webkit-calendar-picker-indicator]:opacity-0 
+        [&::-webkit-calendar-picker-indicator]:cursor-pointer
+        /* Ajustes específicos para Firefox */
+        [&::-moz-calendar-picker-indicator]:opacity-0
+      "
+                            {...register('startDate')}
+                          />
+                          {/* Icono decorativo visual en la esquina derecha si tu componente Input no lo maneja automáticamente */}
+                          <div className="absolute right-3 top-[34px] pointer-events-none text-muted-foreground/60 group-hover:text-foreground transition-colors">
+                            <CalendarDays className="h-4 w-4" />
+                          </div>
+                        </div>
+
+                        {/* Fecha de Finalización */}
+                        <div className="relative">
+                          <Input
+                            label={t('project.endDate', { defaultValue: 'End date' })}
+                            type="date"
+                            icon={<CalendarDays />}
+                            className="
+        w-full 
+        font-sans text-sm
+        /* Reseteo y estilización del indicador nativo del navegador */
+        [&::-webkit-calendar-picker-indicator]:absolute 
+        [&::-webkit-calendar-picker-indicator]:inset-y-0 
+        [&::-webkit-calendar-picker-indicator]:right-3 
+        [&::-webkit-calendar-picker-indicator]:w-5 
+        [&::-webkit-calendar-picker-indicator]:h-full 
+        [&::-webkit-calendar-picker-indicator]:opacity-0 
+        [&::-webkit-calendar-picker-indicator]:cursor-pointer
+        /* Ajustes específicos para Firefox */
+        [&::-moz-calendar-picker-indicator]:opacity-0
+      "
+                            {...register('endDate')}
+                          />
+                          {/* Icono decorativo visual en la esquina derecha */}
+                          <div className="absolute right-3 top-[34px] pointer-events-none text-muted-foreground/60 group-hover:text-foreground transition-colors">
+                            <CalendarDays className="h-4 w-4" />
+                          </div>
+                        </div>
                       </div>
 
                       <div className="flex justify-end">
@@ -444,7 +500,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
                   )}
 
                   {step === 2 && (
-                    <motion.div key="step-2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-4 max-w-xl">
+                    <motion.div key="step-2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-6 max-w-xl">
                       <div>
                         <label className="mb-2 block text-sm font-medium">{t('project.workflowType', { defaultValue: 'Workflow type' })}</label>
                         <div className="grid grid-cols-2 gap-2">
@@ -541,7 +597,7 @@ export function ProjectDrawer({ open, onClose, onSubmit, project, isLoading }: P
 
                   {step === 3 && (
                     <motion.div key="step-3" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-4">
-                      <div className="rounded-xl border border-border/70 bg-background/70 p-3">
+                      <div className="p-3">
                         <p className="mb-2 text-sm font-semibold">{t('project.searchUsers', { defaultValue: 'Search users' })}</p>
                         <Input
                           placeholder={t('project.searchUsersPlaceholder', { defaultValue: 'Search by name or email...' })}

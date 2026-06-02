@@ -194,6 +194,7 @@ export class EmailService {
       variables: {
         userName: input.userName || 'there',
         appUrl: input.appUrl,
+        dashboardUrl: input.dashboardUrl,
         supportEmail: input.supportEmail,
         year: input.year,
         companyName: input.companyName,

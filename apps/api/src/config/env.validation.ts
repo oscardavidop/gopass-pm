@@ -30,10 +30,11 @@ const envSchema = z.object({
   CLOUDFLARE_API_TOKEN: z.string().optional(),
   ZAVU_API_KEY: z.string().optional(),
   ZAVU_SENDER_ID: z.string().optional(),
-  UPLOADS_PROVIDER: z.enum(['local', 's3', 'r2']).optional().default('local'),
+  UPLOADS_PROVIDER: z.enum(['local', 's3', 'r2', 'minio', 'azure']).optional().default('s3'),
   UPLOADS_LOCAL_ROOT: z.string().optional().default('storage/uploads'),
   UPLOADS_MAX_FILE_SIZE_MB: z.coerce.number().int().positive().optional().default(25),
   UPLOADS_ANTIVIRUS_ENABLED: z.string().optional().default('false'),
+  UPLOADS_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().optional().default(900),
   UPLOADS_SIGNING_SECRET: z.string().min(32, 'UPLOADS_SIGNING_SECRET must be at least 32 chars'),
   UPLOADS_S3_BUCKET: z.string().optional().default(''),
   UPLOADS_S3_REGION: z.string().optional().default('auto'),
@@ -80,6 +81,10 @@ export function validateEnv(config: Record<string, unknown>) {
 
     if (env.COOKIE_SAME_SITE === 'none' && env.FRONTEND_URL.startsWith('http://')) {
       throw new Error('COOKIE_SAME_SITE=none requires HTTPS frontend URL in production');
+    }
+
+    if (env.UPLOADS_PROVIDER !== 'local' && !env.UPLOADS_S3_BUCKET) {
+      throw new Error('UPLOADS_S3_BUCKET is required when UPLOADS_PROVIDER is not local');
     }
   }
 

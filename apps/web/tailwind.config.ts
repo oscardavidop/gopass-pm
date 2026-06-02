@@ -76,7 +76,16 @@ export default {
         shimmer: { from: { backgroundPosition: '200% center' }, to: { backgroundPosition: '-200% center' } },
         'slide-in-right': { from: { transform: 'translateX(100%)' }, to: { transform: 'translateX(0)' } },
         'slide-out-right': { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(100%)' } },
-        'scale-in': { from: { opacity: '0', transform: 'scale(0.95)' }, to: { opacity: '1', transform: 'scale(1)' } },
+        'scale-in': {
+          from: {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(0.95)'
+          },
+          to: {
+            opacity: '1',
+            transform: 'translate(-50%, -50%) scale(1)'
+          }
+        },
         'pulse-glow': {
           '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--primary) / 0.3)' },
           '50%': { boxShadow: '0 0 0 8px hsl(var(--primary) / 0)' },

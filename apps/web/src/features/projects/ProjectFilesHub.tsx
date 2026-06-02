@@ -45,7 +45,7 @@ export function ProjectFilesHub({ projectId }: ProjectFilesHubProps) {
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
       <div className="space-y-4">
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3">
+        <div className="p-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="relative w-full md:max-w-sm">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -77,7 +77,7 @@ export function ProjectFilesHub({ projectId }: ProjectFilesHubProps) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3">
+        <div className="p-3">
           <h3 className="mb-2 text-sm font-semibold">Project Files</h3>
           <FileUploader
             accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv"

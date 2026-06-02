@@ -17,8 +17,8 @@ import { S3StorageProvider } from './storage/s3-storage.provider';
       provide: STORAGE_PROVIDER,
       inject: [ConfigService, LocalStorageProvider, S3StorageProvider],
       useFactory: (config: ConfigService, local: LocalStorageProvider, s3: S3StorageProvider) => {
-        const provider = config.get<string>('UPLOADS_PROVIDER', 'local').toLowerCase();
-        return provider === 's3' || provider === 'r2' ? s3 : local;
+        const provider = config.get<string>('UPLOADS_PROVIDER', 's3').toLowerCase();
+        return provider === 'local' ? local : s3;
       },
     },
   ],

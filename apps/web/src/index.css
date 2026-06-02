@@ -48,25 +48,25 @@
   }
 
   .dark {
-    /* Deep slate — premium, not pure black */
-    --background: 224 71% 4%;
-    --foreground: 213 31% 93%;
-    --card: 222 47% 7%;
-    --card-foreground: 213 31% 93%;
-    --popover: 222 47% 8%;
-    --popover-foreground: 213 31% 93%;
+    /* Premium dark: deep slate with softened contrast and stronger depth */
+    --background: 225 27% 7%;
+    --foreground: 210 40% 96%;
+    --card: 224 30% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 224 30% 11%;
+    --popover-foreground: 210 40% 96%;
 
     /* Brand stays vibrant */
     --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
 
     /* Elevated surfaces */
-    --secondary: 215 28% 13%;
-    --secondary-foreground: 213 31% 85%;
-    --muted: 215 28% 11%;
-    --muted-foreground: 218 11% 52%;
-    --accent: 215 28% 14%;
-    --accent-foreground: 213 31% 93%;
+    --secondary: 224 22% 15%;
+    --secondary-foreground: 210 40% 94%;
+    --muted: 224 22% 12%;
+    --muted-foreground: 215 16% 62%;
+    --accent: 224 22% 16%;
+    --accent-foreground: 210 40% 96%;
 
     /* Status */
     --destructive: 0 72% 51%;
@@ -75,17 +75,17 @@
     --warning: 38 92% 50%;
 
     /* Structural */
-    --border: 215 28% 17%;
-    --border-subtle: 215 28% 14%;
-    --input: 215 28% 17%;
+    --border: 224 22% 18%;
+    --border-subtle: 224 22% 14%;
+    --input: 224 22% 18%;
     --ring: 239 84% 67%;
 
-    /* Dark mode shadows use primary glow instead */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+    /* Dark shadows */
+    --shadow-sm: 0 1px 1px rgb(0 0 0 / 0.24);
+    --shadow: 0 12px 28px rgb(0 0 0 / 0.34);
+    --shadow-md: 0 18px 38px rgb(0 0 0 / 0.42);
+    --shadow-lg: 0 28px 54px rgb(0 0 0 / 0.52);
+    --shadow-xl: 0 40px 90px rgb(0 0 0 / 0.60);
   }
 }
 
@@ -107,6 +107,14 @@
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
     font-variant-numeric: tabular-nums lining-nums;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  html.dark body {
+    background:
+      radial-gradient(circle at 14% 8%, hsl(var(--primary) / 0.16), transparent 24%),
+      radial-gradient(circle at 86% 14%, hsl(var(--info) / 0.08), transparent 22%),
+      radial-gradient(circle at 78% 92%, hsl(262 84% 60% / 0.06), transparent 26%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(225 27% 5%));
   }
 
   h1,
@@ -329,8 +337,18 @@ html:not(.dark) .premium-panel {
   background-color: hsl(var(--card) / 0.98);
   border-color: hsl(var(--border) / 0.92);
   box-shadow:
-    0 10px 22px -16px rgb(15 23 42 / 0.22),
-    0 3px 8px -6px rgb(15 23 42 / 0.16);
+    0 18px 34px -24px rgb(15 23 42 / 0.22),
+    0 4px 10px -8px rgb(15 23 42 / 0.16);
+}
+
+.dark .premium-panel {
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.82)),
+    hsl(var(--card));
+  border-color: hsl(var(--border) / 0.9);
+  box-shadow:
+    0 18px 48px -22px rgb(0 0 0 / 0.58),
+    inset 0 1px 0 hsl(0 0% 100% / 0.04);
 }
 
 html:not(.dark) .glass {
@@ -338,9 +356,29 @@ html:not(.dark) .glass {
   border-color: hsl(var(--border) / 0.85);
 }
 
+.dark .glass {
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.84)),
+    hsl(var(--card) / 0.88);
+  border-color: hsl(var(--border) / 0.85);
+  box-shadow:
+    0 10px 30px -18px rgb(0 0 0 / 0.6),
+    inset 0 1px 0 hsl(0 0% 100% / 0.04);
+}
+
 html:not(.dark) .glass-strong {
   background-color: hsl(var(--background) / 0.98);
   border-color: hsl(var(--border) / 0.85);
+}
+
+.dark .glass-strong {
+  background:
+    linear-gradient(180deg, hsl(var(--background) / 0.96), hsl(225 27% 6% / 0.96)),
+    hsl(var(--background) / 0.94);
+  border-color: hsl(var(--border) / 0.82);
+  box-shadow:
+    0 18px 40px -20px rgb(0 0 0 / 0.68),
+    inset 0 1px 0 hsl(0 0% 100% / 0.03);
 }
 
 .premium-divider {

@@ -18,13 +18,14 @@ export class CacheInvalidationService {
     await this.cacheService.delByPattern(`${CACHE_KEY_PREFIX}:search:users:*`);
   }
 
-  async invalidateProject(projectId: string) {
+  async invalidateProject(projectId: string, userId?: string) {
     await this.cacheService.del(
       CacheKeys.project(projectId),
       CacheKeys.projectMembers(projectId),
       CacheKeys.projectStats(projectId),
       CacheKeys.projectOverview(projectId),
     );
+    await this.cacheService.delByPattern(`${CACHE_KEY_PREFIX}:search:${userId ? userId : '*' }:projects:*`);
     await this.cacheService.delByPattern(`${CACHE_KEY_PREFIX}:project:${projectId}:activity:*`);
     await this.cacheService.delByPattern(`${CACHE_KEY_PREFIX}:project:${projectId}:tasks:*`);
     await this.cacheService.delByPattern(`${CACHE_KEY_PREFIX}:dashboard:*`);

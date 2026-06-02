@@ -41,7 +41,7 @@ function ProjectMenu({ project, onEdit, onDelete }: Pick<ProjectCardProps, 'proj
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button
-          className="flex items-center justify-center h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-accent text-muted-foreground hover:text-foreground"
+          className="flex items-center justify-center h-8 w-8 rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-muted text-muted-foreground hover:text-foreground border border-transparent hover:border-border/40 shrink-0 outline-none focus-visible:opacity-100 focus-visible:bg-muted"
           onClick={(e) => e.preventDefault()}
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -49,30 +49,30 @@ function ProjectMenu({ project, onEdit, onDelete }: Pick<ProjectCardProps, 'proj
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="bg-popover border border-border rounded-xl shadow-lg py-1.5 min-w-[160px] z-50 animate-scale-in"
-          sideOffset={4}
+          className="bg-popover/95 backdrop-blur-md border border-border/80 rounded-xl shadow-xl py-1.5 min-w-[170px] z-50 animate-in fade-in-50 zoom-in-95 duration-150"
+          sideOffset={6}
           align="end"
           onClick={(e) => e.stopPropagation()}
         >
-          {onEdit && (
-            <DropdownMenu.Item
-              className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-accent outline-none rounded-md mx-1 transition-colors"
-              onSelect={() => onEdit(project)}
-            >
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> {t('project.edit', { defaultValue: 'Edit project' })}
-            </DropdownMenu.Item>
-          )}
           <DropdownMenu.Item
-            className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-accent outline-none rounded-md mx-1 transition-colors"
+            className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium cursor-pointer hover:bg-muted/80 outline-none rounded-lg mx-1.5 transition-colors text-foreground"
             onSelect={() => {}}
           >
-            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" /> {t('project.open', { defaultValue: 'Open project' })}
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/80" /> {t('project.open', { defaultValue: 'Open project' })}
           </DropdownMenu.Item>
+          {onEdit && (
+            <DropdownMenu.Item
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium cursor-pointer hover:bg-muted/80 outline-none rounded-lg mx-1.5 transition-colors text-foreground"
+              onSelect={() => onEdit(project)}
+            >
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground/80" /> {t('project.edit', { defaultValue: 'Edit project' })}
+            </DropdownMenu.Item>
+          )}
           {onDelete && (
             <>
-              <DropdownMenu.Separator className="my-1.5 border-t border-border mx-2" />
+              <DropdownMenu.Separator className="my-1 border-t border-border/40 mx-2" />
               <DropdownMenu.Item
-                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-destructive/10 text-destructive outline-none rounded-md mx-1 transition-colors"
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium cursor-pointer hover:bg-destructive/10 text-destructive outline-none rounded-lg mx-1.5 transition-colors"
                 onSelect={() => onDelete(project)}
               >
                 <Trash2 className="h-3.5 w-3.5" /> {t('project.deleteAction', { defaultValue: 'Delete project' })}
@@ -99,104 +99,151 @@ export function ProjectCard({ project, doneTasks = 0, view = 'grid', onEdit, onD
     ARCHIVED: t('project.status.archived'),
   };
 
+  // ==========================================
+  // VISTA: LISTA (LIST VIEW)
+  // ==========================================
   if (view === 'list') {
     return (
-      <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} layout>
-        <div className="group premium-panel flex items-center gap-4 px-4 py-3.5 hover:-translate-y-[1px] transition-all duration-200">
-          <ProjectIdentityAvatar name={project.name} color={color} iconUrl={iconUrl} size="sm" />
-          <Link to={`/projects/${project.id}`} className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate hover:text-primary transition-colors">{project.name}</p>
+      <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} layout  layoutId={`project-${project.id}`}>
+        <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 hover:bg-card px-4 py-3 flex items-center gap-4 transition-all duration-300 will-change-transform hover:shadow-md hover:border-border/80">
+          {/* Sutil acento de color a la izquierda para identificar el proyecto */}
+          <div className="absolute left-0 top-0 bottom-0 w-[3px] opacity-80" style={{ backgroundColor: color }} />
+          
+          <div className="shrink-0 pl-1">
+            <ProjectIdentityAvatar name={project.name} color={color} iconUrl={iconUrl} size="sm" />
+          </div>
+          
+          <Link to={`/projects/${project.id}`} className="flex-1 min-w-0 group/title">
+            <p className="text-sm font-semibold truncate text-foreground group-hover/title:text-primary transition-colors">{project.name}</p>
             {descriptionPreview && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{descriptionPreview}</p>
+              <p className="text-xs text-muted-foreground/80 truncate mt-0.5 max-w-xl">{descriptionPreview}</p>
             )}
           </Link>
-          <div className="hidden sm:flex items-center gap-2 w-36 shrink-0">
-            <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: color }} />
+          
+          {/* Barra de Progreso Compacta */}
+          <div className="hidden sm:flex items-center gap-3 w-40 shrink-0">
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: color }} />
             </div>
-            <span className="text-xs text-muted-foreground w-6 text-right">{progress}%</span>
+            <span className="text-[11px] font-mono font-medium text-muted-foreground/90 w-7 text-right">{progress}%</span>
           </div>
-          <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-            <span className="flex items-center gap-1"><CheckSquare className="h-3.5 w-3.5" />{totalTasks}</span>
-            <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{project._count?.members ?? 0}</span>
-            {project.endDate && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{formatDate(project.endDate)}</span>}
+          
+          {/* Métricas */}
+          <div className="hidden md:flex items-center gap-4 text-xs font-medium text-muted-foreground/70 shrink-0">
+            <span className="flex items-center gap-1.5"><CheckSquare className="h-3.5 w-3.5 text-muted-foreground/50" />{totalTasks}</span>
+            <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-muted-foreground/50" />{project._count?.members ?? 0}</span>
+            {project.endDate && (
+              <span className="flex items-center gap-1.5 border-l border-border/40 pl-4">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground/50" />{formatDate(project.endDate)}
+              </span>
+            )}
           </div>
-          <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="hidden sm:inline-flex shrink-0">
+          
+          <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="hidden sm:inline-flex shrink-0 shadow-sm font-medium">
             {statusLabel[project.status]}
           </Badge>
+          
           {project.owner && (
-            <Avatar src={project.owner.avatar} firstName={project.owner.firstName} lastName={project.owner.lastName} size="xs" className="shrink-0" />
+            <div className="shrink-0 border border-background rounded-full shadow-sm">
+              <Avatar src={project.owner.avatar} firstName={project.owner.firstName} lastName={project.owner.lastName} size="xs" />
+            </div>
           )}
+          
           <ProjectMenu project={project} onEdit={onEdit} onDelete={onDelete} />
         </div>
       </motion.div>
     );
   }
 
+  // ==========================================
+  // VISTA: CUADRÍCULA (GRID VIEW)
+  // ==========================================
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} layout>
-      <div className="group premium-panel overflow-hidden transition-all duration-200 flex flex-col hover:-translate-y-[2px] hover:shadow-lg">
-        <div className="h-1.5 shrink-0" style={{ background: `linear-gradient(90deg, ${color}, ${color}66)` }} />
-        <div className="h-16 px-4 pt-3 bg-gradient-to-br from-primary/5 to-transparent">
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">{t('project.workspaceProject', { defaultValue: 'Workspace Project' })}</span>
-            <span>{t('project.collaboratorsCount', { defaultValue: '{{count}} collaborators', count: project._count?.members ?? 0 })}</span>
-          </div>
-          <div className="mt-2">
-            <ProjectIdentityAvatar name={project.name} color={color} iconUrl={iconUrl} size="sm" />
-          </div>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} layout layoutId={`project-${project.id}`}>
+      <div className="group relative rounded-xl border border-border/50 bg-card/40 hover:bg-card/90 overflow-hidden transition-all duration-300 flex flex-col h-full hover:-translate-y-[2px] hover:shadow-xl hover:border-border/90 will-change-transform">
+        
+        {/* Barra superior con gradiente de color del proyecto */}
+        <div className="h-[3px] w-full shrink-0" style={{ background: `linear-gradient(90deg, ${color}, ${color}40)` }} />
+        
+        {/* Cabecera / Sección Contextual */}
+        <div className="px-4 pt-3 flex items-center justify-between text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase">
+          <span className="rounded-md border border-border/40 bg-background/60 px-2 py-0.5">{t('project.workspaceProject', { defaultValue: 'Workspace Project' })}</span>
+          <span>{t('project.collaboratorsCount', { defaultValue: '{{count}} collaborators', count: project._count?.members ?? 0 })}</span>
         </div>
-        <div className="p-4 flex-1 flex flex-col gap-3">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <Link to={`/projects/${project.id}`} className="flex-1 min-w-0 group/link">
-              <h3 className="font-semibold text-foreground truncate group-hover/link:text-primary transition-colors text-sm">
-                {project.name}
-              </h3>
+
+        {/* Cuerpo Principal de la Tarjeta */}
+        <div className="p-4 flex-1 flex flex-col justify-between gap-4">
+          
+          {/* Identidad Visual e Información Base */}
+          <div className="flex items-start gap-3 relative">
+            <div className="shrink-0 mt-0.5">
+              <ProjectIdentityAvatar name={project.name} color={color} iconUrl={iconUrl} size="sm" />
+            </div>
+            
+            <div className="flex-1 min-w-0 pr-6">
+              <Link to={`/projects/${project.id}`} className="group/link block">
+                <h3 className="font-bold text-foreground truncate group-hover/link:text-primary transition-colors text-sm tracking-tight">
+                  {project.name}
+                </h3>
+              </Link>
               {descriptionPreview ? (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-muted-foreground/90 mt-1 line-clamp-2 leading-relaxed font-normal">
                   {descriptionPreview}
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground/70 mt-0.5">{t('project.noDescriptionYet', { defaultValue: 'No description added yet.' })}</p>
+                <p className="text-xs text-muted-foreground/40 italic mt-1 font-normal">{t('project.noDescriptionYet', { defaultValue: 'No description added yet.' })}</p>
               )}
-            </Link>
-            <ProjectMenu project={project} onEdit={onEdit} onDelete={onDelete} />
+            </div>
+
+            {/* Menú de acciones flotando correctamente a la derecha */}
+            <div className="absolute right-0 top-0">
+              <ProjectMenu project={project} onEdit={onEdit} onDelete={onDelete} />
+            </div>
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground border border-border/60 rounded-lg px-2.5 py-2 bg-background/50">
-            <span className="flex items-center gap-1"><CheckSquare className="h-3.5 w-3.5" />{t('project.tasksCount', { defaultValue: '{{count}} tasks', count: totalTasks })}</span>
-            <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{project._count?.members ?? 0}</span>
+          {/* Grilla Semántica de Contadores */}
+          <div className="grid grid-cols-2 gap-2 text-xs font-medium text-muted-foreground/80 rounded-xl px-3 py-2 bg-muted/40 border border-border/20">
+            <span className="flex items-center gap-1.5">
+              <CheckSquare className="h-3.5 w-3.5 text-muted-foreground/50" />
+              {totalTasks} {t('project.tasks', { defaultValue: 'tasks' })}
+            </span>
             {project.endDate && (
-              <span className="flex items-center gap-1 ml-auto"><Calendar className="h-3.5 w-3.5" />{formatDate(project.endDate)}</span>
+              <span className="flex items-center gap-1.5 justify-end border-l border-border/30 pl-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground/50" />
+                {formatDate(project.endDate)}
+              </span>
             )}
           </div>
 
-          {/* Progress */}
+          {/* Estado de Progreso de Tareas */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">{t('project.progress', { defaultValue: 'Progress' })}</span>
-              <span className="font-semibold">{progress}%</span>
+            <div className="flex justify-between text-xs font-medium">
+              <span className="text-muted-foreground/90">{t('project.progress', { defaultValue: 'Progress' })}</span>
+              <span className="font-mono text-foreground">{progress}%</span>
             </div>
-            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
                 className="h-full rounded-full"
                 style={{ background: color }}
               />
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-1">
-            <Badge variant={STATUS_VARIANT[project.status] ?? 'default'}>{statusLabel[project.status]}</Badge>
+          {/* Pie de Tarjeta */}
+          <div className="flex items-center justify-between pt-2 border-t border-border/10">
+            <Badge variant={STATUS_VARIANT[project.status] ?? 'default'} className="font-medium tracking-wide shadow-sm">
+              {statusLabel[project.status]}
+            </Badge>
             {project.owner && (
-              <Avatar src={project.owner.avatar} firstName={project.owner.firstName} lastName={project.owner.lastName} size="sm" />
+              <div className="border border-background rounded-full shadow-sm">
+                <Avatar src={project.owner.avatar} firstName={project.owner.firstName} lastName={project.owner.lastName} size="sm" />
+              </div>
             )}
           </div>
+
         </div>
       </div>
     </motion.div>

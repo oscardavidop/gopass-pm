@@ -364,18 +364,57 @@ Tasku uses a root reference example plus app-specific env files.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `UPLOADS_PROVIDER` | No | `local`, `s3`, or `r2` |
+| `UPLOADS_PROVIDER` | No | `s3` (default), `local`, `r2`, `minio`, `azure` |
 | `UPLOADS_LOCAL_ROOT` | No | Local storage path |
 | `UPLOADS_MAX_FILE_SIZE_MB` | No | Upload file-size cap |
 | `UPLOADS_ANTIVIRUS_ENABLED` | No | Toggle antivirus pipeline |
+| `UPLOADS_SIGNED_URL_TTL_SECONDS` | No | Signed URL TTL in seconds for private files (default `900`) |
 | `UPLOADS_SIGNING_SECRET` | Yes | Signing secret for upload-related trust checks |
-| `UPLOADS_S3_BUCKET` | Optional | Bucket name for S3 or R2 |
+| `UPLOADS_S3_BUCKET` | Required when provider is not `local` | Bucket name for S3-compatible storage |
 | `UPLOADS_S3_REGION` | Optional | S3 or R2 region |
 | `UPLOADS_S3_ENDPOINT` | Optional | Custom S3-compatible endpoint |
 | `UPLOADS_S3_ACCESS_KEY` | Optional | Access key |
 | `UPLOADS_S3_SECRET_KEY` | Optional | Secret key |
 | `UPLOADS_S3_PUBLIC_BASE_URL` | Optional | Public CDN or bucket base URL |
 | `UPLOADS_S3_FORCE_PATH_STYLE` | Optional | Path-style toggle for compatible providers |
+
+## File Storage Architecture (Storage V2)
+
+Tasku now uses S3-compatible object storage as the source of truth for file bytes. The database stores metadata and access semantics, while the physical content lives in object storage.
+
+### Core Rules
+
+- Storage source of truth: object storage (`UPLOADS_PROVIDER=s3` by default)
+- Database source of truth: metadata (`storageKey`, `bucket`, `visibility`, `provider`, `etag`, `checksum`)
+- Public files: returned with direct `publicUrl`
+- Private files: returned with short-lived signed URL
+- Legacy columns (`path`, `url`, `filename`) are still populated for compatibility during migration
+
+### Visibility Model
+
+- `PUBLIC`: branding assets and avatars (for example `icon`, `cover`, `banner`, `avatar`)
+- `PRIVATE`: attachments and internal artifacts by default
+
+### Lifecycle and Cleanup
+
+- Singleton assets (avatar/icon/cover/banner) replace previous files and automatically purge old objects
+- Deleting a task purges task files and task-comment files
+- Deleting a project purges project files, all task files, and task-comment files
+
+### API Behavior
+
+- Upload responses include canonical metadata plus `signedUrl` when visibility is private
+- Listing files resolves direct public URL for public objects and fresh signed URLs for private objects
+- File stream endpoint remains available for signed internal access flows
+
+### Migration Command (Local to S3)
+
+```bash
+cd apps/api
+npm run storage:migrate-local-to-s3
+```
+
+This command uploads legacy local files to S3-compatible storage and updates file metadata in PostgreSQL.
 
 ### Docker and Infra Variables
 
@@ -517,6 +556,25 @@ The deploy script:
 2. Builds and starts the production compose stack.
 3. Runs `prisma migrate deploy`.
 4. Waits for the API health endpoint to become healthy.
+
+### Backend: PM2 (Official Non-Docker Mode)
+
+Use this mode when running directly on Linux hosts without container orchestration.
+
+```bash
+cd apps/api
+npm install
+npm run build
+npm run pm2:start
+```
+
+Operational commands:
+
+- `npm run pm2:restart`
+- `npm run pm2:logs`
+- `npm run pm2:status`
+
+This mode is fully supported in parallel with Docker deployments.
 
 ## API Documentation
 

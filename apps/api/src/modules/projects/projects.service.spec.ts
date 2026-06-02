@@ -13,12 +13,13 @@ describe('ProjectsService', () => {
   const cacheManager = { remember: jest.fn() } as any;
   const cacheInvalidation = { invalidateProject: jest.fn(), invalidateDashboard: jest.fn(), invalidateUser: jest.fn(), invalidateNotifications: jest.fn() } as any;
   const webhookDispatch = { dispatchEvent: jest.fn() } as any;
+  const uploadsService = { deleteFilesForProjectTree: jest.fn() } as any;
 
   let service: ProjectsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ProjectsService(prisma, events, config, email, cacheManager, cacheInvalidation, webhookDispatch);
+    service = new ProjectsService(prisma, events, config, email, cacheManager, cacheInvalidation, webhookDispatch, uploadsService);
   });
 
   it('rejects delete when non-owner user is not admin', async () => {

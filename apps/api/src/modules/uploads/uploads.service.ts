@@ -8,10 +8,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FileEntityType, Role } from '@prisma/client';
-import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
+import { FileEntityType, FileProvider, FileVisibility, Role } from '@prisma/client';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { extname } from 'path';
-
+import { fileTypeFromBuffer } from 'file-type';
+import isSvg from 'is-svg';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { hasProjectPermission } from '../auth/authorization/project-rbac';
 import { STORAGE_PROVIDER, StorageProvider } from './storage/storage.provider';
@@ -27,6 +28,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/svg+xml',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -40,6 +42,21 @@ const DANGEROUS_EXTENSIONS = new Set([
   '.exe', '.bat', '.cmd', '.sh', '.ps1', '.js', '.mjs', '.cjs', '.jar', '.msi', '.vbs', '.scr',
 ]);
 
+const PUBLIC_FILE_KINDS = new Set([
+  'avatar',
+  'icon',
+  'cover',
+  'banner',
+  'logo',
+  'landing',
+  'landing-asset',
+  'project-icon',
+  'project-cover',
+  'project-banner',
+]);
+
+const SINGLETON_KINDS = new Set(['avatar', 'icon', 'cover', 'banner', 'logo', 'project-icon', 'project-cover', 'project-banner']);
+
 @Injectable()
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
@@ -49,7 +66,7 @@ export class UploadsService {
     private readonly config: ConfigService,
     @Inject(STORAGE_PROVIDER)
     private readonly storage: StorageProvider,
-  ) {}
+  ) { }
 
   async upload(
     input: {
@@ -60,14 +77,19 @@ export class UploadsService {
     },
     user: { id: string; role: Role },
   ) {
-    this.validateFile(input.file);
+    const kind = this.normalizeKind(input.kind);
+    const visibility = this.resolveVisibility(input.entityType, kind);
+
+    const normalized = this.normalizeIncomingFile(input.file);
+    this.validateFile(normalized.file, normalized.safeName);
 
     const access = await this.assertEntityAccess(input.entityType, input.entityId, user.id, user.role, true);
-    await this.scanForThreats(input.file);
+    await this.scanForThreats(normalized.file);
 
-    const safeName = this.sanitizeFilename(input.file.originalname);
+    const safeName = normalized.safeName;
     const extension = extname(safeName).toLowerCase();
     const key = [
+      visibility === FileVisibility.PUBLIC ? 'public' : 'private',
       input.entityType.toLowerCase(),
       input.entityId,
       new Date().getUTCFullYear().toString(),
@@ -75,45 +97,82 @@ export class UploadsService {
       `${Date.now()}-${randomUUID()}${extension}`,
     ].join('/');
 
-    await this.storage.upload(input.file.buffer, key, input.file.mimetype);
+    const fileId = randomUUID();
+    const checksum = createHash('sha256').update(normalized.file.buffer).digest('hex');
+    const cacheControl = visibility === FileVisibility.PUBLIC
+      ? 'public, max-age=31536000, immutable'
+      : 'private, max-age=0, no-cache';
+
+    const uploaded = await this.storage.upload({
+      key,
+      file: normalized.file.buffer,
+      mimeType: normalized.file.mimetype,
+      visibility,
+      cacheControl,
+      contentDisposition: this.buildContentDisposition(safeName, normalized.file.mimetype, visibility),
+    });
+
+    const publicUrl = visibility === FileVisibility.PUBLIC ? this.storage.getPublicUrl(key) : null;
+    const canonicalUrl = visibility === FileVisibility.PUBLIC ? publicUrl! : this.buildApiFileUrl(fileId);
 
     const record = await this.prisma.file.create({
       data: {
+        id: fileId,
         path: key,
-        url: this.buildApiFileUrlPlaceholder(),
+        storageKey: key,
+        bucket: uploaded.bucket || this.storage.getBucketName(),
+        url: canonicalUrl,
+        publicUrl,
         filename: safeName,
-        mimeType: input.file.mimetype,
-        size: input.file.size,
+        originalName: input.file.originalname,
+        mimeType: normalized.file.mimetype,
+        size: normalized.file.size,
+        visibility,
+        provider: this.resolveProvider(),
+        etag: uploaded.etag,
+        checksum,
         uploadedBy: user.id,
         entityType: input.entityType,
         entityId: input.entityId,
-        kind: (input.kind || 'attachment').slice(0, 40),
+        kind,
       },
     });
 
-    const canonicalUrl = this.buildApiFileUrl(record.id);
-    const updated = await this.prisma.file.update({
-      where: { id: record.id },
-      data: { url: canonicalUrl },
-    });
+    const signedUrl = visibility === FileVisibility.PRIVATE
+      ? await this.storage.getSignedUrl(key, this.getSignedUrlTtlSeconds())
+      : undefined;
 
-    if (input.entityType === FileEntityType.USER && (input.kind || '').toLowerCase() === 'avatar') {
-      const signedAvatarUrl = this.buildSignedFileUrl(updated.id, 60 * 60 * 24 * 30);
-      await this.prisma.user.update({ where: { id: input.entityId }, data: { avatar: signedAvatarUrl } });
+    if (input.entityType === FileEntityType.USER && kind === 'avatar') {
+      await this.prisma.user.update({
+        where: { id: input.entityId },
+        data: { avatar: publicUrl ?? signedUrl ?? canonicalUrl },
+      });
+    }
+
+    if (this.shouldReplacePrevious(input.entityType, kind)) {
+      await this.cleanupPreviousFiles({
+        entityType: input.entityType,
+        entityId: input.entityId,
+        kind,
+        keepFileId: record.id,
+      });
     }
 
     await this.prisma.activityLog.create({
       data: {
         action: 'FILE_UPLOADED',
         entity: 'File',
-        entityId: updated.id,
+        entityId: record.id,
         newValue: {
-          filename: updated.filename,
-          mimeType: updated.mimeType,
-          size: updated.size,
-          entityType: updated.entityType,
-          entityId: updated.entityId,
-          kind: updated.kind,
+          filename: record.filename,
+          mimeType: record.mimeType,
+          size: record.size,
+          entityType: record.entityType,
+          entityId: record.entityId,
+          kind: record.kind,
+          visibility: record.visibility,
+          provider: record.provider,
+          storageKey: record.storageKey,
         },
         userId: user.id,
         projectId: access.projectId,
@@ -122,8 +181,8 @@ export class UploadsService {
     });
 
     return {
-      ...updated,
-      signedUrl: this.buildSignedFileUrl(updated.id, 60 * 60 * 24 * 7),
+      ...record,
+      signedUrl,
     };
   }
 
@@ -139,10 +198,24 @@ export class UploadsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return files.map((file) => ({
-      ...file,
-      signedUrl: this.buildSignedFileUrl(file.id, 60 * 60 * 24),
+    const mapped = await Promise.all(files.map(async (file) => {
+      const key = this.getStorageKey(file);
+      const signedUrl = file.visibility === FileVisibility.PRIVATE
+        ? await this.storage.getSignedUrl(key, this.getSignedUrlTtlSeconds())
+        : undefined;
+      const url = file.visibility === FileVisibility.PUBLIC
+        ? (file.publicUrl || this.storage.getPublicUrl(key))
+        : file.url;
+
+      return {
+        ...file,
+        url,
+        publicUrl: file.visibility === FileVisibility.PUBLIC ? url : file.publicUrl,
+        signedUrl,
+      };
     }));
+
+    return mapped;
   }
 
   async delete(fileId: string, user: { id: string; role: Role }) {
@@ -156,13 +229,11 @@ export class UploadsService {
       throw new ForbiddenException({ i18nKey: 'uploads.permissionDenied' });
     }
 
-    await this.storage.delete(file.path);
+    await this.deleteFileRecord(file.id);
 
-    await this.prisma.file.delete({ where: { id: file.id } });
-
-    if (file.entityType === FileEntityType.USER && (file.kind || '').toLowerCase() === 'avatar') {
+    if (file.entityType === FileEntityType.USER && this.normalizeKind(file.kind) === 'avatar') {
       const owner = await this.prisma.user.findUnique({ where: { id: file.entityId }, select: { avatar: true } });
-      if (owner?.avatar === file.url) {
+      if (owner?.avatar && [file.url, file.publicUrl].filter(Boolean).includes(owner.avatar)) {
         await this.prisma.user.update({ where: { id: file.entityId }, data: { avatar: null } });
       }
     }
@@ -176,10 +247,12 @@ export class UploadsService {
           filename: file.filename,
           mimeType: file.mimeType,
           size: file.size,
-          path: file.path,
+          storageKey: this.getStorageKey(file),
           entityType: file.entityType,
           entityId: file.entityId,
           kind: file.kind,
+          visibility: file.visibility,
+          provider: file.provider,
         },
         userId: user.id,
         projectId: access.projectId,
@@ -188,6 +261,81 @@ export class UploadsService {
     });
 
     return { id: fileId, deleted: true };
+  }
+
+  async deleteFilesForEntity(entityType: FileEntityType, entityId: string) {
+    const files = await this.prisma.file.findMany({
+      where: { entityType, entityId },
+      select: { id: true },
+    });
+
+    for (const file of files) {
+      await this.deleteFileRecord(file.id);
+    }
+
+    return { deleted: files.length };
+  }
+
+  async deleteFilesForTaskTree(taskId: string) {
+    const commentIds = await this.prisma.comment.findMany({
+      where: { taskId },
+      select: { id: true },
+    });
+    const commentIdSet = commentIds.map((item) => item.id);
+
+    const files = await this.prisma.file.findMany({
+      where: {
+        OR: [
+          { entityType: FileEntityType.TASK, entityId: taskId },
+          ...(commentIdSet.length > 0
+            ? [{ entityType: FileEntityType.COMMENT, entityId: { in: commentIdSet } }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    });
+
+    for (const file of files) {
+      await this.deleteFileRecord(file.id);
+    }
+
+    return { deleted: files.length };
+  }
+
+  async deleteFilesForProjectTree(projectId: string) {
+    const taskIds = await this.prisma.task.findMany({
+      where: { projectId },
+      select: { id: true },
+    });
+    const taskIdSet = taskIds.map((item) => item.id);
+    const commentIds = taskIdSet.length
+      ? await this.prisma.comment.findMany({
+        where: { taskId: { in: taskIdSet } },
+        select: { id: true },
+      })
+      : [];
+    const commentIdSet = commentIds.map((item) => item.id);
+
+    const files = await this.prisma.file.findMany({
+      where: {
+        OR: [
+          { entityType: FileEntityType.PROJECT, entityId: projectId },
+          ...(taskIdSet.length > 0
+            ? [{ entityType: FileEntityType.TASK, entityId: { in: taskIdSet } }]
+            : []),
+          ...(commentIdSet.length > 0
+            ? [{ entityType: FileEntityType.COMMENT, entityId: { in: commentIdSet } }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    });
+
+    for (const file of files) {
+      await this.deleteFileRecord(file.id);
+    }
+
+    return { deleted: files.length };
   }
 
   async getFileStream(fileId: string, sig?: string, exp?: string) {
@@ -199,7 +347,7 @@ export class UploadsService {
     const file = await this.prisma.file.findUnique({ where: { id: fileId } });
     if (!file) throw new NotFoundException({ i18nKey: 'uploads.fileNotFound' });
 
-    const object = await this.storage.getObject(file.path);
+    const object = await this.storage.getObject(this.getStorageKey(file));
 
     return {
       file,
@@ -209,7 +357,7 @@ export class UploadsService {
     };
   }
 
-  private validateFile(file: UploadIncomingFile) {
+  private validateFile(file: UploadIncomingFile, safeName: string) {
     if (!file) {
       throw new BadRequestException({ i18nKey: 'uploads.fileRequired' });
     }
@@ -223,12 +371,68 @@ export class UploadsService {
       });
     }
 
-    const ext = extname(file.originalname || '').toLowerCase();
+    const ext = extname(safeName || '').toLowerCase();
     if (DANGEROUS_EXTENSIONS.has(ext)) {
       throw new BadRequestException({ i18nKey: 'uploads.invalidFileType' });
     }
 
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      throw new BadRequestException({ i18nKey: 'uploads.invalidMimeType' });
+    }
+
+    this.validateMagicBytes(file);
+  }
+
+  private normalizeIncomingFile(file: UploadIncomingFile) {
+    const safeName = this.sanitizeFilename(file.originalname);
+
+    if (file.mimetype !== 'image/svg+xml') {
+      return { file, safeName };
+    }
+
+    const svgText = file.buffer.toString('utf8');
+    const sanitized = this.sanitizeSvg(svgText);
+    const next = Buffer.from(sanitized, 'utf8');
+
+    return {
+      safeName,
+      file: {
+        ...file,
+        buffer: next,
+        size: next.byteLength,
+      },
+    };
+  }
+
+  private async validateMagicBytes(file: UploadIncomingFile): Promise<void> {
+    // 1. Corregido: Convertir el buffer a string para 'is-svg'
+    if (file.mimetype === 'image/svg+xml') {
+      const svgString = file.buffer.toString('utf8');
+      if (!isSvg(svgString)) {
+        throw new BadRequestException({ i18nKey: 'uploads.invalidMimeType' });
+      }
+      return;
+    }
+
+    const detectedType = await fileTypeFromBuffer(file.buffer);
+
+    if (!detectedType) {
+      throw new BadRequestException({ i18nKey: 'uploads.invalidFileType' });
+    }
+
+    const allowedTypes = [
+      { ext: 'jpg', mime: 'image/jpeg' },
+      { ext: 'jpeg', mime: 'image/jpeg' },
+      { ext: 'png', mime: 'image/png' },
+      { ext: 'webp', mime: 'image/webp' },
+      { ext: 'pdf', mime: 'application/pdf' } // Corregido string faltante aquí también
+    ];
+
+    const isValid = allowedTypes.some(
+      type => type.ext === detectedType.ext && type.mime === detectedType.mime
+    );
+
+    if (!isValid) {
       throw new BadRequestException({ i18nKey: 'uploads.invalidMimeType' });
     }
   }
@@ -242,12 +446,17 @@ export class UploadsService {
       .slice(0, 120);
   }
 
+  private sanitizeSvg(content: string) {
+    const withoutScript = content.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+    const withoutHandlers = withoutScript.replace(/\son[a-z]+=\"[^\"]*\"/gi, '').replace(/\son[a-z]+=\'[^\']*\'/gi, '');
+    const withoutForeignObject = withoutHandlers.replace(/<foreignObject[\s\S]*?>[\s\S]*?<\/foreignObject>/gi, '');
+    return withoutForeignObject;
+  }
+
   private async scanForThreats(file: UploadIncomingFile) {
-    // Future-ready antivirus hook.
     const enabled = this.config.get<string>('UPLOADS_ANTIVIRUS_ENABLED', 'false') === 'true';
     if (!enabled) return;
 
-    // Placeholder for external scanner integration.
     if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException({ i18nKey: 'uploads.invalidFileType' });
     }
@@ -258,14 +467,79 @@ export class UploadsService {
     return `/${prefix}/files/${fileId}`;
   }
 
-  private buildApiFileUrlPlaceholder() {
-    return '/api/v1/files/pending';
+  private buildContentDisposition(filename: string, mimeType: string, visibility: FileVisibility) {
+    const inlineTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'application/pdf']);
+    const dispositionType = visibility === FileVisibility.PUBLIC && inlineTypes.has(mimeType) ? 'inline' : 'attachment';
+    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `${dispositionType}; filename="${safe}"`;
   }
 
-  private buildSignedFileUrl(fileId: string, ttlSeconds: number) {
-    const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-    const sig = this.sign(fileId, exp);
-    return `${this.buildApiFileUrl(fileId)}?exp=${exp}&sig=${sig}`;
+  private normalizeKind(kind?: string | null) {
+    return (kind || 'attachment').trim().toLowerCase().slice(0, 40);
+  }
+
+  private resolveVisibility(entityType: FileEntityType, kind: string): FileVisibility {
+    if (entityType === FileEntityType.USER && kind === 'avatar') return FileVisibility.PUBLIC;
+    if (entityType === FileEntityType.PROJECT && PUBLIC_FILE_KINDS.has(kind)) return FileVisibility.PUBLIC;
+    return PUBLIC_FILE_KINDS.has(kind) ? FileVisibility.PUBLIC : FileVisibility.PRIVATE;
+  }
+
+  private shouldReplacePrevious(entityType: FileEntityType, kind: string) {
+    if (entityType === FileEntityType.USER && kind === 'avatar') return true;
+    return entityType === FileEntityType.PROJECT && SINGLETON_KINDS.has(kind);
+  }
+
+  private resolveProvider(): FileProvider {
+    const provider = this.config.get<string>('UPLOADS_PROVIDER', 's3').toUpperCase();
+    if (provider === 'LOCAL') return FileProvider.LOCAL;
+    if (provider === 'R2') return FileProvider.R2;
+    if (provider === 'MINIO') return FileProvider.MINIO;
+    if (provider === 'AZURE') return FileProvider.AZURE;
+    return FileProvider.S3;
+  }
+
+  private getSignedUrlTtlSeconds() {
+    return Number(this.config.get<string>('UPLOADS_SIGNED_URL_TTL_SECONDS', '900'));
+  }
+
+  private getStorageKey(file: { storageKey?: string | null; path?: string | null }) {
+    return file.storageKey || file.path || '';
+  }
+
+  private async cleanupPreviousFiles(input: {
+    entityType: FileEntityType;
+    entityId: string;
+    kind: string;
+    keepFileId: string;
+  }) {
+    const older = await this.prisma.file.findMany({
+      where: {
+        entityType: input.entityType,
+        entityId: input.entityId,
+        kind: input.kind,
+        id: { not: input.keepFileId },
+      },
+      select: { id: true },
+    });
+
+    for (const file of older) {
+      await this.deleteFileRecord(file.id);
+    }
+  }
+
+  private async deleteFileRecord(fileId: string) {
+    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+    if (!file) return;
+
+    const key = this.getStorageKey(file);
+    if (key) {
+      await this.storage.delete(key).catch((error) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to delete storage object ${key}: ${msg}`);
+      });
+    }
+
+    await this.prisma.file.delete({ where: { id: file.id } });
   }
 
   private sign(fileId: string, exp: number) {

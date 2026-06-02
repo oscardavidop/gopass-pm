@@ -27,7 +27,7 @@ export function ProjectsPage() {
 
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data, isLoading } = useProjects({ search: debouncedSearch || undefined, status: statusFilter || undefined });
+  const { data, isLoading, refetch: loadProjects, isRefetching } = useProjects({ search: debouncedSearch || undefined, status: statusFilter || undefined });
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
@@ -93,7 +93,8 @@ export function ProjectsPage() {
     if (!deletingProject) return;
     await deleteProject.mutateAsync(deletingProject.id);
     setDeletingProject(null);
-  }, [deletingProject, deleteProject]);
+    loadProjects();
+  }, [deletingProject, deleteProject, loadProjects]);
 
   const openEdit = useCallback((project: Project) => {
     setEditingProject(project);
@@ -121,7 +122,7 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t('projects.title', { defaultValue: 'Projects' })}</h1>
           <div className="text-muted-foreground text-sm mt-0.5">
-            {isLoading ? (
+            {isLoading || isRefetching ? (
               <Skeleton className="h-3.5 w-24 inline-block" />
             ) : (
               t('projects.count', { defaultValue: '{{count}} projects', count: data?.meta.total ?? 0 })
@@ -251,7 +252,7 @@ export function ProjectsPage() {
       </div>
 
       {/* Content */}
-      {isLoading ? (
+      {isLoading || isRefetching ? (
         <div className={view === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'flex flex-col gap-2'}>
           {Array.from({ length: view === 'grid' ? 6 : 5 }).map((_, i) => (
             view === 'grid' ? (
@@ -297,7 +298,7 @@ export function ProjectsPage() {
           }
         />
       ) : (
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="popLayout" >
           <div
             className={
               view === 'grid'
@@ -315,7 +316,7 @@ export function ProjectsPage() {
               />
             ))}
           </div>
-        </AnimatePresence>
+         </AnimatePresence>
       )}
 
       {/* Project drawer */}

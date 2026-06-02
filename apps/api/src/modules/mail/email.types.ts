@@ -170,6 +170,7 @@ export interface SendWelcomeEmailInput {
   to: string;
   userId?: string;
   locale?: string | null;
+  dashboardUrl: string;
   userName?: string | null;
   appUrl: string;
   supportEmail: string;

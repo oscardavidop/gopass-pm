@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
-import { ProjectRole, Role, TaskStatus } from '@prisma/client';
+import { FileEntityType, ProjectRole, Role, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { EmailService } from '../mail/email.service';
@@ -21,6 +21,7 @@ import { CacheManager } from '../../shared/redis/cache.manager';
 import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
 import { CacheKeys } from '../../shared/redis/cache-keys';
 import { WebhookDispatchService } from '../developers/webhook-dispatch.service';
+import { UploadsService } from '../uploads/uploads.service';
 
 @Injectable()
 export class TasksService {
@@ -35,6 +36,7 @@ export class TasksService {
     private readonly cacheManager: CacheManager,
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly webhookDispatch: WebhookDispatchService,
+    private readonly uploadsService: UploadsService,
   ) { }
 
   async create(projectId: string, dto: CreateTaskDto, userId: string, userRole: Role = Role.USER) {
@@ -501,6 +503,8 @@ export class TasksService {
       data: { deletedAt: new Date() },
     });
 
+    await this.uploadsService.deleteFilesForTaskTree(id);
+
     const actor = await this.getActorSnapshot(userId);
     this.events.emitTaskDeleted(task.projectId, id, {
       actor,
@@ -624,6 +628,8 @@ export class TasksService {
       where: { id: commentId },
       data: { deletedAt: new Date() },
     });
+
+    await this.uploadsService.deleteFilesForEntity(FileEntityType.COMMENT, commentId);
 
     const relatedTask = await this.prisma.task.findFirst({ where: { comments: { some: { id: commentId } } }, select: { id: true, projectId: true, assigneeId: true } });
     if (relatedTask) {

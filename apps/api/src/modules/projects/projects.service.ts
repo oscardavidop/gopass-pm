@@ -1,14 +1,14 @@
 import {
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { createHash, createHmac } from 'crypto';
-import { FileEntityType, ProjectInvitationStatus, ProjectRole, Role } from '@prisma/client';
+import { createHash } from 'crypto';
+import { FileEntityType, FileVisibility, ProjectInvitationStatus, ProjectRole, Role } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -21,6 +21,7 @@ import { CacheManager } from '../../shared/redis/cache.manager';
 import { CacheInvalidationService } from '../../shared/redis/cache-invalidation.service';
 import { CacheKeys } from '../../shared/redis/cache-keys';
 import { WebhookDispatchService } from '../developers/webhook-dispatch.service';
+import { UploadsService } from '../uploads/uploads.service';
 
 @Injectable()
 export class ProjectsService {
@@ -34,6 +35,7 @@ export class ProjectsService {
     private readonly cacheManager: CacheManager,
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly webhookDispatch: WebhookDispatchService,
+    private readonly uploadsService: UploadsService,
   ) { }
 
   async create(dto: CreateProjectDto, userId: string) {
@@ -99,7 +101,18 @@ export class ProjectsService {
         .map((member) => [member.userId, member]),
     ).values());
 
+    // check if members exist and gather their data for notifications before creating any project members, so we don't end up in a half-baked state if one of the userIds is invalid
+    const existingUsers = await this.prisma.user.findMany({
+      where: { id: { in: uniqueMembers.map((m) => m.userId) } },
+      select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
+    });
+
+    const existingUserIds = new Set(existingUsers.map((u) => u.id));
+
     for (const member of uniqueMembers) {
+      if (!existingUserIds.has(member.userId)) {
+        throw new BadRequestException(`User with ID ${member.userId} not found`);
+      }
       const role = (member.role as ProjectRole | undefined) ?? ProjectRole.MEMBER;
       const added = await this.prisma.projectMember.upsert({
         where: { projectId_userId: { projectId: created.id, userId: member.userId } },
@@ -140,7 +153,7 @@ export class ProjectsService {
     const listHash = createHash('sha1').update(JSON.stringify({ userId, userRole, search, status, page, limit, sortBy, order })).digest('hex').slice(0, 16);
 
     return this.cacheManager.remember({
-      key: CacheKeys.searchProjects(listHash),
+      key: CacheKeys.searchProjects(listHash, userId),
       ttlSeconds: ttl,
       loader: async () => {
         const where: any = {
@@ -291,6 +304,8 @@ export class ProjectsService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    await this.uploadsService.deleteFilesForProjectTree(id);
 
     const actor = await this.getActorSnapshot(userId);
     const projectName = project.name;
@@ -792,8 +807,8 @@ export class ProjectsService {
     return this.decorateProjectWithBranding(updated);
   }
 
-  private async invalidateProjectCaches(projectId: string, userId?: string) {
-    await this.cacheInvalidation.invalidateProject(projectId);
+  private async invalidateProjectCaches(projectId: string, userId: string) {
+    await this.cacheInvalidation.invalidateProject(projectId, userId);
     await this.cacheInvalidation.invalidateDashboard();
     if (userId) {
       await this.cacheInvalidation.invalidateUser(userId);
@@ -846,7 +861,7 @@ export class ProjectsService {
         entityId: { in: projectIds },
         kind: { in: ['icon', 'banner', 'cover'] },
       },
-      select: { id: true, entityId: true, kind: true, createdAt: true },
+      select: { id: true, entityId: true, kind: true, createdAt: true, visibility: true, publicUrl: true, url: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -857,30 +872,18 @@ export class ProjectsService {
         brandingMap.set(file.entityId, { iconUrl: null, bannerUrl: null, coverUrl: null });
       }
       const target = brandingMap.get(file.entityId)!;
-      if (file.kind === 'icon' && !target.iconUrl) target.iconUrl = this.buildSignedFileUrl(file.id, 60 * 60 * 24);
-      if (file.kind === 'banner' && !target.bannerUrl) target.bannerUrl = this.buildSignedFileUrl(file.id, 60 * 60 * 24);
-      if (file.kind === 'cover' && !target.coverUrl) target.coverUrl = this.buildSignedFileUrl(file.id, 60 * 60 * 24);
+      const accessUrl = file.visibility === FileVisibility.PUBLIC
+        ? (file.publicUrl || file.url)
+        : file.url;
+      if (file.kind === 'icon' && !target.iconUrl) target.iconUrl = accessUrl;
+      if (file.kind === 'banner' && !target.bannerUrl) target.bannerUrl = accessUrl;
+      if (file.kind === 'cover' && !target.coverUrl) target.coverUrl = accessUrl;
     }
 
     return projects.map((project) => ({
       ...project,
       branding: brandingMap.get(project.id) ?? { iconUrl: null, bannerUrl: null, coverUrl: null },
     }));
-  }
-
-  private buildSignedFileUrl(fileId: string, ttlSeconds: number) {
-    const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-    const sig = this.signFileUrl(fileId, exp);
-    const prefix = this.config.get<string>('API_PREFIX', 'api/v1').replace(/^\/+|\/+$/g, '');
-    return `/${prefix}/files/${fileId}?exp=${exp}&sig=${sig}`;
-  }
-
-  private signFileUrl(fileId: string, exp: number) {
-    const secret = this.config.get<string>('UPLOADS_SIGNING_SECRET') || this.config.get<string>('JWT_ACCESS_SECRET');
-    if (!secret || secret.includes('change_me') || secret === 'change-me') {
-      throw new InternalServerErrorException('File signing secret is not configured');
-    }
-    return createHmac('sha256', secret).update(`${fileId}:${exp}`).digest('hex');
   }
 
   private parseNotificationPrefs(raw: unknown) {

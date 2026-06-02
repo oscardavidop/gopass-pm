@@ -513,11 +513,13 @@ export class AuthService {
     });
 
     const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+    const dashboardUrl = this.config.get<string>('DASHBOARD_URL', 'http://localhost:3000/dashboard');
     await this.email.sendWelcomeEmail({
       to: record.user.email,
       userId: record.user.id,
       userName: record.user.firstName,
       appUrl,
+      dashboardUrl,
       supportEmail: this.config.get<string>('SUPPORT_EMAIL', 'support@tasku.pro'),
       year: new Date().getFullYear().toString(),
       companyName: this.config.get<string>('COMPANY_NAME', 'Tasku'),

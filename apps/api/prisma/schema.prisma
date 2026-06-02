@@ -76,6 +76,19 @@ enum FileEntityType {
   COMMENT
 }
 
+enum FileVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum FileProvider {
+  S3
+  R2
+  MINIO
+  AZURE
+  LOCAL
+}
+
 enum ApiKeyStatus {
   ACTIVE
   REVOKED
@@ -436,21 +449,33 @@ model EmailPreview {
 }
 
 model File {
-  id         String         @id @default(uuid())
-  url        String
-  path       String
-  filename   String
-  mimeType   String         @map("mime_type")
-  size       Int
-  entityType FileEntityType @map("entity_type")
-  entityId   String         @map("entity_id")
-  uploadedBy String         @map("uploaded_by")
-  kind       String?        @default("attachment")
-  createdAt  DateTime       @default(now()) @map("created_at")
+  id           String         @id @default(uuid())
+  url          String
+  path         String
+  filename     String
+  originalName String         @map("original_name")
+  storageKey   String         @map("storage_key")
+  bucket       String
+  mimeType     String         @map("mime_type")
+  size         Int
+  visibility   FileVisibility @default(PRIVATE)
+  provider     FileProvider   @default(S3)
+  publicUrl    String?        @map("public_url")
+  etag         String?
+  checksum     String?
+  entityType   FileEntityType @map("entity_type")
+  entityId     String         @map("entity_id")
+  uploadedBy   String         @map("uploaded_by")
+  kind         String?        @default("attachment")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
 
   uploader User @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
 
   @@index([entityType, entityId])
+  @@index([visibility])
+  @@index([provider])
+  @@index([storageKey])
   @@index([uploadedBy])
   @@index([createdAt])
   @@index([entityType, entityId, createdAt])

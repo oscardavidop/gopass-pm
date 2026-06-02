@@ -65,7 +65,7 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: (id: string) => projectsService.remove(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: projectKeys.all });
+      qc.invalidateQueries({ queryKey: projectKeys.all, exact: true });
       toast.success(translateByKey('project.deleted', undefined, 'Project deleted'));
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'project.deleteFailed', 'Failed to delete project')),
