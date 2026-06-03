@@ -12,3 +12,8 @@ coverage/
 .nyc_output/
 prisma/migrations/
 *.tsbuildinfo
+*.zip
+# AWS Configurations
+.aws/
+credentials
+config
