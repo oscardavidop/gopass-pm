@@ -1,60 +1,23 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-gopass_pm}
-      POSTGRES_USER: ${POSTGRES_USER:-gopass}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gopass_prod_secret}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gopass} -d ${POSTGRES_DB:-gopass_pm}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD:-tasku_redis_secret}"'
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD:-tasku_redis_secret} ping | grep PONG"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  api:
+  api-prod:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - ${API_ENV_FILE:-./.env}
+      - ${API_ENV_FILE:-./.env.docker.prod}
     environment:
       NODE_ENV: production
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    ports:
-      - '${API_PORT:-3001}:${API_PORT:-3001}'
-    volumes:
-      - uploads_data:/app/storage/uploads
+    network_mode: "host"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "prefix=\"$${API_PREFIX:-api/v1}\"; prefix=\"$${prefix#/}\"; wget -qO- http://127.0.0.1:$${API_PORT:-3001}/$${prefix}/health || exit 1",
+          "prefix=\"$${API_PREFIX:-api/v1}\"; prefix=\"$${prefix#/}\"; wget -qO- http://127.0.0.1:$${API_PORT:-3002}/$${prefix}/health || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
-
-volumes:
-  postgres_data:
-  redis_data:
-  uploads_data:

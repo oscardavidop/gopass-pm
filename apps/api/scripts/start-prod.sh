@@ -1,5 +1,7 @@
 #!/bin/sh
-set -eu
+set -eu 
 
 ./node_modules/.bin/prisma migrate deploy
-exec node dist/main.js
+
+set +e
+exec node dist/src/main.js

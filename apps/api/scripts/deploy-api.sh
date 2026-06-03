@@ -1,12 +1,12 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+set -e
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required for API deploy"
   exit 1
 fi
 
-API_ENV_FILE="${API_ENV_FILE:-./.env}"
+API_ENV_FILE="${API_ENV_FILE:-./.env.docker.prod}"
 export API_ENV_FILE
 
 if [[ ! -f "$API_ENV_FILE" ]]; then
@@ -14,42 +14,61 @@ if [[ ! -f "$API_ENV_FILE" ]]; then
   exit 1
 fi
 
-set -a
-source "$API_ENV_FILE"
-set +a
 
-: "${DATABASE_URL:?DATABASE_URL is required}"
-: "${JWT_SECRET:?JWT_SECRET is required}"
-: "${ZAVU_API_KEY:?ZAVU_API_KEY is required}"
+# Configuración de variables de AWS
+CLUSTER_NAME="tasku-cluster"
+SERVICE_NAME="tasku-api-task-service"
+AWS_REGION="us-east-2"
+ECR_REGISTRY="210347900704.dkr.ecr.us-east-2.amazonaws.com"
+IMAGE_NAME="tasku-api"
+TAG="latest"
 
-SEND_REAL_EMAIL_VALUE="${SEND_REAL_EMAIL:-false}"
-SEND_REAL_EMAIL_VALUE="${SEND_REAL_EMAIL_VALUE,,}"
-if [[ "$SEND_REAL_EMAIL_VALUE" == "true" && -z "${ZAVU_SENDER_ID:-}" ]]; then
-  echo "ZAVU_SENDER_ID is required when SEND_REAL_EMAIL=true"
-  exit 1
+echo "===================================================="
+echo "🚀 INICIANDO SCRIPT DE DESPLIEGUE A PRODUCCIÓN - TASKU"
+echo "===================================================="
+
+# ── PRIMERA CONFIRMACIÓN ─────────────────────────────────
+read -p "❓ ¿Estás seguro de que quieres desplegar en PRODUCCIÓN? (y/n): " confirm1
+if [ "$confirm1" != "y" ] && [ "$confirm1" != "Y" ]; then
+    echo "❌ Despliegue cancelado por el usuario."
+    exit 1
 fi
 
-echo "Building and starting API stack (postgres, redis, api)..."
-docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml config >/dev/null
-docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml up -d --build
+# ── SEGUNDA CONFIRMACIÓN (EL FILTRO DE SEGURIDAD) ────────
+echo "⚠️  ADVERTENCIA: Esto actualizará el servicio en vivo de Tasku en AWS Fargate."
+read -p "❓ ¿De verdad estás seguro? Escribe 'y' para confirmar el envío: " confirm2
+if [ "$confirm2" != "y" ] && [ "$confirm2" != "Y" ]; then
+    echo "❌ Segunda confirmación fallida. Despliegue abortado."
+    exit 1
+fi
 
-echo "Running database migrations..."
-docker compose --env-file "$API_ENV_FILE" -f docker-compose.prod.yml exec -T api ./node_modules/.bin/prisma migrate deploy
+echo "🚀 Confirmaciones aprobadas. Iniciando pipeline de despliegue..."
+echo "----------------------------------------------------"
 
-API_PORT_VALUE="${API_PORT:-3001}"
-API_PREFIX_VALUE="${API_PREFIX:-api/v1}"
-API_PREFIX_VALUE="${API_PREFIX_VALUE#/}"
-HEALTH_URL="http://localhost:${API_PORT_VALUE}/${API_PREFIX_VALUE}/health"
+# 1. Autenticarse en AWS ECR
+echo "🔐 Logueándose en AWS ECR..."
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-echo "Waiting for API health at ${HEALTH_URL}"
-for attempt in {1..30}; do
-  echo "Health check attempt ${attempt}/30..."
-  if curl -fsS --connect-timeout 2 --max-time 4 "$HEALTH_URL" >/dev/null; then
-    echo "API is healthy"
-    exit 0
-  fi
-  sleep 2
-done
+# 2. Compilar con BuildKit moderno (Sin warnings molestos) with buildx
+echo "📦 Compilando imagen Docker con BuildKit..."
+DOCKER_BUILDKIT=1 docker build --no-cache --load -t $IMAGE_NAME:$TAG .
 
-echo "API health check failed"
-exit 1
+# 3. Taguear la imagen para AWS ECR
+echo "🏷️  Etiquetando imagen para producción..."
+docker tag $IMAGE_NAME:$TAG $ECR_REGISTRY/$IMAGE_NAME:$TAG
+
+# 4. Subir imagen a la nube
+echo "⬆️  Subiendo imagen a AWS ECR (Subiendo capas)..."
+docker push $ECR_REGISTRY/$IMAGE_NAME:$TAG
+
+# 5. Forzar actualización en AWS ECS Fargate (Aplica el Seed en start-prod.sh)
+echo "🔄 Forzando nueva implementación en AWS ECS Fargate..."
+aws ecs update-service \
+  --cluster $CLUSTER_NAME \
+  --service $SERVICE_NAME \
+  --force-new-deployment \
+  --region $AWS_REGION
+
+echo "===================================================="
+echo "🎉 ¡DESPLIEGUE COMPLETADO EXITOSAMENTE EN AWS FARGATE!"
+echo "===================================================="

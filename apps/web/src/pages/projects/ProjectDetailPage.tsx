@@ -548,7 +548,7 @@ export function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border/70 bg-card/50 p-1.5">
+      <div className="p-1.5">
         <div className="flex flex-wrap gap-1">
           {[
             { key: 'overview', label: t('project.tab.overview', { defaultValue: 'Overview' }), icon: LayoutGrid },

@@ -127,7 +127,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  const redisIoAdapter = new RedisIoAdapter(app, redisService);
+  const redisIoAdapter = new RedisIoAdapter(app, redisService, config);
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
 

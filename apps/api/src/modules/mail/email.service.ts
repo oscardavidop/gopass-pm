@@ -90,8 +90,6 @@ export class EmailService {
         templateVariables: semanticVariables,
       });
 
-      console.log(`Email sent: ${resolved.type} -> ${input.to} via ${providerResult.provider}`, resolved);
-
       const log = await this.prisma.emailLog.create({
         data: {
           userId: input.userId,

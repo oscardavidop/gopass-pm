@@ -1,10 +1,12 @@
 
 import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcryptjs';
-// uuid
 import { v4 as uuidv4 } from 'uuid';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+});
 
 const notificationModel = (prisma as PrismaClient & {
   notification: {

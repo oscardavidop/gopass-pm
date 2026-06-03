@@ -20,6 +20,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { DevelopersModule } from './modules/developers/developers.module';
 import { ApiKeyUsageInterceptor } from './modules/developers/interceptors/api-key-usage.interceptor';
 import { validateEnv } from './config/env.validation';
+import { RedisService } from '@shared/redis/redis.service';
 
 @Module({
   imports: [
@@ -28,21 +29,22 @@ import { validateEnv } from './config/env.validation';
       envFilePath: ['.env.production', '.env'],
       validate: validateEnv,
     }),
+    ScheduleModule.forRoot(),
+    PrismaModule,
+    RedisModule,
     ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      imports: [RedisModule],
+      inject: [ConfigService, RedisService],
+      useFactory: (config: ConfigService, redisService: RedisService) => ({
         throttlers: [
           {
             ttl: Number(config.get<string>('THROTTLE_TTL', '60')) * 1000,
             limit: Number(config.get<string>('THROTTLE_LIMIT', '1000')),
           },
         ],
-        storage: new ThrottlerStorageRedisService(config.get<string>('REDIS_URL', 'redis://127.0.0.1:6379')),
+        storage: new ThrottlerStorageRedisService(redisService.getClient() as any),
       }),
     }),
-    ScheduleModule.forRoot(),
-    PrismaModule,
-    RedisModule,
     AuthModule,
     UsersModule,
     ProjectsModule,
